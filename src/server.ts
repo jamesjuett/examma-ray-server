@@ -10,6 +10,7 @@ import { users_router } from './routes/users';
 import { assert } from 'console';
 // import { exercises_router } from './routes/exercises';
 import path from 'path';
+import { grading_router } from './routes/grade';
 
 const app = express();
 
@@ -23,15 +24,16 @@ app.use('/api',
   passport.authenticate('jwt-bearer', { session: false })
 );
 
-app.use('/data',
+app.use('/exams',
   cookieParser(),
   passport.initialize(),
   passport.authenticate('jwt-cookie', { session: false }),
-  express.static("data")
+  express.static("exams")
 );
 
 // Regular API Routes
 app.use("/api/users", users_router);
+app.use("/api/grade", grading_router);
 // app.use("/api/projects", projects_router);
 // app.use("/api/courses", courses_router);
 // app.use("/api/exercises", exercises_router);

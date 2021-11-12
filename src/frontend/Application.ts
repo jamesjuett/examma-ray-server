@@ -1,5 +1,6 @@
 import Cookies from "js-cookie";
 import { Mutable } from "../util/util";
+import axios from 'axios';
 
 export type UserInfo = {
   id: number;
@@ -38,7 +39,8 @@ export class ExammaRayApplication {
   }
 
   private onLogin() {
-    $(".examma-ray-log-in-button").html(`<i class="bi bi-person-check-fill"> ${this.currentUser?.email}`);
+    $(".examma-ray-log-in-button").html(`<i class="bi bi-person-circle"></i> ${this.currentUser?.email}`);
+    $(".examma-ray-log-out-button").show();
   }
 
   public logout() {
@@ -53,7 +55,25 @@ export class ExammaRayApplication {
     return Cookies.get('bearer');
   }
 
+  private setupEventHandlers() {
+    $(".examma-ray-log-out-button").on("click", () => this.logout());
+    $(".examma-ray-grade-button").on("click", async () => {
+      let response = await axios({
+        url: `api/grade`,
+        method: "POST",
+        data: {},
+        headers: {
+            'Authorization': 'bearer ' + this.getBearerToken()
+        }
+      });
+      alert(JSON.stringify(response.data));
+    })
+  }
+
   public start() {
+
+    this.setupEventHandlers();
+
     this.checkLogin();
   }
 
