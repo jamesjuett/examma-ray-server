@@ -11,28 +11,44 @@ import { assert } from 'console';
 // import { exercises_router } from './routes/exercises';
 import path from 'path';
 import { grading_router } from './routes/grade';
+import { ExammaRayGrader } from './ExammaRayGrader';
+import { readdirSync } from 'fs';
+import { ExamUtils } from "examma-ray/dist/ExamUtils";
+import { Exam } from "examma-ray";
+import { exams_router } from './routes/exams';
+
+export const EXAMMA_RAY_GRADER = new ExammaRayGrader(
+  readdirSync("data", "utf8").map(
+    exam_id => Exam.create(ExamUtils.loadExamSpecification(
+      path.join("data", exam_id, "exam-spec.json")
+    ))
+  )
+);
 
 const app = express();
 
-app.get('/',
-  (req,res) => res.send('Hi this is the Lobster REST API')
+// Requests to output files allow authentication via a bearer
+// token stored in a cookie. These routes are used ONLY to serve
+// files via GET requests. None of these routes perform any state
+// changing actions or have side effects, so CSRF (which cookie
+// authentication would allow) is not a big concern.
+app.use('/out',
+  cookieParser(),
+  passport.initialize(),
+  passport.authenticate('jwt-cookie', { session: false }),
+  express.static("out")
 );
 
-// ALL requests to the regular api require authentication
+// ALL requests to the api require authentication via a bearer
+// token in the request authorization header
 app.use('/api',
   passport.initialize(),
   passport.authenticate('jwt-bearer', { session: false })
 );
 
-app.use('/exams',
-  cookieParser(),
-  passport.initialize(),
-  passport.authenticate('jwt-cookie', { session: false }),
-  express.static("exams")
-);
-
 // Regular API Routes
 app.use("/api/users", users_router);
+app.use("/api/exams", exams_router);
 app.use("/api/grade", grading_router);
 // app.use("/api/projects", projects_router);
 // app.use("/api/courses", courses_router);

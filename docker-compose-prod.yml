@@ -24,7 +24,8 @@ services:
     ports:
       - '127.0.0.1:3000:3000'
     volumes:
-      - ./exams:/usr/src/app/exams
+      - ./data:/usr/src/app/data
+      - ./out:/usr/src/app/out
     networks:
         - http
         - db

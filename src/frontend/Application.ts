@@ -70,11 +70,21 @@ export class ExammaRayApplication {
     })
   }
 
-  public start() {
+  public async start() {
 
     this.setupEventHandlers();
 
     this.checkLogin();
+
+    let response = await axios({
+      url: `api/exams`,
+      method: "GET",
+      data: {},
+      headers: {
+          'Authorization': 'bearer ' + this.getBearerToken()
+      }
+    });
+    alert(JSON.stringify(response.data));
   }
 
 }

@@ -16,7 +16,7 @@ route {
         reverse_proxy examma-ray-server:3000
     }
 
-    route /exams/* {
+    route /out/* {
         reverse_proxy examma-ray-server:3000
     }
 
