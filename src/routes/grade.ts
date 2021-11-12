@@ -1,8 +1,10 @@
 import { Request, Response, Router } from "express";
 import { query } from "../db/db";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION } from "./common";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParam } from "./common";
 import { Worker } from "worker_threads";
-// const validateParamShortName = validateParam("short_name").trim().isLength({min: 1, max: 20});
+import { readFileSync } from "fs";
+import { EXAMMA_RAY_GRADER } from "../server";
+const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, max: 100});
 // const validateParamTerm = validateParam("term").isIn(["fall", "winter", "spring", "summer"]);
 // const validateParamYear = validateParam("year").isInt();
 
@@ -34,15 +36,15 @@ import { Worker } from "worker_threads";
 
 // }
 
-export const getCoursesRoute = createRoute({
-  preprocessing: NO_PREPROCESSING,
-  validation: NO_VALIDATION,
-  authorization: NO_AUTHORIZATION,
-  handler: async (req: Request, res: Response) => {
-    res.status(200);
-    res.json(await query("courses").select());
-  }
-});
+// export const getCoursesRoute = createRoute({
+//   preprocessing: NO_PREPROCESSING,
+//   validation: NO_VALIDATION,
+//   authorization: NO_AUTHORIZATION,
+//   handler: async (req: Request, res: Response) => {
+//     res.status(200);
+//     res.json(await query("courses").select());
+//   }
+// });
 
 
 // export const getCourseByIdRoute = createRoute({
@@ -90,25 +92,32 @@ export const getCoursesRoute = createRoute({
 
 export const grading_router = Router();
 grading_router
-  .post("/", createRoute({
+  .post("/:exam_id", createRoute({
     authorization: NO_AUTHORIZATION, // requireSuperUser,
-    preprocessing: jsonBodyParser,
+    preprocessing: NO_PREPROCESSING,
     validation: [
-      // validateBody("id").not().exists(),
-      // ...validateBodyCourse,
+      validateParamExamId
     ],
     handler: async (req: Request, res: Response) => {
-      process.chdir("exams");
-      const worker = new Worker("../build/run/grade.js")
-      process.chdir("..");
-      res.status(200).json("Testasdfasfas");
-      // let body = req.body;
-      // await query("courses").insert({
-      //   short_name: body.short_name!,
-      //   full_name: body.full_name!,
-      //   term: body.term!,
-      //   year: body.year!,
-      // });
-      // res.sendStatus(201);
+      const exam_spec = EXAMMA_RAY_GRADER.exam_specs_by_id[req.params["exam_id"]];
+      if (!exam_spec) {
+        res.sendStatus(404);
+        return;
+      }
+
+      const grader_spec = {
+        uuid_strategy: "uuidv5",
+        uuidv5_namespace: readFileSync(`data/${exam_spec?.exam_id}/secret`, "utf-8"),
+        frontend_js_path: "js/frontend-graded.js",
+      };
+
+      const worker = new Worker("./build/run/grade.js", {
+        workerData: {
+          exam_id: exam_spec.exam_id,
+          grader_spec: grader_spec
+        }
+      })
+      
+      res.status(200).json("Grading run started...");
     }
   }));

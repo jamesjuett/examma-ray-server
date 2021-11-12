@@ -1,6 +1,7 @@
 import Cookies from "js-cookie";
 import { Mutable } from "../util/util";
 import axios from 'axios';
+import { ExamSpecification, Section } from "examma-ray";
 
 export type UserInfo = {
   id: number;
@@ -56,35 +57,63 @@ export class ExammaRayApplication {
   }
 
   private setupEventHandlers() {
+    const self = this;
     $(".examma-ray-log-out-button").on("click", () => this.logout());
-    $(".examma-ray-grade-button").on("click", async () => {
-      let response = await axios({
-        url: `api/grade`,
-        method: "POST",
-        data: {},
-        headers: {
+  }
+
+  public async reloadExams() {
+    
+    if (this.currentUser) {
+      try {
+
+        let response = await axios({
+          url: `api/exams`,
+          method: "GET",
+          data: {},
+          headers: {
             'Authorization': 'bearer ' + this.getBearerToken()
-        }
-      });
-      alert(JSON.stringify(response.data));
-    })
+          }
+        });
+
+        response.data.forEach((exam_spec: Omit<ExamSpecification, "sections">) => {
+          const self = this;
+          const exam_id = exam_spec.exam_id;
+          $(".examma-ray-exams-list").append(`
+            <li>
+              <a href="out/${exam_id}/graded/overview.html">${exam_id}: ${exam_spec.title}</a>
+              <button class="btn btn-success examma-ray-run-grading-button" data-exam-id="${exam_id}">Run Grading</button>
+            </li>
+          `);
+          $(".examma-ray-run-grading-button").on("click", async function() {
+            let response = await axios({
+              url: `api/grade/${$(this).data("exam-id")}`,
+              method: "POST",
+              data: {},
+              headers: {
+                  'Authorization': 'bearer ' + self.getBearerToken()
+              }
+            });
+            alert(JSON.stringify(response.data));
+          });
+
+        });
+      }
+      catch (e: unknown) {
+        // no courses listed
+      }
+    }
+    else {
+      $(".examma-ray-exams-list").empty();
+    }
   }
 
   public async start() {
 
     this.setupEventHandlers();
 
-    this.checkLogin();
+    let user = await this.checkLogin();
 
-    let response = await axios({
-      url: `api/exams`,
-      method: "GET",
-      data: {},
-      headers: {
-          'Authorization': 'bearer ' + this.getBearerToken()
-      }
-    });
-    alert(JSON.stringify(response.data));
+    this.reloadExams();
   }
 
 }

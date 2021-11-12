@@ -19,9 +19,9 @@ import { exams_router } from './routes/exams';
 
 export const EXAMMA_RAY_GRADER = new ExammaRayGrader(
   readdirSync("data", "utf8").map(
-    exam_id => Exam.create(ExamUtils.loadExamSpecification(
+    exam_id => ExamUtils.loadExamSpecification(
       path.join("data", exam_id, "exam-spec.json")
-    ))
+    )
   )
 );
 
