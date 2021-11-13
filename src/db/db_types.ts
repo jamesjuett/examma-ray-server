@@ -1,4 +1,5 @@
 import { Knex } from "knex";
+import { ManualGradingRubricItemStatus } from "../manual_grading";
 
 declare module "knex/types/tables" {
 
@@ -50,7 +51,7 @@ declare module "knex/types/tables" {
   interface DB_Manual_Grading_Records {
     group_uuid: string;
     rubric_item_id: string;
-    status?: string;
+    status?: ManualGradingRubricItemStatus;
     // created_at: string; // timestamp
     // updated_at: string; // timestamp
   }

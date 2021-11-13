@@ -96,6 +96,7 @@ export class ExammaRayApplication {
             });
             alert(JSON.stringify(response.data));
           });
+
           $(".examma-ray-run-reports-button").on("click", async function() {
             let response = await axios({
               url: `run/reports/${$(this).data("exam-id")}`,
@@ -126,6 +127,16 @@ export class ExammaRayApplication {
     let user = await this.checkLogin();
 
     this.reloadExams();
+
+    let response = await axios({
+      url: `api/manual_grading/records/cstring_remove_corrupted_function`,
+      method: "GET",
+      data: {},
+      headers: {
+          'Authorization': 'bearer ' + this.getBearerToken()
+      }
+    });
+    console.log(JSON.stringify(response.data));
   }
 
 }
