@@ -9,6 +9,12 @@ declare module "knex/types/tables" {
     name: string;
   }
 
+  interface DB_Manual_Grading_Code_Grader_Config {
+    question_id: string;
+    test_harness: string;
+    grouping_function: string;
+  }
+
   interface DB_Manual_Grading_Rubrics {
     question_id: string;
     rubric_item_id: string;
@@ -23,16 +29,17 @@ declare module "knex/types/tables" {
   interface DB_Manual_Grading_Groups {
     group_uuid: string;
     question_id: string;
-    exam_id: string;
     finished: boolean;
     // grouper: string;
-    // grader: string;
+    grader: string;
     // created_at: string; // timestamp
     // updated_at: string; // timestamp
   }
 
   interface DB_Manual_Grading_Submissions {
     submission_uuid: string;
+    question_id: string;
+    exam_id: string;
     group_uuid: string;
     uniqname: string;
     submission: string;
@@ -53,6 +60,17 @@ declare module "knex/types/tables" {
   interface Tables {
     users: ExceptID<DB_Users>;
 
+    manual_grading_code_grader_config: Knex.CompositeTableType<
+      // Base Type
+      DB_Manual_Grading_Code_Grader_Config,
+      // Insert Type
+      //   All required, except active is optional (default true)
+      DB_Manual_Grading_Code_Grader_Config,
+      // Update Type
+      //   All optional except question_id may not be updated
+      Partial<Omit<DB_Manual_Grading_Code_Grader_Config, "question_id">> & {question_id?: undefined}
+    >;
+
     manual_grading_rubrics: Knex.CompositeTableType<
       // Base Type
       DB_Manual_Grading_Rubrics,
@@ -68,8 +86,8 @@ declare module "knex/types/tables" {
       // Base Type
       DB_Manual_Grading_Groups,
       // Insert Type
-      //   All required
-      DB_Manual_Grading_Groups,
+      //   All required, except grader is optional (nullable) and finished is optional (default false)
+      Omit<DB_Manual_Grading_Groups, "grader" | "finished"> & Partial<Pick<DB_Manual_Grading_Groups, "grader" | "finished">>,
       // Update Type
       //   Only allowed to update finished
       Partial<Pick<DB_Manual_Grading_Groups, "finished">> & Record<Exclude<keyof DB_Manual_Grading_Groups, "finished">, undefined>

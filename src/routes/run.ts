@@ -90,9 +90,8 @@ const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, ma
 //   }
 // });
 
-export const grading_router = Router();
-grading_router
-  .post("/:exam_id", createRoute({
+export function createGradeRoute(reports: boolean) {
+  return createRoute({
     authorization: NO_AUTHORIZATION, // requireSuperUser,
     preprocessing: NO_PREPROCESSING,
     validation: [
@@ -114,10 +113,20 @@ grading_router
       const worker = new Worker("./build/run/grade.js", {
         workerData: {
           exam_id: exam_spec.exam_id,
-          grader_spec: grader_spec
+          grader_spec: grader_spec,
+          reports: reports
         }
       })
       
-      res.status(200).json("Grading run started...");
+      res.status(200).json(reports ? "Report generation started..." : "Grading run started...");
     }
-  }));
+  })
+}
+
+export const run_router = Router();
+run_router
+  .route("/grade/:exam_id")
+    .post(createGradeRoute(false));
+run_router
+  .route("/reports/:exam_id")
+    .post(createGradeRoute(true));

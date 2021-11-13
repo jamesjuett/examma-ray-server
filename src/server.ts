@@ -10,7 +10,7 @@ import { users_router } from './routes/users';
 import { assert } from 'console';
 // import { exercises_router } from './routes/exercises';
 import path from 'path';
-import { grading_router } from './routes/grade';
+import { run_router } from './routes/run';
 import { ExammaRayGrader } from './ExammaRayGrader';
 import { readdirSync } from 'fs';
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
@@ -49,7 +49,16 @@ app.use('/api',
 // Regular API Routes
 app.use("/api/users", users_router);
 app.use("/api/exams", exams_router);
-app.use("/api/grade", grading_router);
+
+
+// Routes to run jobs, which require authentication via a bearer
+// token in the request authorization header
+app.use('/run',
+  passport.initialize(),
+  passport.authenticate('jwt-bearer', { session: false }),
+  run_router
+);
+
 // app.use("/api/projects", projects_router);
 // app.use("/api/courses", courses_router);
 // app.use("/api/exercises", exercises_router);

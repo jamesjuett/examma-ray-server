@@ -12,6 +12,14 @@ export async function up(knex: Knex): Promise<void> {
       table.index("email");
     })
 
+    .createTable("manual_grading_code_grader_config", table => {
+      table.string("question_id", 100).notNullable().primary();
+      table.text("test_harness").notNullable();
+      table.text("grouping_function").notNullable();
+
+      table.index("question_id");
+    })
+
     .createTable("manual_grading_rubrics", table => {
       table.string("question_id", 100).notNullable();
       table.string("rubric_item_id", 100).notNullable();
@@ -23,31 +31,34 @@ export async function up(knex: Knex): Promise<void> {
 
       table.primary(["question_id", "rubric_item_id"]);
 
-      table.index("question_id");
+      table.index(["question_id", "rubric_item_id"]);
     })
 
     .createTable("manual_grading_groups", table => {
       table.uuid("group_uuid").primary().notNullable(); // will be a uuidv4 for the grading group
       table.string("question_id", 100).notNullable();
-      table.string("exam_id", 100).notNullable();
+      table.boolean("finished").notNullable().defaultTo(false);
       // table.integer("grouper")
       //   .references("id").inTable("users").onDelete("restrict");
-      // table.integer("grader")
-      //   .references("id").inTable("users").onDelete("restrict");
+      table.integer("grader").nullable()
+        .references("id").inTable("users").onDelete("restrict");
       // table.timestamps(true, true);
 
-      // table.index("group_uuid");
-      // table.index("grader");
+      table.index("group_uuid");
+      table.index("grader");
     })
 
     .createTable("manual_grading_submissions", table => {
       table.uuid("submission_uuid").primary().notNullable();
+      table.string("question_id", 100).notNullable();
+      table.string("exam_id", 100).notNullable();
       table.uuid("group_uuid").notNullable()
         .references("group_uuid").inTable("manual_grading_groups").onDelete("set null");
       table.string("uniqname", 100).notNullable();
       table.text("submission").notNullable();
       // table.timestamps(true, true);
 
+      table.index("question_id");
       table.index("group_uuid");
       table.index("submission_uuid");
     })

@@ -4,6 +4,7 @@ module.exports = {
   mode: "production",
   entry: {
     'frontend': './src/frontend/frontend',
+    'manual-code-grader': './src/frontend/graders/manual-code-grader.ts',
   },
   output: {
     path: path.join(__dirname, '/public/js/'),

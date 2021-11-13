@@ -1,6 +1,6 @@
 // import minimist from "minimist";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
-import { ExamGrader } from "examma-ray/dist/ExamGrader";
+import { ExamGrader, ExamGraderOptions } from "examma-ray/dist/ExamGrader";
 import { ExamGenerator } from "examma-ray/dist/ExamGenerator";
 import { Exam } from "examma-ray";
 import { readFileSync, writeFileSync } from "fs";
@@ -10,14 +10,11 @@ import { workerData } from "worker_threads";
 
 // import { CURVE, EXAM_GRADER } from "../grader-spec";
 function main() {
-  const exam_id = workerData.exam_id;
-  const grader_spec = workerData.grader_spec;
+  const exam_id : string = workerData.exam_id;
+  const grader_spec : ExamGraderOptions = workerData.grader_spec;
+  const reports : boolean = workerData.reports;
 
-  let startTime = performance.now();
-  const spec = ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`);
-  console.log(`time: ${performance.now() - startTime} milliseconds`);
-  const EXAM = Exam.create(spec);
-  console.log(`time: ${performance.now() - startTime} milliseconds`);
+  const EXAM = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
 
   // const EXAM_GENERATOR_INDIVIDUAL = new ExamGenerator(EXAM, {
   //   uuid_strategy: "uuidv5",
@@ -54,9 +51,9 @@ function main() {
 
   EXAM_GRADER.writeAll();
   
-  // if (reports) {
-  //   EXAM_GRADER.writeReports();
-  // }
+  if (reports) {
+    EXAM_GRADER.writeReports();
+  }
   
 }
 

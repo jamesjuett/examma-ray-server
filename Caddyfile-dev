@@ -8,15 +8,15 @@ tls /root/certs/localhost.pem /root/certs/localhost-key.pem
 
 route {
 
+    route /auth/* {
+        reverse_proxy examma-ray-server:3000
+    }
+
     route /api/* {
         reverse_proxy examma-ray-server:3000
     }
 
-    route /public_api/* {
-        reverse_proxy examma-ray-server:3000
-    }
-
-    route /auth/* {
+    route /run/* {
         reverse_proxy examma-ray-server:3000
     }
 

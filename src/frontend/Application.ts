@@ -82,11 +82,23 @@ export class ExammaRayApplication {
             <li>
               <a href="out/${exam_id}/graded/overview.html">${exam_id}: ${exam_spec.title}</a>
               <button class="btn btn-success examma-ray-run-grading-button" data-exam-id="${exam_id}">Run Grading</button>
+              <button class="btn btn-success examma-ray-run-reports-button" data-exam-id="${exam_id}">Generate Grading Reports</button>
             </li>
           `);
           $(".examma-ray-run-grading-button").on("click", async function() {
             let response = await axios({
-              url: `api/grade/${$(this).data("exam-id")}`,
+              url: `run/grade/${$(this).data("exam-id")}`,
+              method: "POST",
+              data: {},
+              headers: {
+                  'Authorization': 'bearer ' + self.getBearerToken()
+              }
+            });
+            alert(JSON.stringify(response.data));
+          });
+          $(".examma-ray-run-reports-button").on("click", async function() {
+            let response = await axios({
+              url: `run/reports/${$(this).data("exam-id")}`,
               method: "POST",
               data: {},
               headers: {
