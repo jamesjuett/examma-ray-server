@@ -17,6 +17,7 @@ import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { Exam } from "examma-ray";
 import { exams_router } from './routes/exams';
 import { manual_grading_router } from './routes/manual_grading';
+import { questions_router } from './routes/questions';
 
 export const EXAMMA_RAY_GRADER = new ExammaRayGrader(
   readdirSync("data", "utf8").map(
@@ -50,6 +51,7 @@ app.use('/api',
 // Regular API Routes
 app.use("/api/users", users_router);
 app.use("/api/exams", exams_router);
+app.use("/api/questions", questions_router);
 app.use("/api/manual_grading", manual_grading_router);
 
 

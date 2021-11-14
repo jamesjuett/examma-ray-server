@@ -1,7 +1,7 @@
 import { ManualGradingGroupRecord, ManualGradingQuestionRecord, ManualGradingRubricItemStatus } from "../manual_grading";
 import { query } from "./db";
 
-export async function db_getManualGradingRubricById(question_id: string) {
+export async function db_getManualGradingRubric(question_id: string) {
   return await query("manual_grading_rubrics").where({question_id: question_id}).select();
 }
 
@@ -71,6 +71,7 @@ export async function db_getManualGradingRecords(question_id: string) {
   const group_records_by_id : {[index: string]: ManualGradingGroupRecord } = {};
   groups.forEach(g => {
     group_records_by_id[g.group_uuid] = {
+      group_uuid: g.group_uuid,
       grader: g.grader,
       submissions: [],
       grading_result: {}

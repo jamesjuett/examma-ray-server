@@ -98,8 +98,8 @@ exams_router
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
       res.status(200);
-      res.json(EXAMMA_RAY_GRADER.exam_specs.map(exam_spec => {
-        const {sections, ...rest} = exam_spec;
+      res.json(EXAMMA_RAY_GRADER.exams.map(exam => {
+        const {sections, ...rest} = exam.spec;
         return rest;
       }));
     }

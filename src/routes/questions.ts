@@ -2,9 +2,10 @@ import { Request, Response, Router } from "express";
 import { query } from "../db/db";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParam } from "./common";
 import { Worker } from "worker_threads";
-import { readFileSync } from "fs";
 import { EXAMMA_RAY_GRADER } from "../server";
+const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
 const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, max: 100});
+// const validateParamShortName = validateParam("short_name").trim().isLength({min: 1, max: 20});
 // const validateParamTerm = validateParam("term").isIn(["fall", "winter", "spring", "summer"]);
 // const validateParamYear = validateParam("year").isInt();
 
@@ -36,15 +37,6 @@ const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, ma
 
 // }
 
-// export const getCoursesRoute = createRoute({
-//   preprocessing: NO_PREPROCESSING,
-//   validation: NO_VALIDATION,
-//   authorization: NO_AUTHORIZATION,
-//   handler: async (req: Request, res: Response) => {
-//     res.status(200);
-//     res.json(await query("courses").select());
-//   }
-// });
 
 
 // export const getCourseByIdRoute = createRoute({
@@ -90,43 +82,19 @@ const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, ma
 //   }
 // });
 
-export function createGradeRoute(reports: boolean) {
-  return createRoute({
-    authorization: NO_AUTHORIZATION, // requireSuperUser,
+
+export const questions_router = Router();
+questions_router
+  .get("/:question_id", createRoute({
     preprocessing: NO_PREPROCESSING,
     validation: [
-      validateParamExamId
+      validateParamQuestionId
     ],
+    authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADER.exams_by_id[req.params["exam_id"]];
-      if (!exam) {
-        res.sendStatus(404);
-        return;
-      }
-
-      const grader_spec = {
-        uuid_strategy: "uuidv5",
-        uuidv5_namespace: readFileSync(`data/${exam?.exam_id}/secret`, "utf-8"),
-        frontend_js_path: "js/frontend-graded.js",
-      };
-
-      const worker = new Worker("./build/run/grade.js", {
-        workerData: {
-          exam_id: exam.exam_id,
-          grader_spec: grader_spec,
-          reports: reports
-        }
-      })
-      
-      res.status(200).json(reports ? "Report generation started..." : "Grading run started...");
+      res.status(200);
+      res.json(EXAMMA_RAY_GRADER.exams
+          .flatMap(exam => exam.allQuestions)
+          .find(q => q.question_id === req.params["question_id"])?.spec);
     }
-  })
-}
-
-export const run_router = Router();
-run_router
-  .route("/grade/:exam_id")
-    .post(createGradeRoute(false));
-run_router
-  .route("/reports/:exam_id")
-    .post(createGradeRoute(true));
+  }));

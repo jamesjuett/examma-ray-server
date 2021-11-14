@@ -1,4 +1,5 @@
-import { assertExists, dotenv_config, getDockerSecret } from "./util/util";
+import { dotenv_config, getDockerSecret } from "./util/backend_util";
+import { assertExists } from "./util/util";
 
 dotenv_config()
 

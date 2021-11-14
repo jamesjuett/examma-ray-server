@@ -10,13 +10,23 @@ export type ManualGradingSubmission = {
 
 export type ManualGradingRubricItemStatus = "on" | "off" | "unknown";
 
+export type ManualGradingRubricItem = {
+  rubric_item_id: string,
+  points: number,
+  title: string,
+  description: string,
+  active: boolean
+};
+
 export type ManualGradingResult = {
   [index: string]: ManualGradingRubricItemStatus | undefined
 };
 
 export type ManualGradingGroupRecord = {
   // name: string,
+  group_uuid: string,
   submissions: ManualGradingSubmission[],
+  finished?: boolean,
   grader?: string,
   grading_result: ManualGradingResult
 }
