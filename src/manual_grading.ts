@@ -37,3 +37,44 @@ export type ManualGradingQuestionRecord = {
   question_id: string,
   groups: ManualGradingGroupRecord[]
 };
+
+
+export type ManualGradingPingResponse = {
+
+  /**
+   * What question is this for?
+   */
+  question_id: string,
+
+  /**
+   * What version of groupings are we on?
+   */
+  group_epoch: string,
+
+  /**
+   * What version of the rubric are we on?
+   */
+  rubric_epoch: string,
+
+  /**
+   * Who has active browser tabs open on this question?
+   */
+  active_graders: ActiveGraders
+};
+
+export type ActiveGraders = {
+  [index: string]: {
+    graders: {
+      [index: string]: {
+        group_uuid?: string,
+        email: string
+      }
+    }
+  }
+};
+
+export type ManualGradingPingRequest = {
+  client_uuid: string,
+  question_id: string,
+  group_uuid?: string
+};

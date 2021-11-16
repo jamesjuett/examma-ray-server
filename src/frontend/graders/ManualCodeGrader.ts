@@ -21,16 +21,19 @@ import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
 
 import queryString from "query-string";
-import { ManualGradingGroupRecord, ManualGradingQuestionRecord, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSubmission } from "../../manual_grading";
+import { ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecord, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSubmission } from "../../manual_grading";
 import { asMutable, assert } from "../../util/util";
 import axios from "axios";
-import { ExammaRayApplication } from "../Application";
+import { ExammaGraderRayApplication } from "../Application";
+import avatar from "animal-avatar-generator";
 
 // Because this grader is based on Lobster, it only works for C++ code
 // Perhaps in the future it will be generalized to other languages and
 // have the option to just use a regular codemirror instance rather than
 // lobster.
 const CODE_LANGUAGE = "cpp";
+
+const ACTIVE_GRADER_AVATAR_SIZE = 30;
 
 
 // let response = await axios({
@@ -76,7 +79,7 @@ export const DEFAULT_EXTRACT_CODE = (raw_submission: string) => {
   return raw_submission;
 };
 
-export class ManualCodeGraderApp extends ExammaRayApplication {
+export class ManualCodeGraderApp extends ExammaGraderRayApplication {
 
   public readonly question?: Question;
   public readonly rubric?: readonly ManualGradingRubricItem[];
@@ -102,8 +105,6 @@ export class ManualCodeGraderApp extends ExammaRayApplication {
   private submissionsSortOrdering : SubmissionsSortOrdering = "asc";
   // private submissions
 
-  
-
   private SUBMISSION_SORTS : {
     [k in SubmissionsSortCriterion]: (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => number
   } = {
@@ -123,10 +124,34 @@ export class ManualCodeGraderApp extends ExammaRayApplication {
     this.groupMemberThumbnailsElem = $(".examma-ray-group-member-thumbnails");
 
     this.lobster = this.createLobster(spec);
+    // setInterval(() => this.saveGradingAssignment(), 10000);
+  }
 
-    this.updateControls();
+  protected composePingRequest() {
+    if (!this.question) {
+      return undefined; // no pings
+    }
 
-    setInterval(() => this.saveGradingAssignment(), 10000);
+    return {
+      client_uuid: this.client_uuid,
+      question_id: this.question.question_id,
+      group_uuid: this.currentGroup?.group_uuid
+    }
+  }
+
+  protected onPingResponse(pingResponse: ManualGradingPingResponse) {
+    if (!this.question) {
+      return;
+    }
+    let graders = pingResponse.active_graders[this.question.question_id].graders;
+    $(".examma-ray-active-graders").empty().html(
+      Object.values(graders).map(grader => grader.email).sort().map(
+        email => `<div style="display: inline-block;" data-toggle="tooltip" data-placement="bottom" title="${email}">
+          ${avatar(email, { size: ACTIVE_GRADER_AVATAR_SIZE })}
+        </div>`
+      ).join("")
+    );
+    $(".examma-ray-active-graders div").tooltip();
   }
 
   private setUpEventHandlers() {
@@ -166,10 +191,6 @@ export class ManualCodeGraderApp extends ExammaRayApplication {
         self.toggleGradingFinished();
     });
   
-  }
-
-  private updateControls() {
-    $(".examma-ray-grading-title").html(this.assn ? this.assn.question_id : "[No question selected]");
   }
 
   private createRubricBar(sub?: ManualGradingSubmission) {
@@ -218,33 +239,20 @@ export class ManualCodeGraderApp extends ExammaRayApplication {
   
   }
 
-  private closeGradingAssignment() {
-    
-    delete asMutable(this).assn;
-    this.clearGroupThumbnails();
+  private setGradingAssignment(records: ManualGradingQuestionRecord) {
     this.closeGroup();
 
+    delete asMutable(this).assn;
+    asMutable(this).assn = records;
+
+    this.updateGroupThumbnails();
   }
 
-  private setGradingAssignment(question: Question, rubric: readonly ManualGradingRubricItem[], assn: ManualGradingQuestionRecord) {
-    this.closeGradingAssignment();
+  private updateGroupThumbnails() {
 
-    asMutable(this).question = question;
-    asMutable(this).rubric = rubric;
-    asMutable(this).assn = assn;
-
-    this.updateControls();
-    this.createRubricBar();
-
-    this.createGroupThumbnails();
-  }
-
-  private clearGroupThumbnails() {
     $(".examma-ray-submissions-column").empty();
     this.thumbnailElems = {};
-  }
 
-  private createGroupThumbnails() {
     if (!this.assn) { return; }
     let groups = this.assn.groups
       .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
@@ -258,8 +266,7 @@ export class ManualCodeGraderApp extends ExammaRayApplication {
   }
 
   private refreshGroups() {
-    this.clearGroupThumbnails();
-    this.createGroupThumbnails();
+    this.updateGroupThumbnails();
     if (this.currentGroup) {
       $(".examma-ray-grading-group-name").html(this.currentGroup.group_uuid);
       $(".examma-ray-grading-group-num-members").html(""+this.currentGroup.submissions.length);
@@ -293,23 +300,22 @@ export class ManualCodeGraderApp extends ExammaRayApplication {
 
   public setSubmissionsFilterCriterion(criterion: SubmissionsFilterCriterion) {
     this.submissionsFilterCriterion = criterion;
-    this.clearGroupThumbnails();
-    this.createGroupThumbnails();
+    this.updateGroupThumbnails();
   }
 
   public setSubmissionsSortCriterion(criterion: SubmissionsSortCriterion) {
     this.submissionsSortCriteria = criterion;
-    this.clearGroupThumbnails();
-    this.createGroupThumbnails();
+    this.updateGroupThumbnails();
   }
 
   public setSubmissionsSortOrdering(ordering: SubmissionsSortOrdering) {
     this.submissionsSortOrdering = ordering;
-    this.clearGroupThumbnails();
-    this.createGroupThumbnails();
+    this.updateGroupThumbnails();
   }
 
   public async loadGradingAssignment(question_id: string) {
+  
+    // TODO: check for unsaved changes
 
     try {
 
@@ -343,11 +349,26 @@ export class ManualCodeGraderApp extends ExammaRayApplication {
       });
       const records = <ManualGradingQuestionRecord>records_response.data;
 
-      this.setGradingAssignment(question, rubric, records);
+      this.setQuestion(question);
+      this.setRubric(rubric);
+
+      this.setGradingAssignment(records);
+
+      this.sendPing();
     }
     catch(e: unknown) {
       alert("Error loading question :(");
     }
+  }
+
+  private setQuestion(question: Question) {
+    asMutable(this).question = question;
+    $(".examma-ray-grading-title").html(this.assn ? this.assn.question_id : "[No question selected]");
+  }
+
+  private setRubric(rubric: readonly ManualGradingRubricItem[]) {
+    asMutable(this).rubric = rubric;
+    this.createRubricBar();
   }
 
   public async saveGradingAssignment() {
@@ -482,7 +503,8 @@ export class ManualCodeGraderApp extends ExammaRayApplication {
       groups: equivalenceGroups
     };
 
-    this.setGradingAssignment(this.question, this.rubric, newAssn);
+    // TODO
+    // this.setGradingAssignment(this.question, this.rubric, newAssn);
 
     $("#examma-ray-grouping-progress-modal").modal("hide");
   }

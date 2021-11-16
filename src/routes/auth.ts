@@ -3,14 +3,14 @@ import passport from "passport";
 import { OAuth2Strategy as GoogleStrategy } from "passport-google-oauth";
 import { auth_config } from "../auth/config";
 import { generateJwt } from "../auth/jwt_auth";
-import { getOrCreateUser } from "../db/db_user";
+import { db_getOrCreateUser } from "../db/db_user";
 
 
 passport.use(new GoogleStrategy(
   auth_config.google,
   async (accessToken, refreshToken, profile, done) => {
     let email = profile.emails![0].value;
-    let user = await getOrCreateUser(email);
+    let user = await db_getOrCreateUser(email);
 
     if (!user) {
       // Error adding new user
@@ -18,7 +18,7 @@ passport.use(new GoogleStrategy(
     }
     
 
-    return done(null, {id: user.id});
+    return done(null, {email: user.email});
   }
 ));
 
@@ -31,7 +31,7 @@ auth_router
   .get("/google/callback",
     passport.authenticate("google", { session: false }),
     (req, res) => {
-      res.cookie("bearer", generateJwt((req.user as any).id), {
+      res.cookie("bearer", generateJwt((req.user as any).email), {
         secure: true
       });
       res.redirect(302, "/");

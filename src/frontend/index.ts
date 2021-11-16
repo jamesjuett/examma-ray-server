@@ -3,13 +3,13 @@
 
 import axios from "axios";
 import { ExamSpecification } from "examma-ray";
-import { ExammaRayApplication } from "./Application";
+import { IndexExammaRayGraderApplication } from "./Application";
 
 // import 'katex/dist/katex.min.css';
 
 function main() {
 
-  const app = new ExammaRayApplication();
+  const app = new IndexExammaRayGraderApplication();
   app.start();
   
   reloadExams(app);
@@ -25,7 +25,7 @@ else {
 
 
 
-async function reloadExams(app: ExammaRayApplication) {
+async function reloadExams(app: IndexExammaRayGraderApplication) {
     
   if (app.currentUser) {
     try {

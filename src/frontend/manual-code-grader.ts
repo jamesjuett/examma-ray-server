@@ -1,6 +1,6 @@
 import queryString from "query-string";
 import { assert } from "../util/util";
-import { ExammaRayApplication } from "./Application";
+import { ExammaGraderRayApplication } from "./Application";
 import { ManualCodeGraderApp } from "./graders/ManualCodeGrader";
 
 function main() {

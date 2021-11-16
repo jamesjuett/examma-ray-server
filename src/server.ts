@@ -11,7 +11,7 @@ import { assert } from 'console';
 // import { exercises_router } from './routes/exercises';
 import path from 'path';
 import { run_router } from './routes/run';
-import { ExammaRayGrader } from './ExammaRayGrader';
+import { ExammaRayGradingServer } from './ExammaRayGrader';
 import { readdirSync } from 'fs';
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { Exam } from "examma-ray";
@@ -19,7 +19,7 @@ import { exams_router } from './routes/exams';
 import { manual_grading_router } from './routes/manual_grading';
 import { questions_router } from './routes/questions';
 
-export const EXAMMA_RAY_GRADER = new ExammaRayGrader(
+export const EXAMMA_RAY_GRADER = new ExammaRayGradingServer(
   readdirSync("data", "utf8").map(
     exam_id => ExamUtils.loadExamSpecification(
       path.join("data", exam_id, "exam-spec.json")

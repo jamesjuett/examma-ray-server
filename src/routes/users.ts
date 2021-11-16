@@ -1,11 +1,7 @@
 import { Request, Response, Router } from "express";
 import { getJwtUserInfo } from "../auth/jwt_auth";
-import { query } from "../db/db";
+import { db_getUserByEmail } from "../db/db_user";
 import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION } from "./common";
-
-async function getUserById(id: number) {
-  return await query("users").where({ id: id }).select().first();
-}
 
 // NOTE: The lack of authorization on these routes is because they
 // operate on resources owned by the current user. Thus, the authentication
@@ -20,7 +16,7 @@ users_router.route("/me")
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
       let userInfo = getJwtUserInfo(req);
-      let user = await getUserById(userInfo.id);
+      let user = await db_getUserByEmail(userInfo.email);
       if (user) {
         res.status(200);
         res.json(user);

@@ -7,7 +7,7 @@ import { assert } from "console";
 
 
 export interface JwtUserInfo {
-  id: number;
+  email: string;
 };
 
 /**
@@ -21,25 +21,25 @@ export function getJwtUserInfo(req: Request) {
 
 passport.use("jwt-bearer", new passportJwt.Strategy(
   auth_config.jwt_bearer, (payload, done) => {
-    const user = {id: parseInt(payload.sub)};
+    const user = {email: payload.sub};
     return done(null, user, payload);
   }
 ));
 
 passport.use("jwt-cookie", new passportJwt.Strategy(
   auth_config.jwt_cookie, (payload, done) => {
-    const user = {id: parseInt(payload.sub)};
+    const user = {email: payload.sub};
     return done(null, user, payload);
   }
 ));
 
-export function generateJwt(user_id: number) {
+export function generateJwt(email: string) {
   return jsonwebtoken.sign(
     {}, // empty payload, all we need for now is user id as subject
     auth_config.jwt_bearer.secretOrKey,
     {
       // No expiration
-      subject: user_id.toString()
+      subject: email
     }
   );
 }

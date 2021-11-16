@@ -4,24 +4,22 @@ export async function up(knex: Knex): Promise<void> {
   return knex.schema
 
     .createTable("users", table => {
-      table.increments("id").primary();
-      table.string("email", 100).notNullable();
+      table.string("email", 100).primary().notNullable();
       table.string("name", 100).notNullable();
 
-      table.index("id");
       table.index("email");
     })
 
-    .createTable("manual_grading_code_grader_config", table => {
-      table.string("question_id", 100).notNullable().primary();
-      table.text("test_harness").notNullable();
-      table.text("grouping_function").notNullable();
+    .createTable("manual_grading_questions", table => {
+      table.string("question_id", 100).primary().notNullable();
+      table.uuid("epoch_uuid").notNullable();
 
       table.index("question_id");
     })
 
     .createTable("manual_grading_rubrics", table => {
-      table.string("question_id", 100).notNullable();
+      table.string("question_id", 100).notNullable()
+        .references("question_id").inTable("manual_grading_questions").onDelete("restrict");
       table.string("rubric_item_id", 100).notNullable();
       table.double("points");
       table.text("title");
@@ -36,7 +34,8 @@ export async function up(knex: Knex): Promise<void> {
 
     .createTable("manual_grading_groups", table => {
       table.uuid("group_uuid").primary().notNullable(); // will be a uuidv4 for the grading group
-      table.string("question_id", 100).notNullable();
+      table.string("question_id", 100).notNullable()
+        .references("question_id").inTable("manual_grading_questions").onDelete("restrict");
       table.boolean("finished").notNullable().defaultTo(false);
       // table.integer("grouper")
       //   .references("id").inTable("users").onDelete("restrict");
@@ -50,7 +49,8 @@ export async function up(knex: Knex): Promise<void> {
 
     .createTable("manual_grading_submissions", table => {
       table.uuid("submission_uuid").primary().notNullable();
-      table.string("question_id", 100).notNullable();
+      table.string("question_id", 100).notNullable()
+        .references("question_id").inTable("manual_grading_questions").onDelete("restrict");
       table.string("exam_id", 100).notNullable();
       table.uuid("group_uuid").notNullable()
         .references("group_uuid").inTable("manual_grading_groups").onDelete("set null");
@@ -75,6 +75,15 @@ export async function up(knex: Knex): Promise<void> {
       table.index("group_uuid");
       table.index("rubric_item_id");
       table.index(["group_uuid", "rubric_item_id"]);
+    })
+
+    .createTable("manual_grading_code_grader_config", table => {
+      table.string("question_id", 100).notNullable().primary()
+        .references("question_id").inTable("manual_grading_questions").onDelete("restrict");
+      table.text("test_harness").notNullable();
+      table.text("grouping_function").notNullable();
+
+      table.index("question_id");
     })
 
 }

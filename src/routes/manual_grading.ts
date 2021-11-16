@@ -1,12 +1,15 @@
 import { Request, Response, Router } from "express";
 import { query } from "../db/db";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParam } from "./common";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam } from "./common";
 import { Worker } from "worker_threads";
 import { readFileSync } from "fs";
 import { EXAMMA_RAY_GRADER } from "../server";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
-import { ManualGradingRubricItem } from "../manual_grading";
+import { ManualGradingPingRequest, ManualGradingRubricItem } from "../manual_grading";
+import { getJwtUserInfo } from "../auth/jwt_auth";
 const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
+const validateBodyQuestionId = validateBody("question_id").trim().isLength({min: 1, max: 100});
+const validateBodyGroupId = validateBody("group_id").trim().isLength({min: 1, max: 100});
 // const validateParamTerm = validateParam("term").isIn(["fall", "winter", "spring", "summer"]);
 // const validateParamYear = validateParam("year").isInt();
 
@@ -118,5 +121,21 @@ manual_grading_router
       handler: async (req: Request, res: Response) => {
         const result: ManualGradingRubricItem[]  = await db_getManualGradingRubric(req.params["question_id"])
         res.status(200).json(result);
+      }
+    }));
+manual_grading_router
+  .route("/ping")
+    .post(createRoute({
+      authorization: NO_AUTHORIZATION, // requireSuperUser,
+      preprocessing: jsonBodyParser,
+      validation: [
+        validateBodyQuestionId,
+        validateBodyGroupId.optional()
+      ],
+      handler: async (req: Request, res: Response) => {
+        let userInfo = getJwtUserInfo(req);
+        let pr = <ManualGradingPingRequest>req.body;
+        EXAMMA_RAY_GRADER.receivePing(userInfo.email, pr);
+        res.status(200).json(EXAMMA_RAY_GRADER.pingResponse(pr.question_id));
       }
     }));

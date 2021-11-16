@@ -2,6 +2,8 @@ import Cookies from "js-cookie";
 import { Mutable } from "../util/util";
 import axios from 'axios';
 import { ExamSpecification, Section } from "examma-ray";
+import { ManualGradingPingRequest, ManualGradingPingResponse } from "../manual_grading";
+import { v4 as uuidv4 } from "uuid";
 
 export type UserInfo = {
   id: number;
@@ -9,9 +11,15 @@ export type UserInfo = {
   name: string;
 };
 
-export class ExammaRayApplication {
+export abstract class ExammaGraderRayApplication {
 
   public readonly currentUser?: UserInfo;
+
+  public readonly client_uuid: string;
+
+  public constructor() {
+    this.client_uuid = uuidv4();
+  }
 
   private async checkLogin() {
     if (Cookies.get("bearer")) {
@@ -66,10 +74,44 @@ export class ExammaRayApplication {
 
     this.setupEventHandlers();
 
-    let user = await this.checkLogin();
+    await this.checkLogin();
 
+    this.sendPing();
+    setInterval(() => this.sendPing(), 5000);
 
+  }
+
+  protected async sendPing() {
+
+    const pingRequest = this.composePingRequest();
+
+    if (!pingRequest) {
+      return;
+    }
+
+    const ping_response = await axios({
+      url: `api/manual_grading/ping`,
+      method: "POST",
+      data: pingRequest,
+      headers: {
+          'Authorization': 'bearer ' + this.getBearerToken()
+      }
+    });
+    this.onPingResponse(<ManualGradingPingResponse>ping_response.data);
+    
+  }
+
+  protected abstract composePingRequest() : ManualGradingPingRequest | undefined;
+
+  protected onPingResponse(pingResponse: ManualGradingPingResponse) {
+    // do nothing, derived classes can override
   }
 
 }
 
+
+export class IndexExammaRayGraderApplication extends ExammaGraderRayApplication {
+  protected composePingRequest() {
+    return undefined; // no pings
+  }
+}

@@ -1,6 +1,6 @@
 import { firstResult, query } from "./db";
 
-export async function getOrCreateUser(email: string) {
+export async function db_getOrCreateUser(email: string) {
   let user = await query("users")
     .where({email: email})
     .select().first();
@@ -15,4 +15,12 @@ export async function getOrCreateUser(email: string) {
   }
 
   return user;
+}
+
+
+
+export async function db_getUserByEmail(email: string) {
+  return await query("users")
+    .where({email: email})
+    .select().first();
 }
