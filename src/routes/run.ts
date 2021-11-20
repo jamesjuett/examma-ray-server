@@ -116,7 +116,7 @@ export function createGradeRoute(reports: boolean) {
           grader_spec: grader_spec,
           reports: reports
         }
-      })
+      });
       
       res.status(200).json(reports ? "Report generation started..." : "Grading run started...");
     }

@@ -10,6 +10,17 @@ export async function up(knex: Knex): Promise<void> {
       table.index("email");
     })
 
+    .createTable("submissions_list", table => {
+      table.uuid("uuid").primary().notNullable();
+      table.string("exam_id", 100).notNullable();
+      table.string("uniqname", 100).notNullable();
+      table.string("name", 200).notNullable();
+
+      table.index("uuid");
+      table.index("exam_id");
+      table.index("uniqname");
+    })
+
     .createTable("manual_grading_questions", table => {
       table.string("question_id", 100).primary().notNullable();
       table.uuid("epoch_uuid").notNullable();
@@ -39,8 +50,8 @@ export async function up(knex: Knex): Promise<void> {
       table.boolean("finished").notNullable().defaultTo(false);
       // table.integer("grouper")
       //   .references("id").inTable("users").onDelete("restrict");
-      table.integer("grader").nullable()
-        .references("id").inTable("users").onDelete("restrict");
+      table.string("grader", 100).nullable()
+        .references("email").inTable("users").onDelete("restrict");
       // table.timestamps(true, true);
 
       table.index("group_uuid");
@@ -91,10 +102,13 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
   return knex.schema
+    .dropTable("manual_grading_code_grader_config")
     .dropTable("manual_grading_records")
     .dropTable("manual_grading_submissions")
     .dropTable("manual_grading_groups")
     .dropTable("manual_grading_rubrics")
-    .dropTable("users");
+    .dropTable("manual_grading_questions")
+    .dropTable("submissions_list")
+    .dropTable("users")
 }
 

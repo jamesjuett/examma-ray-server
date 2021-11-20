@@ -10,6 +10,13 @@ declare module "knex/types/tables" {
     name: string;
   }
 
+  interface DB_Submissions_List {
+    uuid: string;
+    exam_id: string;
+    uniqname: string;
+    name: string;
+  }
+
   interface DB_Manual_Grading_Code_Grader_Config {
     question_id: string;
     test_harness: string;
@@ -61,11 +68,22 @@ declare module "knex/types/tables" {
   interface Tables {
     users: ExceptID<DB_Users>;
 
+    submissions_list: Knex.CompositeTableType<
+      // Base Type
+      DB_Submissions_List,
+      // Insert Type
+      //   All required
+      DB_Submissions_List,
+      // Update Type
+      //   Doesn't make sense to update (you should be using insert/delete)
+      never
+    >;
+
     manual_grading_code_grader_config: Knex.CompositeTableType<
       // Base Type
       DB_Manual_Grading_Code_Grader_Config,
       // Insert Type
-      //   All required, except active is optional (default true)
+      //   All required
       DB_Manual_Grading_Code_Grader_Config,
       // Update Type
       //   All optional except question_id may not be updated

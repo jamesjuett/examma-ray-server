@@ -1,94 +1,31 @@
-import { Request, Response, Router } from "express";
-import { query } from "../db/db";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION } from "./common";
-import { Worker } from "worker_threads";
+import { NextFunction, Request, Response, Router } from "express";
+import { db_getSubmissionsList } from "../db/db_exams";
 import { EXAMMA_RAY_GRADER } from "../server";
-// const validateParamShortName = validateParam("short_name").trim().isLength({min: 1, max: 20});
-// const validateParamTerm = validateParam("term").isIn(["fall", "winter", "spring", "summer"]);
-// const validateParamYear = validateParam("year").isInt();
+import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParamExammaRayId } from "./common";
+import multer from "multer"
+import { Worker } from "worker_threads";
 
-// const validateBodyShortName = validateBody("short_name").trim().isLength({min: 1, max: 20});
-// const validateBodyFullName = validateBody("full_name").trim().isLength({min: 1, max: 100});
-// const validateBodyTerm = validateBody("term").isIn(["fall", "winter", "spring", "summer"]);
-// const validateBodyYear = validateBody("year").isInt();
+// const upload = multer({
+//   storage: multer.diskStorage({
+//     destination: (req, file, callback) => {
+//       const exam_id = req.params["exam_id"];
+//       callback(null, `data/${exam_id}/submissions`);
+//     },
+    
+//     filename: (req, file, callback) => {
+//       callback(null, file.originalname);
+//     }
+//   }),
+// });
 
-// const validateBodyCourse = [
-//   validateBodyShortName,
-//   validateBodyFullName,
-//   validateBodyTerm,
-//   validateBodyYear
-// ];
-
-
-
-// async function requireCourseAdmin(req: Request, res: Response, next: NextFunction) {
-//   let user_id = getJwtUserInfo(req).id;
-//   let course_id = parseInt(req.params["id"]);
-
-//   if (await isCourseAdmin(user_id, course_id)) {
-//     return next();
-//   }
-//   else {
-//     // Not authorized
-//     res.sendStatus(403);
-//   }
-
-// }
-
-export const getCoursesRoute = createRoute({
-  preprocessing: NO_PREPROCESSING,
-  validation: NO_VALIDATION,
-  authorization: NO_AUTHORIZATION,
-  handler: async (req: Request, res: Response) => {
-    res.status(200);
-    res.json(await query("courses").select());
+const upload = multer({
+  dest: "uploads/",
+  limits: {
+    fieldNameSize: 1000,
+    fieldSize: 1000000000,
+    headerPairs: 100000
   }
 });
-
-
-// export const getCourseByIdRoute = createRoute({
-//   preprocessing: NO_PREPROCESSING,
-//   validation: validateParamId,
-//   authorization: NO_AUTHORIZATION,
-//   handler: async (req: Request, res: Response) => {
-//     let course = await getCourse(parseInt(req.params["id"]));
-//     if (course) {
-//       res.status(200);
-//       res.json(course);
-//     }
-//     else {
-//       res.status(404);
-//       res.send("This course does not exist.");
-//     }
-//   }
-// });
-
-// export const getCourseByShortNameTermYearRoute = createRoute({
-//   preprocessing: NO_PREPROCESSING,
-//   validation: [
-//     validateParamShortName,
-//     validateParamTerm,
-//     validateParamYear,
-//   ],
-//   authorization: NO_AUTHORIZATION,
-//   handler: async (req: Request, res: Response) => {
-//     let course = getCourseByShortNameTermYear(
-//       req.params["short_name"],
-//       req.params["term"],
-//       parseInt(req.params["year"])
-//     );
-      
-//     if (course) {
-//       res.status(200);
-//       res.json(course);
-//     }
-//     else {
-//       res.status(404);
-//       res.send("This course does not exist.");
-//     }
-//   }
-// });
-
 
 export const exams_router = Router();
 exams_router
@@ -103,4 +40,52 @@ exams_router
         return rest;
       }));
     }
+  }));
+
+exams_router
+  .get("/:exam_id/submissions-list/", createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      const exam_id = req.params["exam_id"];
+      res.status(200).json(await db_getSubmissionsList(exam_id));
+    }
+  }));
+
+  
+
+exams_router
+  .post("/:exam_id/submissions/", createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: [
+      async (req: Request, res: Response, next: NextFunction) => {
+        console.log("test");
+        next();
+      },
+      upload.array("submissions"),
+      async (req: Request, res: Response) => {
+        const exam_id = req.params["exam_id"];
+
+        console.log(`Beginning to process ${req.files?.length} submissions...`);
+
+        // Files will have been uploaded to "/uploads" and information about
+        // each is in the req.files object. We'll pass this off to a worker
+        // script to process each
+        const worker = new Worker("./build/run/process_submissions.js", {
+          workerData: {
+            exam_id: exam_id,
+            files: req.files
+          }
+        });
+
+        res.sendStatus(200);
+      }
+    ]
   }));

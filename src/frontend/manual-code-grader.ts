@@ -12,7 +12,7 @@ function main() {
   });
   app.start();
   
-  const qs = queryString.parse(location.search)
+  const qs = queryString.parse(location.search);
   const EXAM_ID = qs["exam_id"];
   const QUESTION_ID = qs["question_id"];
   assert(typeof EXAM_ID === "string");

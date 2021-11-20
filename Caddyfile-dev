@@ -6,6 +6,9 @@ localhost
 
 tls /root/certs/localhost.pem /root/certs/localhost-key.pem
 
+log {
+    output stdout
+}
 route {
 
     route /auth/* {
