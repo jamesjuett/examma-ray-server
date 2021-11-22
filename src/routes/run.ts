@@ -3,7 +3,7 @@ import { query } from "../db/db";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParam } from "./common";
 import { Worker } from "worker_threads";
 import { readFileSync } from "fs";
-import { EXAMMA_RAY_GRADER } from "../server";
+import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, max: 100});
 // const validateParamTerm = validateParam("term").isIn(["fall", "winter", "spring", "summer"]);
 // const validateParamYear = validateParam("year").isInt();
@@ -98,7 +98,7 @@ export function createGradeRoute(reports: boolean) {
       validateParamExamId
     ],
     handler: async (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADER.exams_by_id[req.params["exam_id"]];
+      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
       if (!exam) {
         res.sendStatus(404);
         return;

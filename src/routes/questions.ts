@@ -2,7 +2,7 @@ import { Request, Response, Router } from "express";
 import { query } from "../db/db";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParam } from "./common";
 import { Worker } from "worker_threads";
-import { EXAMMA_RAY_GRADER } from "../server";
+import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
 const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, max: 100});
 // const validateParamShortName = validateParam("short_name").trim().isLength({min: 1, max: 20});
@@ -93,7 +93,7 @@ questions_router
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
       res.status(200);
-      res.json(EXAMMA_RAY_GRADER.exams
+      res.json(EXAMMA_RAY_GRADING_SERVER.exams
           .flatMap(exam => exam.allQuestions)
           .find(q => q.question_id === req.params["question_id"])?.spec);
     }

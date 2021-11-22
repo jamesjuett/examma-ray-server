@@ -10,7 +10,12 @@ declare module "knex/types/tables" {
     name: string;
   }
 
-  interface DB_Submissions_List {
+  interface DB_Exams {
+    exam_id: string;
+    epoch: string; // uuid
+  }
+
+  interface DB_Exam_Submissions {
     uuid: string;
     exam_id: string;
     uniqname: string;
@@ -68,12 +73,23 @@ declare module "knex/types/tables" {
   interface Tables {
     users: ExceptID<DB_Users>;
 
-    submissions_list: Knex.CompositeTableType<
+    exams: Knex.CompositeTableType<
       // Base Type
-      DB_Submissions_List,
+      DB_Exams,
       // Insert Type
       //   All required
-      DB_Submissions_List,
+      DB_Exams,
+      // Update Type
+      //   Only allowed to update epoch
+      Partial<Pick<DB_Exams, "epoch">> & Record<Exclude<keyof DB_Exams, "epoch">, undefined>
+    >;
+
+    exam_submissions: Knex.CompositeTableType<
+      // Base Type
+      DB_Exam_Submissions,
+      // Insert Type
+      //   All required
+      DB_Exam_Submissions,
       // Update Type
       //   Doesn't make sense to update (you should be using insert/delete)
       never

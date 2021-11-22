@@ -28,7 +28,21 @@ export class ExammaRayGradingServer {
     }, GRADER_IDLE_THRESHOLD);
   }
 
-  public receivePing(email: string, ping: ManualGradingPingRequest) {
+  public loadExam(exam_spec: ExamSpecification) {
+    const newExam = Exam.create(exam_spec);
+
+    let existingIndex = this.exams.findIndex(ex => ex.exam_id === newExam.exam_id);
+    if (existingIndex !== -1) {
+      asMutable(this.exams)[existingIndex] = newExam;
+    }
+    else {
+      asMutable(this.exams).push(newExam);
+    }
+
+    this.exams_by_id[newExam.exam_id] = newExam;
+  }
+
+  public receiveManualGradingPing(email: string, ping: ManualGradingPingRequest) {
     (this.active_graders[ping.question_id] ??= {graders: {}}).graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
     (this.next_active_graders[ping.question_id] ??= {graders: {}}).graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
   }

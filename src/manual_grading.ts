@@ -39,6 +39,14 @@ export type ManualGradingQuestionRecord = {
 };
 
 
+
+
+export type ManualGradingPingRequest = {
+  client_uuid: string,
+  question_id: string,
+  group_uuid?: string
+};
+
 export type ManualGradingPingResponse = {
 
   /**
@@ -71,10 +79,4 @@ export type ActiveGraders = {
       }
     }
   }
-};
-
-export type ManualGradingPingRequest = {
-  client_uuid: string,
-  question_id: string,
-  group_uuid?: string
 };

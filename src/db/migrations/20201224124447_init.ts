@@ -10,7 +10,14 @@ export async function up(knex: Knex): Promise<void> {
       table.index("email");
     })
 
-    .createTable("submissions_list", table => {
+    .createTable("exams", table => {
+      table.string("exam_id", 100).primary().notNullable();
+      table.uuid("epoch").notNullable();
+
+      table.index("exam_id");
+    })
+
+    .createTable("exam_submissions", table => {
       table.uuid("uuid").primary().notNullable();
       table.string("exam_id", 100).notNullable();
       table.string("uniqname", 100).notNullable();
@@ -109,6 +116,7 @@ export async function down(knex: Knex): Promise<void> {
     .dropTable("manual_grading_rubrics")
     .dropTable("manual_grading_questions")
     .dropTable("submissions_list")
-    .dropTable("users")
+    .dropTable("exams")
+    .dropTable("users");
 }
 

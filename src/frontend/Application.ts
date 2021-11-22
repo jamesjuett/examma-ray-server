@@ -56,7 +56,7 @@ export abstract class ExammaGraderRayApplication {
     Cookies.remove("bearer");
     if (this.currentUser) {
       delete (<Mutable<this>>this).currentUser;
-      window.location.reload();
+      window.location.href = "/";
     }
   }
 
@@ -76,111 +76,11 @@ export abstract class ExammaGraderRayApplication {
 
     await this.checkLogin();
 
-    this.sendPing();
-    setInterval(() => this.sendPing(), 5000);
-
     await this.onStart();
   }
 
-  protected async sendPing() {
-
-    const pingRequest = this.composePingRequest();
-
-    if (!pingRequest) {
-      return;
-    }
-
-    const ping_response = await axios({
-      url: `api/manual_grading/ping`,
-      method: "POST",
-      data: pingRequest,
-      headers: {
-          'Authorization': 'bearer ' + this.getBearerToken()
-      }
-    });
-    this.onPingResponse(<ManualGradingPingResponse>ping_response.data);
-    
-  }
-
-  protected abstract composePingRequest() : ManualGradingPingRequest | undefined;
-
   protected async onStart() {
     // do nothing, derived classes can override
   }
 
-  protected onPingResponse(pingResponse: ManualGradingPingResponse) {
-    // do nothing, derived classes can override
-  }
-
-}
-
-
-export class IndexExammaRayGraderApplication extends ExammaGraderRayApplication {
-  protected composePingRequest() {
-    return undefined; // no pings
-  }
-
-  protected async onStart() {
-    await this.reloadExams();
-  }
-
-  private async reloadExams() {
-    const app = this;
-    if (this.currentUser) {
-      try {
-  
-        let response = await axios({
-          url: `api/exams`,
-          method: "GET",
-          data: {},
-          headers: {
-            'Authorization': 'bearer ' + this.getBearerToken()
-          }
-        });
-  
-        response.data.forEach((exam_spec: Omit<ExamSpecification, "sections">) => {
-          const exam_id = exam_spec.exam_id;
-
-          $(".examma-ray-exams-list").append(`
-            <li>
-              <a href="out/${exam_id}/graded/overview.html">${exam_id}: ${exam_spec.title}</a>
-              <button class="btn btn-success examma-ray-run-grading-button" data-exam-id="${exam_id}">Run Grading</button>
-              <button class="btn btn-success examma-ray-run-reports-button" data-exam-id="${exam_id}">Generate Grading Reports</button>
-            </li>
-          `);
-
-          $(".examma-ray-run-grading-button").on("click", async function() {
-            let response = await axios({
-              url: `run/grade/${$(this).data("exam-id")}`,
-              method: "POST",
-              data: {},
-              headers: {
-                  'Authorization': 'bearer ' + app.getBearerToken()
-              }
-            });
-            alert(JSON.stringify(response.data));
-          });
-  
-          $(".examma-ray-run-reports-button").on("click", async function() {
-            let response = await axios({
-              url: `run/reports/${$(this).data("exam-id")}`,
-              method: "POST",
-              data: {},
-              headers: {
-                  'Authorization': 'bearer ' + app.getBearerToken()
-              }
-            });
-            alert(JSON.stringify(response.data));
-          });
-  
-        });
-      }
-      catch (e: unknown) {
-        // no courses listed
-      }
-    }
-    else {
-      $(".examma-ray-exams-list").empty();
-    }
-  }
 }

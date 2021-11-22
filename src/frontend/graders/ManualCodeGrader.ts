@@ -127,7 +127,32 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
     // setInterval(() => this.saveGradingAssignment(), 10000);
   }
 
-  protected composePingRequest() {
+  protected async onStart() {
+    this.sendPing();
+    setInterval(() => this.sendPing(), 5000);
+  }
+
+  private async sendPing() {
+
+    const pingRequest = this.composePingRequest();
+
+    if (!pingRequest) {
+      return;
+    }
+
+    const ping_response = await axios({
+      url: `api/manual_grading/ping`,
+      method: "POST",
+      data: pingRequest,
+      headers: {
+          'Authorization': 'bearer ' + this.getBearerToken()
+      }
+    });
+    this.onPingResponse(<ManualGradingPingResponse>ping_response.data);
+    
+  }
+
+  private composePingRequest() {
     if (!this.question) {
       return undefined; // no pings
     }
@@ -139,7 +164,7 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
     }
   }
 
-  protected onPingResponse(pingResponse: ManualGradingPingResponse) {
+  private onPingResponse(pingResponse: ManualGradingPingResponse) {
     if (!this.question) {
       return;
     }

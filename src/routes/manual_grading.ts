@@ -3,7 +3,7 @@ import { query } from "../db/db";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam } from "./common";
 import { Worker } from "worker_threads";
 import { readFileSync } from "fs";
-import { EXAMMA_RAY_GRADER } from "../server";
+import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
 import { ManualGradingPingRequest, ManualGradingRubricItem } from "../manual_grading";
 import { getJwtUserInfo } from "../auth/jwt_auth";
@@ -135,7 +135,7 @@ manual_grading_router
       handler: async (req: Request, res: Response) => {
         let userInfo = getJwtUserInfo(req);
         let pr = <ManualGradingPingRequest>req.body;
-        EXAMMA_RAY_GRADER.receivePing(userInfo.email, pr);
-        res.status(200).json(EXAMMA_RAY_GRADER.pingResponse(pr.question_id));
+        EXAMMA_RAY_GRADING_SERVER.receiveManualGradingPing(userInfo.email, pr);
+        res.status(200).json(EXAMMA_RAY_GRADING_SERVER.pingResponse(pr.question_id));
       }
     }));

@@ -1,26 +1,44 @@
 // import minimist from "minimist";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
-import { writeFileSync } from "fs";
+import { rmSync, writeFileSync } from "fs";
 import { workerData } from "worker_threads";
 import extract from "extract-zip";
+import { db_addExamSubmission, db_getExamSubmissionByUuid } from "../db/db_exams";
 
-function addSubmission(exam_id: string, filename: string) {
+// type Upload_Status = {
+//   "complete" | 
+// }
+
+async function addSubmission(exam_id: string, filepath: string) {
   
   try {
+    // Load a trusted submission for them
     const manifest_directory = `data/${exam_id}/manifests/`
-    let trusted_submission = ExamUtils.loadTrustedSubmission(
+    let new_submission = ExamUtils.loadTrustedSubmission(
       manifest_directory,
-      `uploads/${filename}`
+      filepath
     );
+
+    // Check whether this is a duplicate submission
+    const existing_submission = await db_getExamSubmissionByUuid(new_submission.uuid);
+
+    if (existing_submission) {
+      return;
+    }
   
+    // Write submission file to its final destination
     writeFileSync(
-      `data/${exam_id}/submissions/${trusted_submission.student.uniqname}-submission.json`,
-      JSON.stringify(trusted_submission, null, 2),
+      `data/${exam_id}/submissions/${new_submission.student.uniqname}-submission.json`,
+      JSON.stringify(new_submission, null, 2),
       "utf8"
     );
+
+    // Add submission to database
+    db_addExamSubmission(new_submission);
   }
   catch (e: unknown) {
-    console.log("ERROR processing submission for " + filename);
+    console.log("ERROR processing submission for " + filepath);
+    console.log(e);
   }
 }
 
@@ -33,17 +51,30 @@ async function main() {
   for(let i = 0; i < uploaded_files.length; ++i) {
     const file = uploaded_files[i];
   
-    // Extract any uploaded zip files
     if (file.originalname.toLowerCase().endsWith(".zip")) {
+      // Extract any uploaded zip files
       await extract(`uploads/${file.filename}`, {
         dir: `${process.cwd()}/uploads/`,
         onEntry: (entry, zipFile) => {
-          addSubmission(exam_id, entry.fileName);
+          const filepath = `uploads/${entry.fileName}`;
+          // Add extracted submission
+          addSubmission(exam_id, filepath);
+
+          // Remove extracted file
+          rmSync(filepath, { force: true });
         }
       });
+
+      rmSync(`uploads${file.filename}`, { force: true });
     }
     else {
-      addSubmission(exam_id, file.filename);
+      const filepath = `uploads/${file.filename}`;
+
+      // Add uploaded submission
+      addSubmission(exam_id, filepath);
+
+      // Remove uploaded file
+      rmSync(filepath, { force: true });
     }
   };
 
