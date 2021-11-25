@@ -106,13 +106,13 @@ export function createGradeRoute(reports: boolean) {
 
       const grader_spec = {
         uuid_strategy: "uuidv5",
-        uuidv5_namespace: readFileSync(`data/${exam?.exam_id}/secret`, "utf-8"),
+        uuidv5_namespace: readFileSync(`data/${exam?.exam.exam_id}/secret`, "utf-8"),
         frontend_js_path: "js/frontend-graded.js",
       };
 
       const worker = new Worker("./build/run/grade.js", {
         workerData: {
-          exam_id: exam.exam_id,
+          exam_id: exam.exam.exam_id,
           grader_spec: grader_spec,
           reports: reports
         }
@@ -130,3 +130,5 @@ run_router
 run_router
   .route("/reports/:exam_id")
     .post(createGradeRoute(true));
+
+

@@ -1,15 +1,30 @@
 import { ExamSpecification, TrustedExamSubmission } from "examma-ray";
 import { query } from "./db";
 import { v4 as uuidv4 } from "uuid";
+import { assert } from "../util/util";
 
 export async function db_getExamEpoch(exam_id: string) {
-  return await query("exams").where({exam_id: exam_id}).select().first();
+  return await query("exams").where({exam_id: exam_id}).select("epoch").first();
+}
+
+export async function db_nextExamEpoch(exam_id: string, new_epoch?: number) {
+
+  if (!new_epoch) {
+    new_epoch = (await query("exams").where({exam_id: exam_id}).select("epoch").first())?.epoch;
+    assert(new_epoch !== undefined);
+    ++new_epoch;
+    console.log(new_epoch);
+  }
+
+  return await query("exams").where({exam_id: exam_id}).update({
+    epoch: new_epoch
+  });
 }
 
 export async function db_createExam(exam_spec: ExamSpecification) {
   return await query("exams").insert({
     exam_id: exam_spec.exam_id,
-    epoch: uuidv4()
+    epoch: 0
   }).returning("*");
 }
 

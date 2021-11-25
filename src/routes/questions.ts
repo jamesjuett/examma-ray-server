@@ -94,7 +94,7 @@ questions_router
     handler: async (req: Request, res: Response) => {
       res.status(200);
       res.json(EXAMMA_RAY_GRADING_SERVER.exams
-          .flatMap(exam => exam.allQuestions)
+          .flatMap(exam => exam.exam.allQuestions)
           .find(q => q.question_id === req.params["question_id"])?.spec);
     }
   }));

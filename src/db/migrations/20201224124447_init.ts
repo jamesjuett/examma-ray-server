@@ -12,7 +12,7 @@ export async function up(knex: Knex): Promise<void> {
 
     .createTable("exams", table => {
       table.string("exam_id", 100).primary().notNullable();
-      table.uuid("epoch").notNullable();
+      table.integer("epoch").notNullable();
 
       table.index("exam_id");
     })
@@ -30,7 +30,7 @@ export async function up(knex: Knex): Promise<void> {
 
     .createTable("manual_grading_questions", table => {
       table.string("question_id", 100).primary().notNullable();
-      table.uuid("epoch_uuid").notNullable();
+      table.integer("epoch").notNullable();
 
       table.index("question_id");
     })

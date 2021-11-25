@@ -1,12 +1,9 @@
 // import minimist from "minimist";
-import { ExamUtils } from "examma-ray/dist/ExamUtils";
-import { ExamGrader, ExamGraderOptions } from "examma-ray/dist/ExamGrader";
-import { ExamGenerator } from "examma-ray/dist/ExamGenerator";
 import { Exam } from "examma-ray";
-import { readFileSync, writeFileSync } from "fs";
-import { performance } from "perf_hooks"
-
+import { ExamGrader, ExamGraderOptions } from "examma-ray/dist/ExamGrader";
+import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { workerData } from "worker_threads";
+
 
 // import { CURVE, EXAM_GRADER } from "../grader-spec";
 function main() {
@@ -15,28 +12,8 @@ function main() {
   const reports : boolean = workerData.reports;
 
   const EXAM = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
-
-  // const EXAM_GENERATOR_INDIVIDUAL = new ExamGenerator(EXAM, {
-  //   uuid_strategy: "uuidv5",
-  //   uuidv5_namespace: readFileSync(`data/${exam_id}/secret`, "utf-8"),
-  //   frontend_js_path: "js/frontend.js"
-  // });
-  
-  // EXAM_GENERATOR_INDIVIDUAL.assignExams(ExamUtils.loadCSVRoster(`data/${exam_id}/roster.csv`)),
-  // EXAM_GENERATOR_INDIVIDUAL.writeAll("out", "data");
   
   const EXAM_GRADER = new ExamGrader(EXAM, grader_spec, {}, {});
-
-  // let argv = minimist(process.argv, {
-  //   alias: {
-  //     "r": "reports",
-  //   },
-  //   default: {
-
-  //   }
-  // });
-  
-  // let reports: string = argv["reports"];
 
   // Load and verify answers
   console.log("loading submissions...");

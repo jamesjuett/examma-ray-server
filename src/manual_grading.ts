@@ -1,5 +1,3 @@
-import { ResponseKind, SkinReplacements, StudentInfo } from "examma-ray";
-import { GradingResult } from "examma-ray/dist/graders/QuestionGrader";
 
 export type ManualGradingSubmission = {
   submission_uuid: string,

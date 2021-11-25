@@ -1,8 +1,9 @@
 import { groupCollapsed } from "console";
-import { Exam, Question, ResponseKind } from "examma-ray";
+import { Exam, Question } from "examma-ray";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader, CodeWritingGradingResult } from "examma-ray/dist/graders/CodeWritingGrader";
 import { GradingGroup } from "examma-ray/dist/grading_interface/common";
+import { ResponseKind } from "examma-ray/dist/response/common";
 import { readFileSync } from "fs";
 import { Knex } from "knex";
 import pLimit from "p-limit";
@@ -48,8 +49,6 @@ async function createQuestionSubmissions(exam_id: string, question: Question) {
   };
 
   let manual_grading = ExamUtils.readGradingAssignments(exam_id, question_id);
-
-  // console.log(readFileSync(`data/${exam_id}/manual_grading/${QUESTION_ID}/apparent-aqua-reptile.json`, "utf8"));
 
   await db_createCodeGraderConfig(question_id, "{{submission}}", "test");
 

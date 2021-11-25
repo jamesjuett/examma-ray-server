@@ -12,7 +12,7 @@ declare module "knex/types/tables" {
 
   interface DB_Exams {
     exam_id: string;
-    epoch: string; // uuid
+    epoch: number;
   }
 
   interface DB_Exam_Submissions {
@@ -26,6 +26,11 @@ declare module "knex/types/tables" {
     question_id: string;
     test_harness: string;
     grouping_function: string;
+  }
+
+  interface DB_Manual_Grading_Questions {
+    question_id: string;
+    epoch: number;
   }
 
   interface DB_Manual_Grading_Rubrics {
@@ -81,9 +86,9 @@ declare module "knex/types/tables" {
       DB_Exams,
       // Update Type
       //   Only allowed to update epoch
-      Partial<Pick<DB_Exams, "epoch">> & Record<Exclude<keyof DB_Exams, "epoch">, undefined>
+      Partial<Pick<DB_Exams, "epoch">>
     >;
-
+    
     exam_submissions: Knex.CompositeTableType<
       // Base Type
       DB_Exam_Submissions,
@@ -106,6 +111,17 @@ declare module "knex/types/tables" {
       Partial<Omit<DB_Manual_Grading_Code_Grader_Config, "question_id">> & {question_id?: undefined}
     >;
 
+    manual_grading_questions: Knex.CompositeTableType<
+      // Base Type
+      DB_Manual_Grading_Questions,
+      // Insert Type
+      //   All required
+      DB_Manual_Grading_Questions,
+      // Update Type
+      //   Only allowed to update epoch
+      Partial<Pick<DB_Manual_Grading_Questions, "epoch">>
+    >;
+
     manual_grading_rubrics: Knex.CompositeTableType<
       // Base Type
       DB_Manual_Grading_Rubrics,
@@ -125,7 +141,7 @@ declare module "knex/types/tables" {
       Omit<DB_Manual_Grading_Groups, "grader" | "finished"> & Partial<Pick<DB_Manual_Grading_Groups, "grader" | "finished">>,
       // Update Type
       //   Only allowed to update finished
-      Partial<Pick<DB_Manual_Grading_Groups, "finished">> & Record<Exclude<keyof DB_Manual_Grading_Groups, "finished">, undefined>
+      Partial<Pick<DB_Manual_Grading_Groups, "finished">>
     >;
 
     manual_grading_submissions: Knex.CompositeTableType<
@@ -136,7 +152,7 @@ declare module "knex/types/tables" {
       DB_Manual_Grading_Submissions,
       // Update Type
       //   Only allowed to update group_uuid
-      Partial<Pick<DB_Manual_Grading_Submissions, "group_uuid">> & Record<Exclude<keyof DB_Manual_Grading_Submissions, "group_uuid">, undefined>
+      Partial<Pick<DB_Manual_Grading_Submissions, "group_uuid">>
     >;
 
     manual_grading_records: Knex.CompositeTableType<
@@ -147,7 +163,7 @@ declare module "knex/types/tables" {
       Omit<DB_Manual_Grading_Records, "status"> & Partial<Pick<DB_Manual_Grading_Records, "status">>,
       // Update Type
       //   Only allowed to update status
-      Partial<Pick<DB_Manual_Grading_Records, "status">> & Record<Exclude<keyof DB_Manual_Grading_Records, "status">, undefined>
+      Partial<Pick<DB_Manual_Grading_Records, "status">>
     >;
   }
 }

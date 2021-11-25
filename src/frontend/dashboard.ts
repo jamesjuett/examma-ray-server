@@ -1,7 +1,8 @@
 import axios from "axios";
-import { Exam, ExamSpecification } from "examma-ray";
+import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import queryString from "query-string";
 import { ExamSubmissionRecord } from "../dashboard";
+import { ExamTaskStatus } from "../ExammaRayGradingServer";
 import { asMutable, assert } from "../util/util";
 import { ExammaGraderRayApplication } from "./Application";
 
@@ -12,7 +13,7 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
   public readonly exam_id: string;
   public readonly exam?: Exam;
   
-  private exam_epoch?: string;
+  private exam_epoch?: number;
 
   public constructor(exam_id: string) {
     super();
@@ -48,20 +49,34 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
   protected async onStart() {
     this.sendPing();
     setInterval(() => this.sendPing(), 5000);
+    setInterval(() => this.checkTaskStatus(), 2000);
   }
 
-  private async sendPing() {
+  private async checkTaskStatus() {
 
-    const ping_exam_id = this.exam_id;
-
-    const epoch_response = await axios({
-      url: `api/exams/${ping_exam_id}/epoch`,
+    const task_status_response = await axios({
+      url: `api/exams/${this.exam_id}/tasks`,
       method: "GET",
       headers: {
           'Authorization': 'bearer ' + this.getBearerToken()
       }
     });
-    const current_epoch = <string>epoch_response.data;
+    const task_status = <ExamTaskStatus>task_status_response.data;
+
+    $("#examma-ray-task-status").html(JSON.stringify(task_status, null, 2));
+    
+  }
+
+  private async sendPing() {
+
+    const epoch_response = await axios({
+      url: `api/exams/${this.exam_id}/epoch`,
+      method: "GET",
+      headers: {
+          'Authorization': 'bearer ' + this.getBearerToken()
+      }
+    });
+    const current_epoch = <number>epoch_response.data.epoch;
 
     if (this.exam_epoch !== current_epoch) {
       this.exam_epoch = current_epoch;
@@ -90,14 +105,46 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
       const submissions_response = await axios({
         url: `api/exams/${this.exam_id}/submissions`,
         method: "GET",
-        data: {},
         headers: {
             'Authorization': 'bearer ' + this.getBearerToken()
         }
       });
       const submissions = <ExamSubmissionRecord[]>submissions_response.data;
 
-      $(".examma-ray-submissions-list").html(submissions.map(sub => `<li>${sub.uniqname}</li>`).join(""));
+      const roster_response = await axios({
+        url: `api/exams/${this.exam_id}/roster`,
+        method: "GET",
+        headers: {
+            'Authorization': 'bearer ' + this.getBearerToken()
+        }
+      });
+      const roster = <StudentInfo[]>roster_response.data;
+
+      let students : {
+        [index: string] : {
+          uniqname: string,
+          name: string,
+          submission?: ExamSubmissionRecord
+        }
+      } = {};
+      
+      roster.forEach(s => students[s.uniqname] = {
+        uniqname: s.uniqname,
+        name: s.name
+      });
+
+      submissions.forEach(s => students[s.uniqname].submission = s);
+
+      $(".examma-ray-students-list").html(Object.values(students).sort((a,b) => a.uniqname.localeCompare(b.uniqname)).map(s => `<li>
+        ${s.uniqname}
+        ${s.submission
+          ? `
+            <a class="btn btn-sm btn-primary" href="out/${this.exam?.exam_id}/exams/${s.uniqname}-${s.submission.uuid}.html">Exam</a>
+          `
+          : "[no submission]"
+      
+        }
+      </li>`).join(""));
       
     }
     catch(e: unknown) {

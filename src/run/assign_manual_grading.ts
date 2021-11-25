@@ -6,19 +6,16 @@ import extract from "extract-zip";
 import { db_addExamSubmission, db_getExamSubmissionByUuid } from "../db/db_exams";
 import { query } from "../db/db";
 import { v4 as uuidv4 } from "uuid";
-import { AssignedExam, Exam, TrustedExamSubmission } from "examma-ray";
-import { db_createGroup, db_createSubmission } from "../db/db_code_grader";
-import { stringify_response } from "examma-ray/dist/response/responses";
 
 // type Upload_Status = {
 //   "complete" | 
 // }
 
-async function addSubmission(exam: Exam, filepath: string, originalFilename: string) {
+async function addSubmission(exam_id: string, filepath: string, originalFilename: string) {
   
   try {
     // Load a trusted submission for them
-    const manifest_directory = `data/${exam.exam_id}/manifests/`
+    const manifest_directory = `data/${exam_id}/manifests/`
     let new_submission = ExamUtils.loadTrustedSubmission(
       manifest_directory,
       filepath
@@ -33,40 +30,25 @@ async function addSubmission(exam: Exam, filepath: string, originalFilename: str
   
     // Write submission file to its final destination
     writeFileSync(
-      `data/${exam.exam_id}/submissions/${new_submission.student.uniqname}-submission.json`,
+      `data/${exam_id}/submissions/${new_submission.student.uniqname}-submission.json`,
       JSON.stringify(new_submission, null, 2),
       "utf8"
     );
 
     // Add submission to database
     await db_addExamSubmission(new_submission);
-
-    await assignGrading(exam, new_submission);
   }
   catch (e: unknown) {
     console.log("ERROR processing submission for " + filepath);
-    copyFileSync(filepath, `data/${exam.exam_id}/error-submissions/${uuidv4()}-${originalFilename}`,)
+    copyFileSync(filepath, `data/${exam_id}/error-submissions/${uuidv4()}-${originalFilename}`,)
     // console.log(e);
   }
-}
-
-async function assignGrading(exam: Exam, submission: TrustedExamSubmission) {
-  let assigned_exam = AssignedExam.createFromSubmission(exam, submission);
-
-  await Promise.all(assigned_exam.assignedQuestions.map(async q => {
-    const group_uuid = uuidv4();
-    await db_createGroup(group_uuid, q.question.question_id, false);
-    await db_createSubmission(q.uuid, q.question.question_id, exam.exam_id, q.student.uniqname, q.rawSubmission, group_uuid)
-  }));
 }
 
 
 // import { CURVE, EXAM_GRADER } from "../grader-spec";
 async function main() {
-  const exam_id = <string>workerData.exam_id;
-
-  const exam = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
-
+  const exam_id = workerData.exam_id;
   const uploaded_files : Express.Multer.File[] = workerData.files ?? [];
 
   for(let i = 0; i < uploaded_files.length; ++i) {
@@ -79,7 +61,7 @@ async function main() {
         onEntry: (entry, zipFile) => {
           const filepath = `uploads/${entry.fileName}`;
           // Add extracted submission
-          addSubmission(exam, filepath, entry.fileName);
+          addSubmission(exam_id, filepath, entry.fileName);
 
           // Remove extracted file
           rmSync(filepath, { force: true });
@@ -93,7 +75,7 @@ async function main() {
       const originalFilename = file.originalname;
 
       // Add uploaded submission
-      await addSubmission(exam, filepath, originalFilename);
+      await addSubmission(exam_id, filepath, originalFilename);
 
       // Remove uploaded file
       rmSync(filepath, { force: true });
@@ -103,6 +85,52 @@ async function main() {
   console.log(`DONE processing submissions!`);
   
   await query.destroy();
+  // process.exit(0);
+
+  // console
+  // const grader_spec : ExamGraderOptions = workerData.grader_spec;
+  // const reports : boolean = workerData.reports;
+
+  // const EXAM = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
+
+  // // const EXAM_GENERATOR_INDIVIDUAL = new ExamGenerator(EXAM, {
+  // //   uuid_strategy: "uuidv5",
+  // //   uuidv5_namespace: readFileSync(`data/${exam_id}/secret`, "utf-8"),
+  // //   frontend_js_path: "js/frontend.js"
+  // // });
+  
+  // // EXAM_GENERATOR_INDIVIDUAL.assignExams(ExamUtils.loadCSVRoster(`data/${exam_id}/roster.csv`)),
+  // // EXAM_GENERATOR_INDIVIDUAL.writeAll("out", "data");
+  
+  // const EXAM_GRADER = new ExamGrader(EXAM, grader_spec, {}, {});
+
+  // // let argv = minimist(process.argv, {
+  // //   alias: {
+  // //     "r": "reports",
+  // //   },
+  // //   default: {
+
+  // //   }
+  // // });
+  
+  // // let reports: string = argv["reports"];
+
+  // // Load and verify answers
+  // console.log("loading submissions...");
+  // EXAM_GRADER.loadAllSubmissions();
+
+  // console.log("grading submissions...");
+  // EXAM_GRADER.gradeAll();
+  
+  // // if (CURVE) {
+  // //   EXAM_GRADER.applyCurve(CURVE);
+  // // }
+
+  // EXAM_GRADER.writeAll();
+  
+  // if (reports) {
+  //   EXAM_GRADER.writeReports();
+  // }
   
 }
 

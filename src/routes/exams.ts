@@ -34,7 +34,7 @@ exams_router
     handler: async (req: Request, res: Response) => {
       res.status(200);
       res.json(EXAMMA_RAY_GRADING_SERVER.exams.map(exam => {
-        const {sections, ...rest} = exam.spec;
+        const {sections, ...rest} = exam.exam.spec;
         return rest;
       }));
     }
@@ -51,7 +51,6 @@ exams_router
           return res.sendStatus(400);
         }
 
-        console.time("test");
         const uploaded_filepath = `uploads/${req.file?.filename}`;
         const new_exam_spec = <ExamSpecification>JSON.parse(await readFile(uploaded_filepath, "utf8"));
         await rm(uploaded_filepath, { force: true });
@@ -65,6 +64,7 @@ exams_router
         await mkdir(`data/${exam_id}/`);
         await mkdir(`data/${exam_id}/manifests`);
         await mkdir(`data/${exam_id}/submissions`);
+        await mkdir(`data/${exam_id}/error-submissions`);
   
         await writeFile(`data/${exam_id}/exam-spec.json`, JSON.stringify(new_exam_spec, null, 2), "utf8");
         await writeFile(`data/${exam_id}/roster.csv`, "uniqname,name", "utf8");
@@ -73,7 +73,6 @@ exams_router
 
         EXAMMA_RAY_GRADING_SERVER.loadExam(new_exam_spec);
   
-        console.timeEnd("test");
         return res.sendStatus(201);
       }
     ]
@@ -93,7 +92,7 @@ exams_router
         res.sendStatus(404);
         return;
       }
-      res.status(200).json(exam.spec);
+      res.status(200).json(exam.exam.spec);
     }
   }));
 
@@ -122,23 +121,13 @@ exams_router
     handler: [
       upload.array("submissions"),
       async (req: Request, res: Response) => {
-        const exam_id = req.params["exam_id"];
-
-        if (!EXAMMA_RAY_GRADING_SERVER.exams_by_id[exam_id]) {
-          return res.sendStatus(404);
+        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+        if (!exam) {
+          res.sendStatus(404);
+          return;
         }
 
-        console.log(`Beginning to process ${req.files?.length} submissions...`);
-
-        // Files will have been uploaded to "/uploads" and information about
-        // each is in the req.files object. We'll pass this off to a worker
-        // script to process each
-        const worker = new Worker("./build/run/process_submissions.js", {
-          workerData: {
-            exam_id: exam_id,
-            files: req.files
-          }
-        });
+        req.files && exam.addSubmissions(<Express.Multer.File[]>req.files);
 
         res.sendStatus(200);
       }
@@ -147,6 +136,22 @@ exams_router
 
 exams_router
   .route("/:exam_id/roster")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+
+      if (!exam) {
+        return res.sendStatus(404);
+      }
+
+      res.status(200).json(await exam.getRoster());
+    }
+  }))
   .put(createRoute({
     preprocessing: NO_PREPROCESSING,
     validation: [
@@ -156,9 +161,9 @@ exams_router
     handler: [
       upload.single("roster"),
       async (req: Request, res: Response) => {
-        const exam_id = req.params["exam_id"];
+        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
 
-        if (!EXAMMA_RAY_GRADING_SERVER.exams_by_id[exam_id]) {
+        if (!exam) {
           return res.sendStatus(404);
         }
 
@@ -167,7 +172,42 @@ exams_router
         }
 
         const uploaded_filepath = `uploads/${req.file?.filename}`;
-        await copyFile(uploaded_filepath, `data/${exam_id}/roster.csv`);
+
+        await exam.update({ new_roster_csv_filepath: uploaded_filepath });
+
+        await rm(uploaded_filepath, { force: true });
+        return res.sendStatus(201);
+      }
+    ]
+  }));
+
+  
+
+exams_router
+  .route("/:exam_id/secret")
+  .put(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: [
+      upload.single("secret"),
+      async (req: Request, res: Response) => {
+        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+
+        if (!exam) {
+          return res.sendStatus(404);
+        }
+
+        if (!req.file) {
+          return res.sendStatus(400);
+        }
+
+        const uploaded_filepath = `uploads/${req.file?.filename}`;
+
+        await exam.update({ new_secret_filepath: uploaded_filepath});
+
         await rm(uploaded_filepath, { force: true });
         return res.sendStatus(201);
       }
@@ -184,5 +224,26 @@ exams_router
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
       res.status(200).json(await db_getExamEpoch(req.params["exam_id"]));
+    }
+  }));
+
+  
+
+exams_router
+  .route("/:exam_id/tasks")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+
+      if (!exam) {
+        return res.sendStatus(404);
+      }
+
+      res.status(200).json(exam.getTaskStatus());
     }
   }));
