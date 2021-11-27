@@ -1,5 +1,22 @@
-import { ManualGradingGroupRecord, ManualGradingQuestionRecord, ManualGradingRubricItemStatus } from "../manual_grading";
+import { Tables } from "knex/types/tables";
+import { ManualGradingGroupRecord, ManualGradingQuestionRecord, ManualGradingRubricItem, ManualGradingRubricItemStatus } from "../manual_grading";
 import { query } from "./db";
+
+export async function db_getManualGradingQuestion(question_id: string) {
+  return await query("manual_grading_questions").where({question_id: question_id}).select().first();
+}
+
+export async function db_setManualGradingQuestion(
+  question_id: string,
+  grading_epoch: number) {
+
+  // Create and get a copy of the new rubric item
+  return await query("manual_grading_questions").insert({
+    question_id: question_id,
+    grading_epoch: grading_epoch
+  }).onConflict("question_id").merge();
+}
+
 
 export async function db_getManualGradingRubric(question_id: string) {
   return await query("manual_grading_rubrics").where({question_id: question_id}).select();
@@ -11,43 +28,68 @@ export async function db_getGroupSubmissions(group_uuid: string) {
   }).select("*");
 }
 
-export async function db_createManualGradingRubricItem(
-  question_id: string,
-  rubric_item_id: string,
-  points: number,
-  title: string,
-  description: string,
-  active: boolean = true) {
+export async function db_createManualGradingRubricItem(question_id: string, rubric_item_id: string, rubric_item: ManualGradingRubricItem) {
 
   // Create and get a copy of the new rubric item
   return await query("manual_grading_rubrics").insert({
     question_id: question_id,
     rubric_item_id: rubric_item_id,
-    points: points,
-    title: title,
-    description: description,
-    active: active
+    points: rubric_item.points,
+    title: rubric_item.title,
+    description: rubric_item.description,
+    active: rubric_item.active
   }).returning("*");
 }
 
+export async function db_updateManualGradingRubricItem(question_id: string, rubric_item_id: string, updates: Partial<ManualGradingRubricItem>) {
 
-export async function db_createManualGradingRecord(
+  return await query("manual_grading_rubrics").where({
+    question_id: question_id,
+    rubric_item_id: rubric_item_id
+  }).update({
+    points: updates.points,
+    description: updates.description,
+    title: updates.title,
+    active: updates.active
+  });
+
+}
+
+
+export async function db_setManualGradingRecord(
   group_uuid: string,
   rubric_item_id: string,
-  status?: ManualGradingRubricItemStatus) {
+  status: ManualGradingRubricItemStatus) {
 
   // Create and get a copy of the new rubric item
   return await query("manual_grading_records").insert({
     group_uuid: group_uuid,
     rubric_item_id: rubric_item_id,
     status: status
-  }).returning("*");
+  }).onConflict(["group_uuid", "rubric_item_id"]).merge();
+}
+
+export async function db_setManualGradingGroupFinished(
+  group_uuid: string,
+  finished: boolean) {
+
+  // Create and get a copy of the new rubric item
+  return await query("manual_grading_groups").where({
+    group_uuid: group_uuid
+  }).update({
+    finished: finished
+  });
 }
 
 
+export async function db_getManualGradingRecords(question_id: string) : Promise<ManualGradingQuestionRecord> {
 
-export async function db_getManualGradingRecords(question_id: string) {
-
+  
+  const question = await query("manual_grading_questions")
+    .where({
+      question_id: question_id
+    })
+    .select("*").first();
   
   const groups = await query("manual_grading_groups")
     .where({
@@ -90,8 +132,11 @@ export async function db_getManualGradingRecords(question_id: string) {
     record.grading_result[r.rubric_item_id] = r.status;
   });
 
-  return <ManualGradingQuestionRecord>{
+  return {
     question_id: question_id,
-    groups: Object.values(group_records_by_id),
+    groups: group_records_by_id,
+    grading_epoch: question?.grading_epoch ?? 0
   }
 }
+
+

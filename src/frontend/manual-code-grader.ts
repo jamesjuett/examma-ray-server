@@ -1,23 +1,18 @@
 import queryString from "query-string";
 import { assert } from "../util/util";
-import { ExammaGraderRayApplication } from "./Application";
+import { ExammaRayGraderClient } from "./Application";
 import { ManualCodeGraderApp } from "./graders/ManualCodeGrader";
 
-function main() {
+async function main() {
 
-  const app = new ManualCodeGraderApp({
-    checkpoints: [],
-    groupingFunctionName: "none",
-    testHarness: "{{submission}}",
-  });
-  app.start();
   
   const qs = queryString.parse(location.search);
   const EXAM_ID = qs["exam_id"];
   const QUESTION_ID = qs["question_id"];
   assert(typeof EXAM_ID === "string");
   assert(typeof QUESTION_ID === "string");
-  app.loadGradingAssignment(QUESTION_ID);
+  const app = await ManualCodeGraderApp.create(EXAM_ID, QUESTION_ID);
+
 }
 
 if (typeof $ === "function") {

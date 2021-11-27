@@ -1,3 +1,10 @@
+import { ManualGradingEpochTransition } from "./ExammaRayGradingServer";
+
+export type ManualCodeGraderConfiguration = {
+  test_harness: string,
+  grouping_function: string
+};
+
 
 export type ManualGradingSubmission = {
   submission_uuid: string,
@@ -32,8 +39,11 @@ export type ManualGradingGroupRecord = {
 export type ManualGradingQuestionRecord = {
   // name?: string,
   // exam_id: string,
+  grading_epoch: number,
   question_id: string,
-  groups: ManualGradingGroupRecord[]
+  groups: {
+    [index: string]: ManualGradingGroupRecord
+  }
 };
 
 
@@ -41,26 +51,26 @@ export type ManualGradingQuestionRecord = {
 
 export type ManualGradingPingRequest = {
   client_uuid: string,
+  exam_id: string,
   question_id: string,
-  group_uuid?: string
+  group_uuid?: string,
+  my_grading_epoch: number | undefined
 };
 
 export type ManualGradingPingResponse = {
 
-  /**
-   * What question is this for?
-   */
+  exam_id: string,
   question_id: string,
 
   /**
-   * What version of groupings are we on?
+   * What grading epoch are we on
    */
-  group_epoch: string,
+  grading_epoch: number,
 
   /**
-   * What version of the rubric are we on?
+   * Tranistions needed to come up to the current epoch
    */
-  rubric_epoch: string,
+  epoch_transitions: readonly ManualGradingEpochTransition[] | "reload" | "invalid"
 
   /**
    * Who has active browser tabs open on this question?

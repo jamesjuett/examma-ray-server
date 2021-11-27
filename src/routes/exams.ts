@@ -97,7 +97,23 @@ exams_router
   }));
 
 
-  
+
+exams_router
+  .route("/:exam_id/questions/:question_id")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id"),
+      validateParamExammaRayId("question_id"),
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      const question_spec = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.exam.allQuestions.find(q => q.question_id === req.params["question_id"]);
+      return question_spec ? res.status(200).json(question_spec) : res.sendStatus(404);
+    }
+  }));
+
+
 
 exams_router
   .route("/:exam_id/submissions")

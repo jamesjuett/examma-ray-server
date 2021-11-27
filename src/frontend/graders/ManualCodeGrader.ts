@@ -21,10 +21,10 @@ import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
 
 import queryString from "query-string";
-import { ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecord, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSubmission } from "../../manual_grading";
+import { ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecord, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSubmission } from "../../manual_grading";
 import { asMutable, assert } from "../../util/util";
 import axios from "axios";
-import { ExammaGraderRayApplication } from "../Application";
+import { ExammaRayGraderClient } from "../Application";
 import avatar from "animal-avatar-generator";
 
 // Because this grader is based on Lobster, it only works for C++ code
@@ -35,16 +35,6 @@ const CODE_LANGUAGE = "cpp";
 
 const ACTIVE_GRADER_AVATAR_SIZE = 30;
 
-
-// let response = await axios({
-//   url: `api/manual_grading/records/cstring_remove_corrupted_function`,
-//   method: "GET",
-//   data: {},
-//   headers: {
-//       'Authorization': 'bearer ' + this.getBearerToken()
-//   }
-// });
-// console.log(JSON.stringify(response.data));
 
 
 type SubmissionsFilterCriterion = "all" | "graded" | "ungraded";
@@ -64,36 +54,41 @@ const SUBMISSION_FILTERS : {
   "ungraded": (sub: ManualGradingGroupRecord) => !isFullyGraded(sub),
 }
 
-export type CodeWritingManualGraderAppSpecification = {
-  testHarness: string,
-  extract_code?: (raw_submission: string, skin: ExamComponentSkin) => string,
-  skin_override?: ExamComponentSkin,
-  preprocess?: (submission: string) => string,
-  checkpoints: Checkpoint[],
-  // autograder: (ex: Exercise) => ManualGradingResult,
-  groupingFunctionName: string
-};
+// export type CodeWritingManualGraderAppSpecification = {
+//   testHarness: string,
+//   extract_code?: (raw_submission: string, skin: ExamComponentSkin) => string,
+//   skin_override?: ExamComponentSkin,
+//   preprocess?: (submission: string) => string,
+//   checkpoints: Checkpoint[],
+//   // autograder: (ex: Exercise) => ManualGradingResult,
+//   groupingFunctionName: string
+// };
 
 export const DEFAULT_EXTRACT_CODE = (raw_submission: string) => {
   assert(typeof raw_submission === "string");
   return raw_submission;
 };
 
-export class ManualCodeGraderApp extends ExammaGraderRayApplication {
+export class ManualCodeGraderApp {
 
-  public readonly question?: Question;
+  public readonly client: ExammaRayGraderClient;
+
+  public readonly exam_id: string;
+  public readonly question: Question;
   public readonly rubric?: readonly ManualGradingRubricItem[];
   
   public readonly assn?: ManualGradingQuestionRecord;
   public readonly currentGroup?: ManualGradingGroupRecord;
 
+  public readonly grading_epoch?: number;
+
   public lobster: SimpleExerciseLobsterOutlet;
 
-  private extract_code: (raw_submission: string, skin: ExamComponentSkin) => string;
+  // private extract_code: (raw_submission: string, skin: ExamComponentSkin) => string;
   private skin_override?: ExamComponentSkin;
-  private preprocess?: (submission: string) => string;
-  private testHarness: string;
-  private groupingFunctionName: string;
+  // private preprocess?: (submission: string) => string;
+  // private testHarness: string;
+  // private groupingFunctionName: string;
 
   private groupMemberThumbnailsElem: JQuery;
 
@@ -111,25 +106,46 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
     "name": (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => a.group_uuid.localeCompare(b.group_uuid, undefined, {numeric: true}),
     "size": (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => a.submissions.length - b.submissions.length,
     "score": (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => this.pointsEarned(a.grading_result) - this.pointsEarned(b.grading_result),
+    
   }
+  public readonly config?: ManualCodeGraderConfiguration;
 
-  public constructor(spec: CodeWritingManualGraderAppSpecification) {
-    super();
-    this.testHarness = spec.testHarness;
-    this.extract_code = spec.extract_code ?? DEFAULT_EXTRACT_CODE;
-    this.skin_override = spec.skin_override;
-    this.preprocess = spec.preprocess;
-    this.groupingFunctionName = spec.groupingFunctionName;
+  private constructor(client: ExammaRayGraderClient, exam_id: string, question: Question) {
+    this.client = client;
+    this.exam_id = exam_id;
+    this.question = question;
+    // this.testHarness = spec.testHarness;
+    // this.extract_code = spec.extract_code ?? DEFAULT_EXTRACT_CODE;
+    // this.skin_override = spec.skin_override;
+    // this.preprocess = spec.preprocess;
+    // this.groupingFunctionName = spec.groupingFunctionName;
 
+    $(".examma-ray-grading-title").html(this.question.question_id);
     this.groupMemberThumbnailsElem = $(".examma-ray-group-member-thumbnails");
 
-    this.lobster = this.createLobster(spec);
+    this.lobster = this.createLobster();
     // setInterval(() => this.saveGradingAssignment(), 10000);
-  }
 
-  protected async onStart() {
     this.sendPing();
     setInterval(() => this.sendPing(), 5000);
+  }
+
+  public static async create(exam_id: string, question_id: string) {
+
+    const client = await ExammaRayGraderClient.create();
+
+    const question_response = await axios({
+      url: `api/exams/${exam_id}/questions/${question_id}`,
+      method: "GET",
+      data: {},
+      headers: {
+          'Authorization': 'bearer ' + client.getBearerToken()
+      }
+    });
+    
+    const question = Question.create(<QuestionSpecification>question_response.data);
+
+    return new ManualCodeGraderApp(client, exam_id, question);
   }
 
   private async sendPing() {
@@ -141,33 +157,52 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
     }
 
     const ping_response = await axios({
-      url: `api/manual_grading/ping`,
+      url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
       method: "POST",
       data: pingRequest,
       headers: {
-          'Authorization': 'bearer ' + this.getBearerToken()
+          'Authorization': 'bearer ' + this.client.getBearerToken()
       }
     });
     this.onPingResponse(<ManualGradingPingResponse>ping_response.data);
     
   }
 
-  private composePingRequest() {
+  private composePingRequest() : ManualGradingPingRequest | undefined {
     if (!this.question) {
       return undefined; // no pings
     }
 
     return {
-      client_uuid: this.client_uuid,
+      client_uuid: this.client.client_uuid,
+      exam_id: this.exam_id,
       question_id: this.question.question_id,
-      group_uuid: this.currentGroup?.group_uuid
+      group_uuid: this.currentGroup?.group_uuid,
+      my_grading_epoch: this.grading_epoch
     }
   }
 
-  private onPingResponse(pingResponse: ManualGradingPingResponse) {
-    if (!this.question) {
-      return;
+  private async onPingResponse(pingResponse: ManualGradingPingResponse) {
+
+    this.updateGraderAvatars(pingResponse);
+
+    if (pingResponse.epoch_transitions === "reload") {
+
+      const records_response = await axios({
+        url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/records`,
+        method: "GET",
+        data: {},
+        headers: {
+            'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      });
+      
+      console.log(records_response.data);
+  
     }
+  }
+
+  private updateGraderAvatars(pingResponse: ManualGradingPingResponse) {
     let graders = pingResponse.active_graders[this.question.question_id].graders;
     $(".examma-ray-active-graders").empty().html(
       Object.values(graders).map(grader => grader.email).sort().map(
@@ -246,13 +281,13 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
     });
   }
 
-  private createLobster(spec: CodeWritingManualGraderAppSpecification) {
+  private createLobster() {
     let lobsterElem = $("#lobster-exercise");
   
     lobsterElem.append(createRunestoneExerciseOutlet("1"));
   
     let ex = new Exercise({
-      checkpoints: spec.checkpoints,
+      checkpoints: [],
       completionCriteria: COMPLETION_ALL_CHECKPOINTS,
       starterCode: "",
       completionMessage: "Code passes all checkpoints."
@@ -279,7 +314,7 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
     this.thumbnailElems = {};
 
     if (!this.assn) { return; }
-    let groups = this.assn.groups
+    let groups = Object.values(this.assn.groups)
       .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
       .sort(this.SUBMISSION_SORTS[this.submissionsSortCriteria]);
 
@@ -312,7 +347,7 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
           ${group.grading_result ? renderScoreBadge(this.pointsEarned(group.grading_result), this.question.pointsPossible, group.grading_result.verified ? VERIFIED_ICON : "") : renderUngradedBadge(this.question.pointsPossible)}
         </div>
         <div class="panel-body">
-          <pre><code>${highlightCode(this.extract_code(response, originalSkin), CODE_LANGUAGE)}</code></pre>
+          <pre><code>${highlightCode(response, CODE_LANGUAGE)}</code></pre>
         </div>
       </div>
     `);
@@ -338,57 +373,38 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
     this.updateGroupThumbnails();
   }
 
-  public async loadGradingAssignment(question_id: string) {
+  private async reloadGradingResults() {
   
     // TODO: check for unsaved changes
 
     try {
 
       const rubric_response = await axios({
-        url: `api/manual_grading/rubric/${question_id}`,
+        url: `api/manual_grading/rubric/${this.question.question_id}`,
         method: "GET",
         data: {},
         headers: {
-            'Authorization': 'bearer ' + this.getBearerToken()
+            'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
       const rubric = <ManualGradingRubricItem[]>rubric_response.data;
-
-      const question_response = await axios({
-        url: `api/questions/${question_id}`,
-        method: "GET",
-        data: {},
-        headers: {
-            'Authorization': 'bearer ' + this.getBearerToken()
-        }
-      });
-      const question = Question.create(<QuestionSpecification>question_response.data);
   
       let records_response = await axios({
-        url: `api/manual_grading/records/${question_id}`,
+        url: `api/manual_grading/records/${this.question.question_id}`,
         method: "GET",
         data: {},
         headers: {
-            'Authorization': 'bearer ' + this.getBearerToken()
+            'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
       const records = <ManualGradingQuestionRecord>records_response.data;
 
-      this.setQuestion(question);
       this.setRubric(rubric);
-
       this.setGradingAssignment(records);
-
-      this.sendPing();
     }
     catch(e: unknown) {
       alert("Error loading question :(");
     }
-  }
-
-  private setQuestion(question: Question) {
-    asMutable(this).question = question;
-    $(".examma-ray-grading-title").html(this.assn ? this.assn.question_id : "[No question selected]");
   }
 
   private setRubric(rubric: readonly ManualGradingRubricItem[]) {
@@ -445,16 +461,20 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
   }
 
   private applyHarness(rep: ManualGradingSubmission) {
+    if (!this.config) {
+      return rep.submission;
+    }
+
     let response = rep.submission;
     let originalSkin = createRecordedSkin(rep);
     let skin = this.skin_override ?? originalSkin;
-    let submittedCode = this.extract_code(response, originalSkin);
+    let submittedCode = response;
 
-    if (this.preprocess) {
-      submittedCode = this.preprocess(submittedCode);
-    }
+    // if (this.preprocess) {
+    //   submittedCode = this.preprocess(submittedCode);
+    // }
 
-    let code = this.testHarness.replace("{{submission}}", indentString(submittedCode, 4));
+    let code = this.config.test_harness.replace("{{submission}}", indentString(submittedCode, 4));
     code = applySkin(code, skin);
     return code;
   }
@@ -477,7 +497,7 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
           ${sub.uniqname}
         </div>
         <div class="panel-body">
-          <pre><code>${highlightCode(this.extract_code(response, originalSkin), CODE_LANGUAGE)}</code></pre>
+          <pre><code>${highlightCode(response, CODE_LANGUAGE)}</code></pre>
         </div>
       </div>
     `);
@@ -492,8 +512,12 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
   }
 
   public async autoGroup() {
+    if (!this.config) {
+      return;
+    }
+
     assert(this.question);
-    assert(this.rubric);
+
     if (!this.assn) {
       return;
     }
@@ -502,7 +526,7 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
 
     let equivalenceGroups : (ManualGradingGroupRecord & { repProgram?: Program })[] = [];
 
-    let allSubs = this.assn!.groups.flatMap(g => g.submissions.map(sub => ({
+    let allSubs = Object.values(this.assn.groups).flatMap(g => g.submissions.map(sub => ({
       submission: sub,
       grading_result: copyGradingResult(g.grading_result)
     })));
@@ -523,9 +547,13 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
     // Remove program property
     equivalenceGroups.forEach(g => delete (<any>g).repProgram);
 
+    let newGroups : {[index: string]: (ManualGradingGroupRecord & { repProgram?: Program })}= {};
+    equivalenceGroups.forEach(g => newGroups[g.group_uuid] = g);
+
     let newAssn : ManualGradingQuestionRecord = {
       question_id: this.assn!.question_id,
-      groups: equivalenceGroups
+      groups: newGroups,
+      grading_epoch: this.assn!.grading_epoch
     };
 
     // TODO
@@ -535,8 +563,9 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
   }
 
   private getGroupingFunctionName(sub: ManualGradingSubmission) {
+    assert(this.config);
     let skin = this.skin_override ?? createRecordedSkin(sub);
-    return applySkin(this.groupingFunctionName, skin);
+    return applySkin(this.config?.grouping_function, skin);
   }
 
   private autoGroupHelper(
@@ -624,11 +653,12 @@ export class ManualCodeGraderApp extends ExammaGraderRayApplication {
     let i = this.currentGroup.submissions.findIndex(sub => sub.submission_uuid === subToRemove.submission_uuid);
     i !== -1 && this.currentGroup.submissions.splice(i, 1);
 
-    this.assn.groups.push({
-      group_uuid: uuidv4(),
+    let new_uuid = uuidv4();
+    this.assn.groups[new_uuid] = {
+      group_uuid: new_uuid,
       submissions: [subToRemove],
       grading_result: copyGradingResult(this.currentGroup.grading_result)
-    });
+    };
 
     this.refreshGroups();
   }

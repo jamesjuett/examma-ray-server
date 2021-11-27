@@ -4,22 +4,30 @@
 import axios from "axios";
 import { ExamSpecification } from "examma-ray";
 import { read } from "fs";
-import { ExammaGraderRayApplication } from "./Application";
+import { ExammaRayGraderClient } from "./Application";
 
 // import 'katex/dist/katex.min.css';
 
 
 
-export class IndexExammaRayGraderApplication extends ExammaGraderRayApplication {
+export class IndexExammaRayGraderApplication {
 
-  protected async onStart() {
-    await this.reloadExams();
-    setInterval(() => this.reloadExams(), 30000)
+  public readonly client: ExammaRayGraderClient;
+
+  private constructor(client: ExammaRayGraderClient) {
+    this.client = client;
+  }
+
+  public static async create() {
+    let app = new IndexExammaRayGraderApplication(await ExammaRayGraderClient.create());
+    await app.reloadExams();
+    setInterval(() => app.reloadExams(), 30000)
+    return app;
   }
 
   public async reloadExams() {
     const app = this;
-    if (this.currentUser) {
+    if (this.client.currentUser) {
       try {
   
         let response = await axios({
@@ -27,7 +35,7 @@ export class IndexExammaRayGraderApplication extends ExammaGraderRayApplication 
           method: "GET",
           data: {},
           headers: {
-            'Authorization': 'bearer ' + this.getBearerToken()
+            'Authorization': 'bearer ' + this.client.getBearerToken()
           }
         });
   
@@ -48,7 +56,7 @@ export class IndexExammaRayGraderApplication extends ExammaGraderRayApplication 
               method: "POST",
               data: {},
               headers: {
-                  'Authorization': 'bearer ' + app.getBearerToken()
+                  'Authorization': 'bearer ' + app.client.getBearerToken()
               }
             });
             alert(JSON.stringify(response.data));
@@ -60,7 +68,7 @@ export class IndexExammaRayGraderApplication extends ExammaGraderRayApplication 
               method: "POST",
               data: {},
               headers: {
-                  'Authorization': 'bearer ' + app.getBearerToken()
+                  'Authorization': 'bearer ' + app.client.getBearerToken()
               }
             });
             alert(JSON.stringify(response.data));
@@ -80,9 +88,7 @@ export class IndexExammaRayGraderApplication extends ExammaGraderRayApplication 
 
 async function main() {
 
-  const app = new IndexExammaRayGraderApplication();
-  await app.start();
-
+  const app = await IndexExammaRayGraderApplication.create();
   $("#create-exam-form").on("submit", async (e) => {
     e.preventDefault();
     let files = (<HTMLInputElement>$("#exam-spec-file-input")[0]).files;
@@ -96,7 +102,7 @@ async function main() {
       method: "POST",
       data: formData,
       headers: {
-        'Authorization': 'bearer ' + app.getBearerToken(),
+        'Authorization': 'bearer ' + app.client.getBearerToken(),
       },
     });
 

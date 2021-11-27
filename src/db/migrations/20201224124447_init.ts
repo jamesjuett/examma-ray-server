@@ -30,7 +30,7 @@ export async function up(knex: Knex): Promise<void> {
 
     .createTable("manual_grading_questions", table => {
       table.string("question_id", 100).primary().notNullable();
-      table.integer("epoch").notNullable();
+      table.integer("grading_epoch").notNullable();
 
       table.index("question_id");
     })
@@ -70,7 +70,7 @@ export async function up(knex: Knex): Promise<void> {
       table.string("question_id", 100).notNullable()
         .references("question_id").inTable("manual_grading_questions").onDelete("restrict");
       table.string("exam_id", 100).notNullable();
-      table.uuid("group_uuid").notNullable()
+      table.uuid("group_uuid").nullable()
         .references("group_uuid").inTable("manual_grading_groups").onDelete("set null");
       table.string("uniqname", 100).notNullable();
       table.text("submission").notNullable();
@@ -85,7 +85,7 @@ export async function up(knex: Knex): Promise<void> {
       table.uuid("group_uuid").notNullable()
         .references("group_uuid").inTable("manual_grading_groups").onDelete("cascade");
       table.string("rubric_item_id", 100).notNullable();
-      table.string("status", 100).nullable();
+      table.string("status", 100).notNullable();
       // table.timestamps(true, true);
 
       table.primary(["group_uuid", "rubric_item_id"]);

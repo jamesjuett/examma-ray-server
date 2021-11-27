@@ -11,14 +11,21 @@ export type UserInfo = {
   name: string;
 };
 
-export abstract class ExammaGraderRayApplication {
+export class ExammaRayGraderClient {
 
   public readonly currentUser?: UserInfo;
 
   public readonly client_uuid: string;
 
-  public constructor() {
+  private constructor() {
     this.client_uuid = uuidv4();
+    this.setupEventHandlers();
+  }
+
+  public static async create() {
+    let client = new ExammaRayGraderClient();
+    await client.checkLogin();
+    return client;
   }
 
   private async checkLogin() {
@@ -65,22 +72,7 @@ export abstract class ExammaGraderRayApplication {
   }
 
   private setupEventHandlers() {
-    const self = this;
     $(".examma-ray-log-out-button").on("click", () => this.logout());
-  }
-
-
-  public async start() {
-
-    this.setupEventHandlers();
-
-    await this.checkLogin();
-
-    await this.onStart();
-  }
-
-  protected async onStart() {
-    // do nothing, derived classes can override
   }
 
 }

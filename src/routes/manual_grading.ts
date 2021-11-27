@@ -1,12 +1,13 @@
 import { Request, Response, Router } from "express";
 import { query } from "../db/db";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam } from "./common";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam, validateParamExammaRayId } from "./common";
 import { Worker } from "worker_threads";
 import { readFileSync } from "fs";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
-import { ManualGradingPingRequest, ManualGradingRubricItem } from "../manual_grading";
+import { ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingRubricItem } from "../manual_grading";
 import { getJwtUserInfo } from "../auth/jwt_auth";
+import { db_getCodeGraderConfig } from "../db/db_code_grader";
 const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyQuestionId = validateBody("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyGroupId = validateBody("group_id").trim().isLength({min: 1, max: 100});
@@ -97,21 +98,10 @@ const validateBodyGroupId = validateBody("group_id").trim().isLength({min: 1, ma
 
 
 export const manual_grading_router = Router();
+
+    
 manual_grading_router
-  .route("/records/:question_id")
-    .get(createRoute({
-      authorization: NO_AUTHORIZATION, // requireSuperUser,
-      preprocessing: NO_PREPROCESSING,
-      validation: [
-        validateParamQuestionId
-      ],
-      handler: async (req: Request, res: Response) => {
-        const result = await db_getManualGradingRecords(req.params["question_id"])
-        res.status(200).json(result);
-      }
-    }));
-manual_grading_router
-  .route("/rubric/:question_id")
+  .route("/:question_id/rubric")
     .get(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: NO_PREPROCESSING,
@@ -123,19 +113,66 @@ manual_grading_router
         res.status(200).json(result);
       }
     }));
+    
 manual_grading_router
-  .route("/ping")
+  .route("/:question_id/config")
+    .get(createRoute({
+      authorization: NO_AUTHORIZATION, // requireSuperUser,
+      preprocessing: NO_PREPROCESSING,
+      validation: [
+        validateParamQuestionId
+      ],
+      handler: async (req: Request, res: Response) => {
+        const result: ManualCodeGraderConfiguration | undefined = await db_getCodeGraderConfig(req.params["question_id"])
+        if (result) {
+          return res.status(200).json(result);
+        }
+        else {
+          return res.sendStatus(404);
+        }
+      }
+    }));
+
+manual_grading_router
+  .route("/:exam_id/questions/:question_id/ping")
     .post(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: jsonBodyParser,
       validation: [
-        validateBodyQuestionId,
-        validateBodyGroupId.optional()
+        validateParamExammaRayId("exam_id"),
+        validateParamExammaRayId("question_id"),
+        validateBodyGroupId.optional(),
+        validateBody("my_grading_epoch").isInt().optional()
       ],
       handler: async (req: Request, res: Response) => {
         let userInfo = getJwtUserInfo(req);
         let pr = <ManualGradingPingRequest>req.body;
-        EXAMMA_RAY_GRADING_SERVER.receiveManualGradingPing(userInfo.email, pr);
-        res.status(200).json(EXAMMA_RAY_GRADING_SERVER.pingResponse(pr.question_id));
+        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        if (qs) {
+          return res.status(200).json(qs.processManualGradingPing(userInfo.email, pr));
+        }
+        else {
+          return res.sendStatus(404);
+        }
+      }
+    }));
+
+manual_grading_router
+  .route("/:exam_id/questions/:question_id/records")
+    .get(createRoute({
+      authorization: NO_AUTHORIZATION, // requireSuperUser,
+      preprocessing: NO_PREPROCESSING,
+      validation: [
+        validateParamExammaRayId("exam_id"),
+        validateParamExammaRayId("question_id"),
+      ],
+      handler: async (req: Request, res: Response) => {
+        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        if (qs) {
+          return res.status(200).json(qs.grading_record);
+        }
+        else {
+          return res.sendStatus(404);
+        }
       }
     }));

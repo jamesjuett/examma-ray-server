@@ -46,7 +46,7 @@ async function addSubmission(exam: Exam, filepath: string, originalFilename: str
   catch (e: unknown) {
     console.log("ERROR processing submission for " + filepath);
     copyFileSync(filepath, `data/${exam.exam_id}/error-submissions/${uuidv4()}-${originalFilename}`,)
-    // console.log(e);
+    console.log(e);
   }
 }
 

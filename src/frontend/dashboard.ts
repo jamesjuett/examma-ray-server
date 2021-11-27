@@ -4,22 +4,35 @@ import queryString from "query-string";
 import { ExamSubmissionRecord } from "../dashboard";
 import { ExamTaskStatus } from "../ExammaRayGradingServer";
 import { asMutable, assert } from "../util/util";
-import { ExammaGraderRayApplication } from "./Application";
+import { ExammaRayGraderClient } from "./Application";
 
 
 
-export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplication {
+export class DashboardExammaRayGraderApplication {
+
+  public readonly client: ExammaRayGraderClient;
 
   public readonly exam_id: string;
   public readonly exam?: Exam;
   
   private exam_epoch?: number;
 
-  public constructor(exam_id: string) {
-    super();
+  private constructor(client: ExammaRayGraderClient, exam_id: string) {
+    this.client = client;
     this.exam_id = exam_id;
 
     this.initComponents();
+
+    this.sendPing();
+    setInterval(() => this.sendPing(), 5000);
+    setInterval(() => this.checkTaskStatus(), 2000);
+  }
+
+  public static async create(exam_id: string) {
+    return new DashboardExammaRayGraderApplication(
+      await ExammaRayGraderClient.create(),
+      exam_id
+    );
   }
 
   private initComponents() {
@@ -38,18 +51,12 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
         method: "put",
         data: formData,
         headers: {
-          'Authorization': 'bearer ' + this.getBearerToken(),
+          'Authorization': 'bearer ' + this.client.getBearerToken(),
         },
       });
 
       $("#upload-roster-modal").modal("hide");
     });
-  }
-
-  protected async onStart() {
-    this.sendPing();
-    setInterval(() => this.sendPing(), 5000);
-    setInterval(() => this.checkTaskStatus(), 2000);
   }
 
   private async checkTaskStatus() {
@@ -58,7 +65,7 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
       url: `api/exams/${this.exam_id}/tasks`,
       method: "GET",
       headers: {
-          'Authorization': 'bearer ' + this.getBearerToken()
+          'Authorization': 'bearer ' + this.client.getBearerToken()
       }
     });
     const task_status = <ExamTaskStatus>task_status_response.data;
@@ -73,7 +80,7 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
       url: `api/exams/${this.exam_id}/epoch`,
       method: "GET",
       headers: {
-          'Authorization': 'bearer ' + this.getBearerToken()
+          'Authorization': 'bearer ' + this.client.getBearerToken()
       }
     });
     const current_epoch = <number>epoch_response.data.epoch;
@@ -95,7 +102,7 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
         method: "GET",
         data: {},
         headers: {
-            'Authorization': 'bearer ' + this.getBearerToken()
+            'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
       const exam_spec = <ExamSpecification>exam_spec_response.data;
@@ -106,7 +113,7 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
         url: `api/exams/${this.exam_id}/submissions`,
         method: "GET",
         headers: {
-            'Authorization': 'bearer ' + this.getBearerToken()
+            'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
       const submissions = <ExamSubmissionRecord[]>submissions_response.data;
@@ -115,7 +122,7 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
         url: `api/exams/${this.exam_id}/roster`,
         method: "GET",
         headers: {
-            'Authorization': 'bearer ' + this.getBearerToken()
+            'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
       const roster = <StudentInfo[]>roster_response.data;
@@ -169,21 +176,20 @@ export class DashboardExammaRayGraderApplication extends ExammaGraderRayApplicat
       method: "POST",
       data: formData,
       headers: {
-        'Authorization': 'bearer ' + this.getBearerToken(),
+        'Authorization': 'bearer ' + this.client.getBearerToken(),
       },
     });
   }
 }
 
-function main() {
+async function main() {
   
   const qs = queryString.parse(location.search);
   const EXAM_ID = qs["exam-id"];
   assert(typeof EXAM_ID === "string");
 
 
-  const app = new DashboardExammaRayGraderApplication(EXAM_ID);
-  app.start();
+  const app = await DashboardExammaRayGraderApplication.create(EXAM_ID);
 
   
   $("#submissions-file-input-form").on("submit", async (e) => {

@@ -30,7 +30,8 @@ declare module "knex/types/tables" {
 
   interface DB_Manual_Grading_Questions {
     question_id: string;
-    epoch: number;
+    // grouping_epoch: number;
+    grading_epoch: number;
   }
 
   interface DB_Manual_Grading_Rubrics {
@@ -68,7 +69,7 @@ declare module "knex/types/tables" {
   interface DB_Manual_Grading_Records {
     group_uuid: string;
     rubric_item_id: string;
-    status?: ManualGradingRubricItemStatus;
+    status: ManualGradingRubricItemStatus;
     // created_at: string; // timestamp
     // updated_at: string; // timestamp
   }
@@ -118,8 +119,8 @@ declare module "knex/types/tables" {
       //   All required
       DB_Manual_Grading_Questions,
       // Update Type
-      //   Only allowed to update epoch
-      Partial<Pick<DB_Manual_Grading_Questions, "epoch">>
+      //   Only allowed to update epochs
+      Partial<Pick<DB_Manual_Grading_Questions, "grading_epoch">>
     >;
 
     manual_grading_rubrics: Knex.CompositeTableType<
@@ -129,8 +130,8 @@ declare module "knex/types/tables" {
       //   All required, except active is optional (default true)
       Omit<DB_Manual_Grading_Rubrics, "active"> & Partial<Pick<DB_Manual_Grading_Rubrics, "active">>,
       // Update Type
-      //   All optional except question_id may not be updated
-      Partial<Omit<DB_Manual_Grading_Rubrics, "question_id">> & {question_id?: undefined}
+      //   All optional except question_id and rubric_item_id may not be updated
+      Partial<Omit<DB_Manual_Grading_Rubrics, "question_id" | "rubric_item_id">> & Partial<Record<"question_id" | "rubric_item_id", undefined>>
     >;
 
     manual_grading_groups: Knex.CompositeTableType<
@@ -148,8 +149,8 @@ declare module "knex/types/tables" {
       // Base Type
       DB_Manual_Grading_Submissions,
       // Insert Type
-      //   All required
-      DB_Manual_Grading_Submissions,
+      //   All required, except group_uuid is optional (nullable)
+      Omit<DB_Manual_Grading_Submissions, "group_uuid"> & Partial<Pick<DB_Manual_Grading_Submissions, "group_uuid">>,
       // Update Type
       //   Only allowed to update group_uuid
       Partial<Pick<DB_Manual_Grading_Submissions, "group_uuid">>
