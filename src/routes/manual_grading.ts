@@ -8,6 +8,7 @@ import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_
 import { ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingRubricItem } from "../manual_grading";
 import { getJwtUserInfo } from "../auth/jwt_auth";
 import { db_getCodeGraderConfig } from "../db/db_code_grader";
+import { ManualGradingOperation } from "../ExammaRayGradingServer";
 const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyQuestionId = validateBody("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyGroupId = validateBody("group_id").trim().isLength({min: 1, max: 100});
@@ -101,7 +102,7 @@ export const manual_grading_router = Router();
 
     
 manual_grading_router
-  .route("/:question_id/rubric")
+  .route("/:exam_id/questions/:question_id/rubric")
     .get(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: NO_PREPROCESSING,
@@ -109,8 +110,13 @@ manual_grading_router
         validateParamQuestionId
       ],
       handler: async (req: Request, res: Response) => {
-        const result: ManualGradingRubricItem[]  = await db_getManualGradingRubric(req.params["question_id"])
-        res.status(200).json(result);
+        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        if (qs) {
+          return res.status(200).json(qs.rubric);
+        }
+        else {
+          return res.sendStatus(404);
+        }
       }
     }));
     
@@ -175,4 +181,23 @@ manual_grading_router
           return res.sendStatus(404);
         }
       }
-    }));
+    }))
+    // .post(createRoute({
+    //   authorization: NO_AUTHORIZATION, // requireSuperUser,
+    //   preprocessing: jsonBodyParser,
+    //   validation: [
+    //     validateParamExammaRayId("exam_id"),
+    //     validateParamExammaRayId("question_id"),
+    //   ],
+    //   handler: async (req: Request, res: Response) => {
+    //     let ops = <ManualGradingOperation[]>req.body;
+    //     let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+    //     if (qs) {
+    //       qs.receiveOperations(ops)
+    //       return res.sendStatus(200);
+    //     }
+    //     else {
+    //       return res.sendStatus(404);
+    //     }
+    //   }
+    // }));

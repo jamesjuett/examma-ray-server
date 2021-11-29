@@ -1,5 +1,5 @@
 import { Tables } from "knex/types/tables";
-import { ManualGradingGroupRecord, ManualGradingQuestionRecord, ManualGradingRubricItem, ManualGradingRubricItemStatus } from "../manual_grading";
+import { ManualGradingGroupRecord, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus } from "../manual_grading";
 import { query } from "./db";
 
 export async function db_getManualGradingQuestion(question_id: string) {
@@ -26,6 +26,15 @@ export async function db_getGroupSubmissions(group_uuid: string) {
   return await query("manual_grading_submissions").where({
     group_uuid: group_uuid
   }).select("*");
+}
+
+export async function db_getManualGradingRubricItem(question_id: string, rubric_item_id: string) {
+
+  // Create and get a copy of the new rubric item
+  return await query("manual_grading_rubrics").where({
+    question_id: question_id,
+    rubric_item_id: rubric_item_id
+  }).select().first();
 }
 
 export async function db_createManualGradingRubricItem(question_id: string, rubric_item_id: string, rubric_item: ManualGradingRubricItem) {
@@ -82,7 +91,7 @@ export async function db_setManualGradingGroupFinished(
 }
 
 
-export async function db_getManualGradingRecords(question_id: string) : Promise<ManualGradingQuestionRecord> {
+export async function db_getManualGradingRecords(question_id: string) : Promise<ManualGradingQuestionRecords> {
 
   
   const question = await query("manual_grading_questions")

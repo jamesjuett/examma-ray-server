@@ -1,4 +1,4 @@
-import { ManualGradingEpochTransition } from "./ExammaRayGradingServer";
+import { ManualGradingEpochTransition, ManualGradingOperation } from "./ExammaRayGradingServer";
 
 export type ManualCodeGraderConfiguration = {
   test_harness: string,
@@ -36,7 +36,7 @@ export type ManualGradingGroupRecord = {
   grading_result: ManualGradingResult
 }
 
-export type ManualGradingQuestionRecord = {
+export type ManualGradingQuestionRecords = {
   // name?: string,
   // exam_id: string,
   grading_epoch: number,
@@ -54,7 +54,8 @@ export type ManualGradingPingRequest = {
   exam_id: string,
   question_id: string,
   group_uuid?: string,
-  my_grading_epoch: number | undefined
+  my_grading_epoch: number
+  my_operations: readonly ManualGradingOperation[]
 };
 
 export type ManualGradingPingResponse = {

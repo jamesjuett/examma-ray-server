@@ -21,11 +21,12 @@ import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
 
 import queryString from "query-string";
-import { ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecord, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSubmission } from "../../manual_grading";
-import { asMutable, assert } from "../../util/util";
+import { ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSubmission } from "../../manual_grading";
+import { asMutable, assert, assertFalse, assertNever } from "../../util/util";
 import axios from "axios";
 import { ExammaRayGraderClient } from "../Application";
 import avatar from "animal-avatar-generator";
+import { ManualGradingEpochTransition, ManualGradingOperation } from "../../ExammaRayGradingServer";
 
 // Because this grader is based on Lobster, it only works for C++ code
 // Perhaps in the future it will be generalized to other languages and
@@ -76,11 +77,14 @@ export class ManualCodeGraderApp {
   public readonly exam_id: string;
   public readonly question: Question;
   public readonly rubric?: readonly ManualGradingRubricItem[];
-  
-  public readonly assn?: ManualGradingQuestionRecord;
-  public readonly currentGroup?: ManualGradingGroupRecord;
 
-  public readonly grading_epoch?: number;
+  public readonly grading_records?: ManualGradingQuestionRecords;
+  private local_changes: ManualGradingOperation[] = [];
+  private pendingPing: boolean = false;
+
+
+
+  public readonly currentGroup?: ManualGradingGroupRecord;
 
   public lobster: SimpleExerciseLobsterOutlet;
 
@@ -123,11 +127,31 @@ export class ManualCodeGraderApp {
     $(".examma-ray-grading-title").html(this.question.question_id);
     this.groupMemberThumbnailsElem = $(".examma-ray-group-member-thumbnails");
 
-    this.lobster = this.createLobster();
-    // setInterval(() => this.saveGradingAssignment(), 10000);
+    this.initComponents();
 
-    this.sendPing();
-    setInterval(() => this.sendPing(), 5000);
+    this.lobster = this.createLobster();
+
+    this.reloadGradingRecords();
+    setInterval(() => this.sendPing(), 1000);
+  }
+
+  private initComponents() {
+
+    $("#create-rubric-item-button").on("click", async () => {
+      let i = this.rubric?.length ?? 0;
+      
+      this.performLocalOperation({
+        kind: "create_rubric_item",
+        rubric_item: {
+          rubric_item_id: `ri_${i}`,
+          title: `Title ${i}`,
+          description: `Desc ${i}`,
+          points: i,
+          active: true
+        }
+      });
+      $("#create-rubric-item-modal").modal("hide");
+    });
   }
 
   public static async create(exam_id: string, question_id: string) {
@@ -150,11 +174,30 @@ export class ManualCodeGraderApp {
 
   private async sendPing() {
 
-    const pingRequest = this.composePingRequest();
-
-    if (!pingRequest) {
+    // only one ping at a time
+    if (this.pendingPing) {
       return;
     }
+
+    if (!this.question || !this.grading_records) {
+      return;
+    }
+    
+    this.pendingPing = true;
+
+    let pingRequest: ManualGradingPingRequest = {
+      client_uuid: this.client.client_uuid,
+      exam_id: this.exam_id,
+      question_id: this.question.question_id,
+      group_uuid: this.currentGroup?.group_uuid,
+      my_grading_epoch: this.grading_records.grading_epoch,
+      my_operations: this.local_changes.slice() // copy
+    };
+
+    // All local changes will be sent with the request and
+    // reflected in the response to come up to the latest grading
+    // epoch, so they'll be reapplied and we don't need to keep them.
+    this.local_changes.length = 0; // clear the array
 
     const ping_response = await axios({
       url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
@@ -164,42 +207,42 @@ export class ManualCodeGraderApp {
           'Authorization': 'bearer ' + this.client.getBearerToken()
       }
     });
+
+    // Note that after this promise resolves, there may be new local changes
+    // that will be reapplied after processing the remote ones via the call
+    // here
+    
     this.onPingResponse(<ManualGradingPingResponse>ping_response.data);
     
-  }
-
-  private composePingRequest() : ManualGradingPingRequest | undefined {
-    if (!this.question) {
-      return undefined; // no pings
-    }
-
-    return {
-      client_uuid: this.client.client_uuid,
-      exam_id: this.exam_id,
-      question_id: this.question.question_id,
-      group_uuid: this.currentGroup?.group_uuid,
-      my_grading_epoch: this.grading_epoch
-    }
+    this.pendingPing = false;
   }
 
   private async onPingResponse(pingResponse: ManualGradingPingResponse) {
 
     this.updateGraderAvatars(pingResponse);
 
-    if (pingResponse.epoch_transitions === "reload") {
-
-      const records_response = await axios({
-        url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/records`,
-        method: "GET",
-        data: {},
-        headers: {
-            'Authorization': 'bearer ' + this.client.getBearerToken()
-        }
-      });
-      
-      console.log(records_response.data);
-  
+    if (pingResponse.epoch_transitions === "invalid") {
+      alert("Uh oh, something went wrong synchronizing your work to the server. This should never happen. Try reloading the page, I guess? :(");
     }
+    else if (pingResponse.epoch_transitions === "reload") {
+      await this.reloadGradingRecords();
+    }
+    else {
+      this.applyRemoteEpochTransitions(pingResponse.epoch_transitions, pingResponse.grading_epoch);
+    }
+  }
+
+  private applyRemoteEpochTransitions(transitions: readonly ManualGradingEpochTransition[], to_epoch: number) {
+    
+    assert(this.grading_records);
+
+    // Apply remote transitions
+    transitions.forEach(t => t.ops.forEach(op => this.applyOperation(op)))
+
+    // Reapply our current set of local operations
+    this.local_changes.forEach(op => this.applyOperation(op));
+
+    this.grading_records.grading_epoch = to_epoch;
   }
 
   private updateGraderAvatars(pingResponse: ManualGradingPingResponse) {
@@ -259,7 +302,6 @@ export class ManualCodeGraderApp {
     buttons.addClass("list-group");
     this.rubricButtonElems.length = 0;
 
-
     buttons.empty();
     
     let skin = this.skin_override ?? (sub && createRecordedSkin(sub));
@@ -299,13 +341,54 @@ export class ManualCodeGraderApp {
   
   }
 
-  private setGradingAssignment(records: ManualGradingQuestionRecord) {
+  private setGradingRecords(records: ManualGradingQuestionRecords) {
     this.closeGroup();
 
-    delete asMutable(this).assn;
-    asMutable(this).assn = records;
+    asMutable(this).grading_records = records;
 
     this.updateGroupThumbnails();
+  }
+
+  public performLocalOperation(op: ManualGradingOperation) {
+    this.applyOperation(op);
+    this.local_changes.push(op);
+  }
+
+  private applyOperation(op: ManualGradingOperation) {
+    if (!this.grading_records || !this.rubric) {
+      return;
+    }
+
+    if (op.kind === "set_rubric_item_status") {
+      this.grading_records.groups[op.group_uuid].grading_result[op.rubric_item_id] = op.status;
+    }
+    else if (op.kind === "set_group_finished") {
+      this.grading_records.groups[op.group_uuid].finished = op.finished;
+    }
+    else if (op.kind === "edit_rubric_item") {
+      let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item_id);
+      if (existingRi) {
+        Object.assign(existingRi, op.edits);
+        this.createRubricBar();
+      }
+      else {
+        // tehcnically should never get here - rubric items can't be deleted, only hidden
+        return assertFalse();
+      }
+    }
+    else if (op.kind === "create_rubric_item") {
+      let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item.rubric_item_id);
+      if (existingRi) {
+        Object.assign(existingRi, op.rubric_item);
+      }
+      else {
+        asMutable(this.rubric).push(op.rubric_item);
+      }
+      this.createRubricBar();
+    }
+    else {
+      return assertNever(op);
+    }
   }
 
   private updateGroupThumbnails() {
@@ -313,8 +396,8 @@ export class ManualCodeGraderApp {
     $(".examma-ray-submissions-column").empty();
     this.thumbnailElems = {};
 
-    if (!this.assn) { return; }
-    let groups = Object.values(this.assn.groups)
+    if (!this.grading_records) { return; }
+    let groups = Object.values(this.grading_records.groups)
       .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
       .sort(this.SUBMISSION_SORTS[this.submissionsSortCriteria]);
 
@@ -373,14 +456,12 @@ export class ManualCodeGraderApp {
     this.updateGroupThumbnails();
   }
 
-  private async reloadGradingResults() {
+  private async reloadGradingRecords() {
   
-    // TODO: check for unsaved changes
-
     try {
 
       const rubric_response = await axios({
-        url: `api/manual_grading/rubric/${this.question.question_id}`,
+        url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/rubric`,
         method: "GET",
         data: {},
         headers: {
@@ -389,51 +470,30 @@ export class ManualCodeGraderApp {
       });
       const rubric = <ManualGradingRubricItem[]>rubric_response.data;
   
-      let records_response = await axios({
-        url: `api/manual_grading/records/${this.question.question_id}`,
+      const records_response = await axios({
+        url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/records`,
         method: "GET",
         data: {},
         headers: {
             'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
-      const records = <ManualGradingQuestionRecord>records_response.data;
+      const records = <ManualGradingQuestionRecords>records_response.data;
 
       this.setRubric(rubric);
-      this.setGradingAssignment(records);
+      this.setGradingRecords(records);
+
+      // Reapply our current set of local operations
+      this.local_changes.forEach(op => this.applyOperation(op));
     }
     catch(e: unknown) {
-      alert("Error loading question :(");
+      alert("Error loading grading records :(");
     }
   }
 
   private setRubric(rubric: readonly ManualGradingRubricItem[]) {
     asMutable(this).rubric = rubric;
     this.createRubricBar();
-  }
-
-  public async saveGradingAssignment() {
-    if (!this.assn) {
-      return;
-    }
-
-    // TODO
-
-    // // Check if file is still there
-    // try {
-    //   await this.fileHandle.getFile();
-    // }
-    // catch (e) {
-    //   delete this.fileHandle;
-    //   alert("Oops! The grading assignment file appears to have disappeared! Please reload the page.");
-    //   return;
-    // }
-
-    // const writable = await this.fileHandle.createWritable();
-    // // Write the contents of the file to the stream.
-    // await writable.write(JSON.stringify(this.assn, null, 2));
-    // // Close the file and write the contents to disk.
-    // await writable.close();
   }
 
   public openGroup(group: ManualGradingGroupRecord) {
@@ -518,7 +578,7 @@ export class ManualCodeGraderApp {
 
     assert(this.question);
 
-    if (!this.assn) {
+    if (!this.grading_records) {
       return;
     }
 
@@ -526,7 +586,7 @@ export class ManualCodeGraderApp {
 
     let equivalenceGroups : (ManualGradingGroupRecord & { repProgram?: Program })[] = [];
 
-    let allSubs = Object.values(this.assn.groups).flatMap(g => g.submissions.map(sub => ({
+    let allSubs = Object.values(this.grading_records.groups).flatMap(g => g.submissions.map(sub => ({
       submission: sub,
       grading_result: copyGradingResult(g.grading_result)
     })));
@@ -550,10 +610,10 @@ export class ManualCodeGraderApp {
     let newGroups : {[index: string]: (ManualGradingGroupRecord & { repProgram?: Program })}= {};
     equivalenceGroups.forEach(g => newGroups[g.group_uuid] = g);
 
-    let newAssn : ManualGradingQuestionRecord = {
-      question_id: this.assn!.question_id,
+    let newAssn : ManualGradingQuestionRecords = {
+      question_id: this.grading_records!.question_id,
       groups: newGroups,
-      grading_epoch: this.assn!.grading_epoch
+      grading_epoch: this.grading_records!.grading_epoch
     };
 
     // TODO
@@ -646,7 +706,7 @@ export class ManualCodeGraderApp {
   }
 
   private removeFromCurrentGroup(subToRemove: ManualGradingSubmission) {
-    if (!this.assn || !this.currentGroup || this.currentGroup.submissions.length <= 1) {
+    if (!this.grading_records || !this.currentGroup || this.currentGroup.submissions.length <= 1) {
       return;
     }
 
@@ -654,7 +714,7 @@ export class ManualCodeGraderApp {
     i !== -1 && this.currentGroup.submissions.splice(i, 1);
 
     let new_uuid = uuidv4();
-    this.assn.groups[new_uuid] = {
+    this.grading_records.groups[new_uuid] = {
       group_uuid: new_uuid,
       submissions: [subToRemove],
       grading_result: copyGradingResult(this.currentGroup.grading_result)

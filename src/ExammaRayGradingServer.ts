@@ -2,14 +2,14 @@ import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { readdirSync } from "fs";
 import { copyFile, readFile } from "fs/promises";
 import { JwtUserInfo } from "./auth/jwt_auth";
-import { ActiveGraders, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecord, ManualGradingRubricItem, ManualGradingRubricItemStatus } from "./manual_grading";
+import { ActiveGraders, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus } from "./manual_grading";
 import { asMutable, assertExists, assertFalse, assertNever } from "./util/util";
 import { Worker } from "worker_threads";
 import { ExamGeneratorSpecification } from "examma-ray/dist/ExamGenerator";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { db_getExamEpoch, db_nextExamEpoch } from "./db/db_exams";
 import { WorkerData_Generate } from "./run/types";
-import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingRecords, db_getManualGradingRubric, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecord, db_updateManualGradingRubricItem } from "./db/db_rubrics";
+import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecord, db_updateManualGradingRubricItem } from "./db/db_rubrics";
 import { assert } from "console";
 
 const GRADER_IDLE_THRESHOLD = 10000; // ms
@@ -173,7 +173,7 @@ export type ManualGradingOperation = {
 }
 
 export type ManualGradingEpochTransition = {
-  ops: ManualGradingOperation[]
+  readonly ops: readonly ManualGradingOperation[]
 };
 
 export class QuestionGradingServer {
@@ -182,12 +182,12 @@ export class QuestionGradingServer {
   public readonly question_id: string;
   public readonly rubric: ManualGradingRubricItem[];
 
-  public readonly grading_record: ManualGradingQuestionRecord;
+  public readonly grading_record: ManualGradingQuestionRecords;
   private history_starting_epoch: number;
   private transitionHistory: ManualGradingEpochTransition[] = [];
 
-  private epochQueue: ManualGradingEpochTransition[] = [];
-  private epochQueueLock: boolean = false;
+  private transitionRecorderQueue: ManualGradingEpochTransition[] = [];
+  private transitionRecorderQueueLock: boolean = false;
 
   public readonly active_graders: ActiveGraders = {};
   private next_active_graders: ActiveGraders = {};
@@ -207,7 +207,7 @@ export class QuestionGradingServer {
     );
   }
 
-  private constructor(exam_id: string, question_id: string, rubric: ManualGradingRubricItem[], grading_record: ManualGradingQuestionRecord) {
+  private constructor(exam_id: string, question_id: string, rubric: ManualGradingRubricItem[], grading_record: ManualGradingQuestionRecords) {
     this.exam_id = exam_id;
     this.question_id = question_id;
     this.history_starting_epoch = grading_record.grading_epoch;
@@ -221,77 +221,69 @@ export class QuestionGradingServer {
     }, GRADER_IDLE_THRESHOLD);
   }
 
-  public receiveOperations(ops: ManualGradingOperation[]) {
-    this.epochQueue.push({
-      ops: ops
-    });
+  public receiveTransition(transition: ManualGradingEpochTransition) {
+
+    // all at once, synchronous transition to next epoch
+    // so that clients won't ever get info halfway through
+    // an epoch
+    transition.ops.map(op => this.applyOperation(op));
+    ++(this.grading_record.grading_epoch);
+
+    this.transitionHistory.push(transition);
+    if (this.transitionHistory.length > 100) {
+      this.transitionHistory.shift();
+    }
+
+    // This happens async, but with all transitions/operations in order
+    this.transitionRecorderQueue.push();
+    this.recordOperations();
   }
 
-  public async processOperations() {
+  public async recordOperations() {
 
     // If an async call to process operations was already going,
     // then we won't spawn another one
-    if (this.epochQueueLock) {
+    if (this.transitionRecorderQueueLock) {
       return;
     }
     
-    this.epochQueueLock = true;
+    this.transitionRecorderQueueLock = true;
 
-    while(this.epochQueue.length > 0) {
-      let next = this.epochQueue.shift()!;
-
-      // all at once, synchronous transition to next epoch
-      // so that clients won't ever get info halfway through
-      // an epoch
-      let recordOperations = next.ops.map(op => this.applyOperation(op));
-      ++(this.grading_record.grading_epoch);
-
-      this.transitionHistory.push(next);
-      if (this.transitionHistory.length > 100) {
-        this.transitionHistory.shift();
+    while(this.transitionRecorderQueue.length > 0) {
+      let nextTransition = this.transitionRecorderQueue.shift()!
+      for(let i = 0; i < nextTransition.ops.length; ++i) {
+        await this.recordOperation(nextTransition.ops[i]);
       }
-
-      // ok to record asynch, though the individual operations
-      // within an epoch transition must still be sequenced in order
-      for(let i = 0; i < recordOperations.length; ++i) {
-        await recordOperations[i]();
-      }
-
       await db_setManualGradingQuestion(this.question_id, this.grading_record.grading_epoch);
     }
-
-    this.epochQueueLock = false;
+    
+    this.transitionRecorderQueueLock = false;
   }
 
-  // Note that this doesn't create any promises - it returns functors that can
-  // be executed to create the promises later
-  private applyOperation(op: ManualGradingOperation) : () => Promise<unknown> {
+  private applyOperation(op: ManualGradingOperation) {
     if (op.kind === "set_rubric_item_status") {
       this.grading_record.groups[op.group_uuid].grading_result[op.rubric_item_id] = op.status;
-      return () => db_setManualGradingRecord(op.group_uuid, op.rubric_item_id, op.status);
     }
     else if (op.kind === "set_group_finished") {
       this.grading_record.groups[op.group_uuid].finished = op.finished;
-      return () => db_setManualGradingGroupFinished(op.group_uuid, op.finished);
     }
     else if (op.kind === "edit_rubric_item") {
       let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item_id);
       if (existingRi) {
         Object.assign(existingRi, op.edits);
-        return () => db_updateManualGradingRubricItem(this.question_id, op.rubric_item_id, op.edits)
       }
-      // tehcnically should never get here - rubric items can't be deleted, only hidden
-      return assertFalse();
+      else {
+        // tehcnically should never get here - rubric items can't be deleted, only hidden
+        return assertFalse();
+      }
     }
     else if (op.kind === "create_rubric_item") {
       let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item.rubric_item_id);
       if (existingRi) {
         Object.assign(existingRi, op.rubric_item);
-        return () => db_updateManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_id, op.rubric_item)
       }
       else {
         this.rubric.push(op.rubric_item);
-        return () => db_createManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_id, op.rubric_item)
       }
     }
     else {
@@ -301,29 +293,28 @@ export class QuestionGradingServer {
 
   private async recordOperation(op: ManualGradingOperation) {
     if (op.kind === "set_rubric_item_status") {
-      this.grading_record.groups[op.group_uuid].grading_result[op.rubric_item_id] = op.status;
+      return db_setManualGradingRecord(op.group_uuid, op.rubric_item_id, op.status);
     }
     else if (op.kind === "set_group_finished") {
-      this.grading_record.groups[op.group_uuid].finished = op.finished;
+      return db_setManualGradingGroupFinished(op.group_uuid, op.finished);
     }
     else if (op.kind === "edit_rubric_item") {
-      let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item_id);
-      if (existingRi) {
-        Object.assign(existingRi, op.edits);
+      if (await db_getManualGradingRubricItem(this.question_id, op.rubric_item_id)) {
+        return db_updateManualGradingRubricItem(this.question_id, op.rubric_item_id, op.edits)
       }
       // tehcnically should never get here - rubric items can't be deleted, only hidden
+      return assertFalse();
     }
     else if (op.kind === "create_rubric_item") {
-      let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item.rubric_item_id);
-      if (existingRi) {
-        Object.assign(existingRi, op.rubric_item);
+      if (await db_getManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_id)) {
+        return db_updateManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_id, op.rubric_item)
       }
       else {
-        this.rubric.push(op.rubric_item);
+        return db_createManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_id, op.rubric_item)
       }
     }
     else {
-      assertNever(op);
+      return assertNever(op);
     }
   }
 
@@ -331,12 +322,16 @@ export class QuestionGradingServer {
     (this.active_graders[ping.question_id] ??= {graders: {}}).graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
     (this.next_active_graders[ping.question_id] ??= {graders: {}}).graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
 
+    // if the ping contained some new local operations from the client, apply them and advance the epoch
+    if (ping.my_operations.length > 0) {
+      this.receiveTransition({
+        ops: ping.my_operations
+      });
+    }
+
     let transitions: ManualGradingPingResponse["epoch_transitions"];
 
-    if (ping.my_grading_epoch === undefined) {
-      transitions = "reload";
-    }
-    else if (ping.my_grading_epoch < this.history_starting_epoch) {
+    if (ping.my_grading_epoch < this.history_starting_epoch) {
       transitions = "reload";
     }
     else if(ping.my_grading_epoch > this.grading_record.grading_epoch) {
