@@ -36,18 +36,17 @@ export async function up(knex: Knex): Promise<void> {
     })
 
     .createTable("manual_grading_rubrics", table => {
+      table.uuid("rubric_item_uuid").primary().notNullable();
       table.string("question_id", 100).notNullable()
         .references("question_id").inTable("manual_grading_questions").onDelete("restrict");
-      table.string("rubric_item_id", 100).notNullable();
       table.double("points");
       table.text("title");
       table.text("description");
       table.boolean("active").notNullable().defaultTo(true);
       // table.timestamps(true, true);
 
-      table.primary(["question_id", "rubric_item_id"]);
-
-      table.index(["question_id", "rubric_item_id"]);
+      table.index("rubric_item_uuid");
+      table.index("question_id");
     })
 
     .createTable("manual_grading_groups", table => {
@@ -84,15 +83,15 @@ export async function up(knex: Knex): Promise<void> {
     .createTable("manual_grading_records", table => {
       table.uuid("group_uuid").notNullable()
         .references("group_uuid").inTable("manual_grading_groups").onDelete("cascade");
-      table.string("rubric_item_id", 100).notNullable();
+      table.uuid("rubric_item_uuid").notNullable();
       table.string("status", 100).notNullable();
       // table.timestamps(true, true);
 
-      table.primary(["group_uuid", "rubric_item_id"]);
+      table.primary(["group_uuid", "rubric_item_uuid"]);
 
       table.index("group_uuid");
-      table.index("rubric_item_id");
-      table.index(["group_uuid", "rubric_item_id"]);
+      table.index("rubric_item_uuid");
+      table.index(["group_uuid", "rubric_item_uuid"]);
     })
 
     .createTable("manual_grading_code_grader_config", table => {

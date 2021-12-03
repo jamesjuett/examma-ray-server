@@ -156,7 +156,7 @@ export class ServerExam {
 export type ManualGradingOperation = {
   kind: "set_rubric_item_status",
   group_uuid: string,
-  rubric_item_id: string,
+  rubric_item_uuid: string,
   status: ManualGradingRubricItemStatus
 } | {
   kind: "set_group_finished",
@@ -164,7 +164,7 @@ export type ManualGradingOperation = {
   finished: boolean
 } | {
   kind: "edit_rubric_item",
-  rubric_item_id: string,
+  rubric_item_uuid: string,
   edits: Partial<ManualGradingRubricItem>  
 } | {
   kind: "create_rubric_item",
@@ -173,6 +173,8 @@ export type ManualGradingOperation = {
 }
 
 export type ManualGradingEpochTransition = {
+  readonly client_uuid: string,
+  readonly grader_email: string,
   readonly ops: readonly ManualGradingOperation[]
 };
 
@@ -235,7 +237,7 @@ export class QuestionGradingServer {
     }
 
     // This happens async, but with all transitions/operations in order
-    this.transitionRecorderQueue.push();
+    this.transitionRecorderQueue.push(transition);
     this.recordOperations();
   }
 
@@ -262,13 +264,13 @@ export class QuestionGradingServer {
 
   private applyOperation(op: ManualGradingOperation) {
     if (op.kind === "set_rubric_item_status") {
-      this.grading_record.groups[op.group_uuid].grading_result[op.rubric_item_id] = op.status;
+      this.grading_record.groups[op.group_uuid].grading_result[op.rubric_item_uuid] = op.status;
     }
     else if (op.kind === "set_group_finished") {
       this.grading_record.groups[op.group_uuid].finished = op.finished;
     }
     else if (op.kind === "edit_rubric_item") {
-      let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item_id);
+      let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item_uuid);
       if (existingRi) {
         Object.assign(existingRi, op.edits);
       }
@@ -278,7 +280,7 @@ export class QuestionGradingServer {
       }
     }
     else if (op.kind === "create_rubric_item") {
-      let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item.rubric_item_id);
+      let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item.rubric_item_uuid);
       if (existingRi) {
         Object.assign(existingRi, op.rubric_item);
       }
@@ -293,24 +295,24 @@ export class QuestionGradingServer {
 
   private async recordOperation(op: ManualGradingOperation) {
     if (op.kind === "set_rubric_item_status") {
-      return db_setManualGradingRecord(op.group_uuid, op.rubric_item_id, op.status);
+      return db_setManualGradingRecord(op.group_uuid, op.rubric_item_uuid, op.status);
     }
     else if (op.kind === "set_group_finished") {
       return db_setManualGradingGroupFinished(op.group_uuid, op.finished);
     }
     else if (op.kind === "edit_rubric_item") {
-      if (await db_getManualGradingRubricItem(this.question_id, op.rubric_item_id)) {
-        return db_updateManualGradingRubricItem(this.question_id, op.rubric_item_id, op.edits)
+      if (await db_getManualGradingRubricItem(this.question_id, op.rubric_item_uuid)) {
+        return db_updateManualGradingRubricItem(this.question_id, op.rubric_item_uuid, op.edits)
       }
       // tehcnically should never get here - rubric items can't be deleted, only hidden
       return assertFalse();
     }
     else if (op.kind === "create_rubric_item") {
-      if (await db_getManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_id)) {
-        return db_updateManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_id, op.rubric_item)
+      if (await db_getManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_uuid)) {
+        return db_updateManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_uuid, op.rubric_item)
       }
       else {
-        return db_createManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_id, op.rubric_item)
+        return db_createManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_uuid, op.rubric_item)
       }
     }
     else {
@@ -325,7 +327,9 @@ export class QuestionGradingServer {
     // if the ping contained some new local operations from the client, apply them and advance the epoch
     if (ping.my_operations.length > 0) {
       this.receiveTransition({
-        ops: ping.my_operations
+        ops: ping.my_operations,
+        client_uuid: ping.client_uuid,
+        grader_email: email
       });
     }
 

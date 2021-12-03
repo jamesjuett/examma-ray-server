@@ -97,7 +97,9 @@ export class ManualCodeGraderApp {
   private groupMemberThumbnailsElem: JQuery;
 
   private thumbnailElems: {[index: string]: JQuery} = {};
-  private rubricButtonElems: JQuery[] = [];
+  private rubricItemOutlets: {
+    [index: string]: RubricItemOutlet | undefined
+  } = { };
   
   private submissionsFilterCriterion : SubmissionsFilterCriterion = "all";
   private submissionsSortCriteria : SubmissionsSortCriterion = "name";
@@ -137,20 +139,44 @@ export class ManualCodeGraderApp {
 
   private initComponents() {
 
-    $("#create-rubric-item-button").on("click", async () => {
+    $("#create-rubric-item-open-modal").on("click", async () => {
+      $("#edit-rubric-item-input-uuid").val(uuidv4());
+      $("#edit-rubric-item-input-title").val("");
+      $("#edit-rubric-item-input-description").val("");
+      $("#edit-rubric-item-input-points").val("");
+      $("#edit-rubric-item-modal").data("edit-rubric-item-mode", "create");
+      $("#edit-rubric-item-modal").modal("show");
+    });
+      
+    $("#edit-rubric-item-submit-button").on("click", async () => {
       let i = this.rubric?.length ?? 0;
       
-      this.performLocalOperation({
-        kind: "create_rubric_item",
-        rubric_item: {
-          rubric_item_id: `ri_${i}`,
-          title: `Title ${i}`,
-          description: `Desc ${i}`,
-          points: i,
-          active: true
-        }
-      });
-      $("#create-rubric-item-modal").modal("hide");
+      if ($("#edit-rubric-item-modal").data("edit-rubric-item-mode") === "create") {
+        this.performLocalOperation({
+          kind: "create_rubric_item",
+          rubric_item: {
+            rubric_item_uuid: ""+$("#edit-rubric-item-input-uuid").val(),
+            title: ""+$("#edit-rubric-item-input-title").val(),
+            description: ""+$("#edit-rubric-item-input-description").val(),
+            points: <number>$("#edit-rubric-item-input-points").val(),
+            active: true
+          }
+        });
+      }
+      else {
+        this.performLocalOperation({
+          kind: "edit_rubric_item",
+          rubric_item_uuid: ""+$("#edit-rubric-item-input-uuid").val(),
+          edits: {
+            title: ""+$("#edit-rubric-item-input-title").val(),
+            description: ""+$("#edit-rubric-item-input-description").val(),
+            points: <number>$("#edit-rubric-item-input-points").val(),
+            active: true
+          }
+        });
+      }
+
+      $("#edit-rubric-item-modal").modal("hide");
     });
   }
 
@@ -237,7 +263,7 @@ export class ManualCodeGraderApp {
     assert(this.grading_records);
 
     // Apply remote transitions
-    transitions.forEach(t => t.ops.forEach(op => this.applyOperation(op)))
+    transitions.forEach(t => t.ops.forEach(op => this.applyOperation(op, t.grader_email)))
 
     // Reapply our current set of local operations
     this.local_changes.forEach(op => this.applyOperation(op));
@@ -300,27 +326,24 @@ export class ManualCodeGraderApp {
     assert(this.rubric);
     let buttons = $(".examma-ray-grading-rubric-buttons");
     buttons.addClass("list-group");
-    this.rubricButtonElems.length = 0;
-
-    buttons.empty();
     
-    let skin = this.skin_override ?? (sub && createRecordedSkin(sub));
     this.rubric.forEach((ri, i) => {
-      let skinnedTitle = sub ? applySkin(ri.title, skin) : ri.title;
-      let skinnedDesc = sub ? applySkin(ri.description, skin) : ri.description;
-      let button = $(
-        `<button type="button" class="list-group-item">
-          ${renderShortPointsWorthBadge(ri.points)}
-          <div class="examma-ray-rubric-item-title"><b>${mk2html(skinnedTitle)}</b></div>
-          ${mk2html(skinnedDesc)}
-        </button>`
-      ).on("click", () => {
-        this.toggleRubricItem(i);
-      });
-      
-      buttons.append(button);
-      this.rubricButtonElems.push(button);
+      let rubricItemElem = $(`<button type="button" class="list-group-item"></button>`).appendTo(buttons);
+      buttons.append(rubricItemElem);
+      let outlet = new RubricItemOutlet(rubricItemElem, ri);
+      outlet.applySkin(this.skin_override ?? (sub && createRecordedSkin(sub)));
+      this.rubricItemOutlets[ri.rubric_item_uuid] = outlet;
+
     });
+  }
+
+  private highlightRubricItem(rubric_item_uuid: string, grader_email: string) {
+    let buttonBar = this.rubricButtonElems.find(elem => elem.data("rubric-item-id") === rubric_item_uuid)?.find(".examma-ray-rubric-item-avatar-bar");
+    let highlight = $(`<div data-toggle="tooltip" data-placement="bottom" title="${grader_email}">
+      ${avatar(grader_email, { size: ACTIVE_GRADER_AVATAR_SIZE })}
+    </div>`);
+    buttonBar?.append(highlight);
+    // setTimeout(() => highlight.fadeOut(3000, () => highlight.remove()), 5000);
   }
 
   private createLobster() {
@@ -354,22 +377,23 @@ export class ManualCodeGraderApp {
     this.local_changes.push(op);
   }
 
-  private applyOperation(op: ManualGradingOperation) {
+  private applyOperation(op: ManualGradingOperation, remote_grader_email?: string) {
     if (!this.grading_records || !this.rubric) {
       return;
     }
 
     if (op.kind === "set_rubric_item_status") {
-      this.grading_records.groups[op.group_uuid].grading_result[op.rubric_item_id] = op.status;
+      this.grading_records.groups[op.group_uuid].grading_result[op.rubric_item_uuid] = op.status;
     }
     else if (op.kind === "set_group_finished") {
       this.grading_records.groups[op.group_uuid].finished = op.finished;
     }
     else if (op.kind === "edit_rubric_item") {
-      let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item_id);
+      let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item_uuid);
       if (existingRi) {
         Object.assign(existingRi, op.edits);
         this.createRubricBar();
+        remote_grader_email && this.highlightRubricItem(op.rubric_item_uuid, remote_grader_email);
       }
       else {
         // tehcnically should never get here - rubric items can't be deleted, only hidden
@@ -377,7 +401,7 @@ export class ManualCodeGraderApp {
       }
     }
     else if (op.kind === "create_rubric_item") {
-      let existingRi = this.rubric.find(ri => ri.rubric_item_id === op.rubric_item.rubric_item_id);
+      let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item.rubric_item_uuid);
       if (existingRi) {
         Object.assign(existingRi, op.rubric_item);
       }
@@ -385,6 +409,7 @@ export class ManualCodeGraderApp {
         asMutable(this.rubric).push(op.rubric_item);
       }
       this.createRubricBar();
+      remote_grader_email && this.highlightRubricItem(op.rubric_item.rubric_item_uuid, remote_grader_email);
     }
     else {
       return assertNever(op);
@@ -731,10 +756,10 @@ export class ManualCodeGraderApp {
     let gr = this.currentGroup.grading_result;
 
     if (status === "off") {
-      delete gr[this.rubric[i].rubric_item_id];
+      delete gr[this.rubric[i].rubric_item_uuid];
     }
     else {
-      gr[this.rubric[i].rubric_item_id] = status;
+      gr[this.rubric[i].rubric_item_uuid] = status;
     }
 
     this.updatedGradingResult();
@@ -749,7 +774,7 @@ export class ManualCodeGraderApp {
 
     this.currentGroup.grading_result ??= { };
 
-    let currentStatus = this.currentGroup.grading_result[this.rubric[i].rubric_item_id] ?? "off";
+    let currentStatus = this.currentGroup.grading_result[this.rubric[i].rubric_item_uuid] ?? "off";
     if (currentStatus === "off") {
       currentStatus = "on";
     }
@@ -765,7 +790,7 @@ export class ManualCodeGraderApp {
   private updateRubricItemButtons(gr: ManualGradingResult | undefined) {
     assert(this.rubric);
     this.rubric.forEach((ri, i) => {
-      this.updateRubricItemButton(i, (gr && gr[ri.rubric_item_id]) ?? "off");
+      this.updateRubricItemButton(i, (gr && gr[ri.rubric_item_uuid]) ?? "off");
     });
 
     this.updateGradingFinishedButton(gr);
@@ -837,7 +862,7 @@ export class ManualCodeGraderApp {
       return 0;
     }
     return Math.max(0, Math.min(this.question.pointsPossible,
-      this.rubric.reduce((p, ri) => p + (gr[ri.rubric_item_id] === "on" ? ri.points : 0), 0)
+      this.rubric.reduce((p, ri) => p + (gr[ri.rubric_item_uuid] === "on" ? ri.points : 0), 0)
     ));
   }
 
@@ -895,3 +920,70 @@ function createRecordedSkin(sub: ManualGradingSubmission) {
 }
 
 const VERIFIED_ICON = `<i class="bi bi-check2-circle" style="vertical-align: text-top;"></i> `;
+
+class RubricItemOutlet {
+
+  private rubricItem: ManualGradingRubricItem;
+  private status?: ManualGradingRubricItemStatus;
+  private skin?: ExamComponentSkin;
+
+  private readonly elem: JQuery;
+  private readonly contentElem: JQuery;
+
+  public constructor(elem: JQuery, ri: ManualGradingRubricItem) {
+    this.elem = elem;
+    this.rubricItem = ri;
+
+    this.contentElem = $("<div></div>").appendTo(elem);
+    elem.on("click", () => {
+      // this.toggleRubricItem(i);
+    });
+
+    $('<div class="examma-ray-rubric-item-avatar-bar" style="position: absolute; bottom: 0; right: 5px; text-align: right;"></div>').appendTo(elem);
+
+    let buttonBar = $('<div class="examma-ray-rubric-item-button-bar"></div>').appendTo(elem);
+    $(`<button class="btn btn-primary btn-xs">Edit</button>`)
+      .appendTo(buttonBar)
+      .on("click", async () => this.openEditModal());
+  }
+
+  public update(rubric_item: ManualGradingRubricItem) {
+    assert(rubric_item.rubric_item_uuid === this.rubricItem.rubric_item_uuid);
+    this.rubricItem = rubric_item;
+    this.refreshContent();
+  }
+
+  public updateStatus(status: ManualGradingRubricItemStatus | undefined) {
+    this.status = status;
+    // this.refreshContent();
+  }
+
+  public updateSkin(skin: ExamComponentSkin) {
+    this.skin = skin;
+    this.refreshContent();
+  }
+
+  public refreshContent() {
+    let skinnedTitle = applySkin(this.rubricItem.title, this.skin);
+    let skinnedDesc = applySkin(this.rubricItem.description, this.skin);
+    this.contentElem.html(`<button type="button" class="list-group-item">
+      ${renderShortPointsWorthBadge(this.rubricItem.points)}
+      <div class="examma-ray-rubric-item-title"><b>${mk2html(skinnedTitle)}</b></div>
+      ${mk2html(skinnedDesc)}
+    </button>`);
+  }
+
+  private openEditModal() {
+    $("#edit-rubric-item-input-uuid").val(this.rubricItem.rubric_item_uuid);
+    $("#edit-rubric-item-input-title").val(this.rubricItem.title);
+    $("#edit-rubric-item-input-description").val(this.rubricItem.description);
+    $("#edit-rubric-item-input-points").val(this.rubricItem.points);
+    $("#edit-rubric-item-modal").data("edit-rubric-item-mode", "edit");
+    $("#edit-rubric-item-modal").modal("show");
+  }
+
+  public toggle() {
+
+  }
+
+}

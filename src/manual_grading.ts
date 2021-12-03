@@ -16,7 +16,7 @@ export type ManualGradingSubmission = {
 export type ManualGradingRubricItemStatus = "on" | "off" | "unknown";
 
 export type ManualGradingRubricItem = {
-  rubric_item_id: string,
+  rubric_item_uuid: string,
   points: number,
   title: string,
   description: string,

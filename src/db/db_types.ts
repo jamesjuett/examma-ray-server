@@ -36,7 +36,7 @@ declare module "knex/types/tables" {
 
   interface DB_Manual_Grading_Rubrics {
     question_id: string;
-    rubric_item_id: string;
+    rubric_item_uuid: string;
     points: number;
     title: string;
     description: string;
@@ -68,7 +68,7 @@ declare module "knex/types/tables" {
 
   interface DB_Manual_Grading_Records {
     group_uuid: string;
-    rubric_item_id: string;
+    rubric_item_uuid: string;
     status: ManualGradingRubricItemStatus;
     // created_at: string; // timestamp
     // updated_at: string; // timestamp
@@ -130,8 +130,8 @@ declare module "knex/types/tables" {
       //   All required, except active is optional (default true)
       Omit<DB_Manual_Grading_Rubrics, "active"> & Partial<Pick<DB_Manual_Grading_Rubrics, "active">>,
       // Update Type
-      //   All optional except question_id and rubric_item_id may not be updated
-      Partial<Omit<DB_Manual_Grading_Rubrics, "question_id" | "rubric_item_id">> & Partial<Record<"question_id" | "rubric_item_id", undefined>>
+      //   All optional except question_id and rubric_item_uuid may not be updated
+      Partial<Omit<DB_Manual_Grading_Rubrics, "question_id" | "rubric_item_uuid">> & Partial<Record<"question_id" | "rubric_item_uuid", undefined>>
     >;
 
     manual_grading_groups: Knex.CompositeTableType<

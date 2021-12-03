@@ -28,21 +28,21 @@ export async function db_getGroupSubmissions(group_uuid: string) {
   }).select("*");
 }
 
-export async function db_getManualGradingRubricItem(question_id: string, rubric_item_id: string) {
+export async function db_getManualGradingRubricItem(question_id: string, rubric_item_uuid: string) {
 
   // Create and get a copy of the new rubric item
   return await query("manual_grading_rubrics").where({
     question_id: question_id,
-    rubric_item_id: rubric_item_id
+    rubric_item_uuid: rubric_item_uuid
   }).select().first();
 }
 
-export async function db_createManualGradingRubricItem(question_id: string, rubric_item_id: string, rubric_item: ManualGradingRubricItem) {
+export async function db_createManualGradingRubricItem(question_id: string, rubric_item_uuid: string, rubric_item: ManualGradingRubricItem) {
 
   // Create and get a copy of the new rubric item
   return await query("manual_grading_rubrics").insert({
     question_id: question_id,
-    rubric_item_id: rubric_item_id,
+    rubric_item_uuid: rubric_item_uuid,
     points: rubric_item.points,
     title: rubric_item.title,
     description: rubric_item.description,
@@ -50,11 +50,11 @@ export async function db_createManualGradingRubricItem(question_id: string, rubr
   }).returning("*");
 }
 
-export async function db_updateManualGradingRubricItem(question_id: string, rubric_item_id: string, updates: Partial<ManualGradingRubricItem>) {
+export async function db_updateManualGradingRubricItem(question_id: string, rubric_item_uuid: string, updates: Partial<ManualGradingRubricItem>) {
 
   return await query("manual_grading_rubrics").where({
     question_id: question_id,
-    rubric_item_id: rubric_item_id
+    rubric_item_uuid: rubric_item_uuid
   }).update({
     points: updates.points,
     description: updates.description,
@@ -67,15 +67,15 @@ export async function db_updateManualGradingRubricItem(question_id: string, rubr
 
 export async function db_setManualGradingRecord(
   group_uuid: string,
-  rubric_item_id: string,
+  rubric_item_uuid: string,
   status: ManualGradingRubricItemStatus) {
 
   // Create and get a copy of the new rubric item
   return await query("manual_grading_records").insert({
     group_uuid: group_uuid,
-    rubric_item_id: rubric_item_id,
+    rubric_item_uuid: rubric_item_uuid,
     status: status
-  }).onConflict(["group_uuid", "rubric_item_id"]).merge();
+  }).onConflict(["group_uuid", "rubric_item_uuid"]).merge();
 }
 
 export async function db_setManualGradingGroupFinished(
@@ -117,7 +117,7 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
     .where({
       question_id: question_id
     })
-    .select("manual_grading_records.group_uuid", "rubric_item_id", "status");
+    .select("manual_grading_records.group_uuid", "rubric_item_uuid", "status");
 
   const group_records_by_id : {[index: string]: ManualGradingGroupRecord } = {};
   groups.forEach(g => {
@@ -138,7 +138,7 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
   });
   records.forEach(r => {
     let record = group_records_by_id[r.group_uuid];
-    record.grading_result[r.rubric_item_id] = r.status;
+    record.grading_result[r.rubric_item_uuid] = r.status;
   });
 
   return {
