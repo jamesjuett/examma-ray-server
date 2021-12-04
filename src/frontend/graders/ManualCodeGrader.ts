@@ -116,6 +116,8 @@ export class ManualCodeGraderApp {
   }
   public readonly config?: ManualCodeGraderConfiguration;
 
+  private rubricBarElem: JQuery;
+
   private constructor(client: ExammaRayGraderClient, exam_id: string, question: Question) {
     this.client = client;
     this.exam_id = exam_id;
@@ -128,6 +130,9 @@ export class ManualCodeGraderApp {
 
     $(".examma-ray-grading-title").html(this.question.question_id);
     this.groupMemberThumbnailsElem = $(".examma-ray-group-member-thumbnails");
+
+    this.rubricBarElem = $(".examma-ray-grading-rubric-buttons")
+      .addClass("list-group");
 
     this.initComponents();
 
@@ -158,7 +163,7 @@ export class ManualCodeGraderApp {
             rubric_item_uuid: ""+$("#edit-rubric-item-input-uuid").val(),
             title: ""+$("#edit-rubric-item-input-title").val(),
             description: ""+$("#edit-rubric-item-input-description").val(),
-            points: <number>$("#edit-rubric-item-input-points").val(),
+            points: parseInt(""+$("#edit-rubric-item-input-points").val()),
             active: true
           }
         });
@@ -170,7 +175,7 @@ export class ManualCodeGraderApp {
           edits: {
             title: ""+$("#edit-rubric-item-input-title").val(),
             description: ""+$("#edit-rubric-item-input-description").val(),
-            points: <number>$("#edit-rubric-item-input-points").val(),
+            points: parseInt(""+$("#edit-rubric-item-input-points").val()),
             active: true
           }
         });
@@ -263,7 +268,7 @@ export class ManualCodeGraderApp {
     assert(this.grading_records);
 
     // Apply remote transitions
-    transitions.forEach(t => t.ops.forEach(op => this.applyOperation(op, t.grader_email)))
+    transitions.forEach(t => t.ops.forEach(op => this.applyOperation(op, t.client_uuid !== this.client.client_uuid ? t.grader_email : undefined)))
 
     // Reapply our current set of local operations
     this.local_changes.forEach(op => this.applyOperation(op));
@@ -322,28 +327,20 @@ export class ManualCodeGraderApp {
   
   }
 
-  private createRubricBar(sub?: ManualGradingSubmission) {
+  private createRubricBar() {
     assert(this.rubric);
-    let buttons = $(".examma-ray-grading-rubric-buttons");
-    buttons.addClass("list-group");
-    
-    this.rubric.forEach((ri, i) => {
-      let rubricItemElem = $(`<button type="button" class="list-group-item"></button>`).appendTo(buttons);
-      buttons.append(rubricItemElem);
-      let outlet = new RubricItemOutlet(rubricItemElem, ri);
-      outlet.applySkin(this.skin_override ?? (sub && createRecordedSkin(sub)));
-      this.rubricItemOutlets[ri.rubric_item_uuid] = outlet;
-
-    });
+    this.rubric.forEach((ri, i) => this.createRubricItemOutlet(ri));
   }
 
-  private highlightRubricItem(rubric_item_uuid: string, grader_email: string) {
-    let buttonBar = this.rubricButtonElems.find(elem => elem.data("rubric-item-id") === rubric_item_uuid)?.find(".examma-ray-rubric-item-avatar-bar");
-    let highlight = $(`<div data-toggle="tooltip" data-placement="bottom" title="${grader_email}">
-      ${avatar(grader_email, { size: ACTIVE_GRADER_AVATAR_SIZE })}
-    </div>`);
-    buttonBar?.append(highlight);
-    // setTimeout(() => highlight.fadeOut(3000, () => highlight.remove()), 5000);
+  private createRubricItemOutlet(ri: ManualGradingRubricItem) {
+    let rubricItemElem = $(`<button type="button" class="list-group-item"></button>`).appendTo(this.rubricBarElem);
+    let sub = this.currentGroup?.submissions[0];
+    let skin = this.skin_override ?? (sub && createRecordedSkin(sub));
+    let outlet = new RubricItemOutlet(rubricItemElem, ri, undefined, skin);
+    this.rubricItemOutlets[ri.rubric_item_uuid] = outlet;
+    rubricItemElem.on("click", () => {
+      this.toggleRubricItem(ri.rubric_item_uuid);
+    });
   }
 
   private createLobster() {
@@ -384,6 +381,9 @@ export class ManualCodeGraderApp {
 
     if (op.kind === "set_rubric_item_status") {
       this.grading_records.groups[op.group_uuid].grading_result[op.rubric_item_uuid] = op.status;
+      if (op.group_uuid === this.currentGroup?.group_uuid) {
+        this.rubricItemOutlets[op.rubric_item_uuid]?.updateStatus(op.status).highlight(remote_grader_email);
+      }
     }
     else if (op.kind === "set_group_finished") {
       this.grading_records.groups[op.group_uuid].finished = op.finished;
@@ -392,8 +392,7 @@ export class ManualCodeGraderApp {
       let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item_uuid);
       if (existingRi) {
         Object.assign(existingRi, op.edits);
-        this.createRubricBar();
-        remote_grader_email && this.highlightRubricItem(op.rubric_item_uuid, remote_grader_email);
+        this.rubricItemOutlets[op.rubric_item_uuid]?.update(existingRi).highlight(remote_grader_email);
       }
       else {
         // tehcnically should never get here - rubric items can't be deleted, only hidden
@@ -404,12 +403,13 @@ export class ManualCodeGraderApp {
       let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item.rubric_item_uuid);
       if (existingRi) {
         Object.assign(existingRi, op.rubric_item);
+        this.rubricItemOutlets[op.rubric_item.rubric_item_uuid]?.update(existingRi).highlight(remote_grader_email);
       }
       else {
         asMutable(this.rubric).push(op.rubric_item);
+        this.createRubricItemOutlet(op.rubric_item)
       }
-      this.createRubricBar();
-      remote_grader_email && this.highlightRubricItem(op.rubric_item.rubric_item_uuid, remote_grader_email);
+      
     }
     else {
       return assertNever(op);
@@ -529,12 +529,9 @@ export class ManualCodeGraderApp {
     this.groupMemberThumbnailsElem.empty();
     group.submissions.forEach(sub => {
       this.groupMemberThumbnailsElem.append(this.createMemberThumbnail(sub));
-    })
+    });
 
     let rep = group.submissions[0];
-
-    // Update rubric buttons
-    this.createRubricBar(rep);
 
     let code = this.applyHarness(rep);
     this.lobster.project.setFileContents(new SourceFile("file.cpp", code));
@@ -542,7 +539,8 @@ export class ManualCodeGraderApp {
     $(".examma-ray-submissions-column").find(".panel-primary").removeClass("panel-primary");
     this.thumbnailElems[group.group_uuid].addClass("panel-primary");
 
-    this.updatedGradingResult();
+    let gr = this.currentGroup?.grading_result;
+    this.rubric?.forEach((ri, i) => this.rubricItemOutlets[ri.rubric_item_uuid]?.updateStatus(gr && gr[ri.rubric_item_uuid]).clearHighlights());
   }
 
   private applyHarness(rep: ManualGradingSubmission) {
@@ -748,24 +746,23 @@ export class ManualCodeGraderApp {
     this.refreshGroups();
   }
 
-  public setRubricItemStatus(i: number, status: ManualGradingRubricItemStatus) {
-    assert(this.rubric);
-    if (!this.currentGroup?.grading_result) {
-      return;
-    }
-    let gr = this.currentGroup.grading_result;
+  // public setRubricItemStatus(rubric_item_uuid: string, status: ManualGradingRubricItemStatus) {
+  //   assert(this.rubric);
+  //   if (!this.currentGroup?.grading_result) {
+  //     return;
+  //   }
+  //   let gr = this.currentGroup.grading_result;
 
-    if (status === "off") {
-      delete gr[this.rubric[i].rubric_item_uuid];
-    }
-    else {
-      gr[this.rubric[i].rubric_item_uuid] = status;
-    }
+  //   if (status === "off") {
+  //     delete gr[rubric_item_uuid];
+  //   }
+  //   else {
+  //     gr[rubric_item_uuid] = status;
+  //   }
 
-    this.updatedGradingResult();
-  }
+  // }
 
-  public toggleRubricItem(i: number) {
+  public toggleRubricItem(rubric_item_uuid: string) {
     assert(this.rubric);
 
     if(!this.currentGroup) {
@@ -774,7 +771,7 @@ export class ManualCodeGraderApp {
 
     this.currentGroup.grading_result ??= { };
 
-    let currentStatus = this.currentGroup.grading_result[this.rubric[i].rubric_item_uuid] ?? "off";
+    let currentStatus = this.currentGroup.grading_result[rubric_item_uuid] ?? "off";
     if (currentStatus === "off") {
       currentStatus = "on";
     }
@@ -784,35 +781,13 @@ export class ManualCodeGraderApp {
     else if (currentStatus === "unknown") {
       currentStatus = "off";
     }
-    this.setRubricItemStatus(i, currentStatus);
-  }
-
-  private updateRubricItemButtons(gr: ManualGradingResult | undefined) {
-    assert(this.rubric);
-    this.rubric.forEach((ri, i) => {
-      this.updateRubricItemButton(i, (gr && gr[ri.rubric_item_uuid]) ?? "off");
+    
+    this.performLocalOperation({
+      kind: "set_rubric_item_status",
+      group_uuid: this.currentGroup.group_uuid,
+      rubric_item_uuid: rubric_item_uuid,
+      status: currentStatus
     });
-
-    this.updateGradingFinishedButton(gr);
-  }
-
-  private updateRubricItemButton(i: number, status: ManualGradingRubricItemStatus) {
-    assert(this.rubric);
-    let elem = this.rubricButtonElems[i];
-    elem.removeClass("list-group-item-success").removeClass("list-group-item-danger").removeClass("list-group-item-warning");
-    elem.find(".examma-ray-unknown-rubric-item-icon").remove();
-    if (status === "on") {
-      if (this.rubric[i].points >= 0) {
-        elem.addClass("list-group-item-success");
-      }
-      else {
-        elem.addClass("list-group-item-danger");
-      }
-    }
-    else if (status === "unknown") {
-      elem.addClass("list-group-item-warning");
-      elem.append($(`<span class="examma-ray-unknown-rubric-item-icon"><i class="bi bi-question-diamond-fill"></i><span>`));
-    }
   }
 
   private updateGradingFinishedButton(gr: ManualGradingResult | undefined) {
@@ -837,23 +812,23 @@ export class ManualCodeGraderApp {
 
     this.currentGroup.finished = !this.currentGroup.finished;
 
-    this.updatedGradingResult();
+    // this.updatedGradingResult();
   }
 
-  private updatedGradingResult() {
-    if (!this.currentGroup || !this.question) {
-      return;
-    }
+  // private updatedGradingResult() {
+  //   if (!this.currentGroup || !this.question) {
+  //     return;
+  //   }
 
-    let thumbElem = this.thumbnailElems[this.currentGroup.group_uuid];
-    thumbElem.find(".examma-ray-score-badge").replaceWith(
-      this.currentGroup.grading_result
-        ? renderScoreBadge(this.pointsEarned(this.currentGroup.grading_result), this.question.pointsPossible, this.currentGroup.grading_result.verified ? VERIFIED_ICON : "")
-        : renderUngradedBadge(this.question.pointsPossible)
-    );
+  //   let thumbElem = this.thumbnailElems[this.currentGroup.group_uuid];
+  //   thumbElem.find(".examma-ray-score-badge").replaceWith(
+  //     this.currentGroup.grading_result
+  //       ? renderScoreBadge(this.pointsEarned(this.currentGroup.grading_result), this.question.pointsPossible, this.currentGroup.grading_result.verified ? VERIFIED_ICON : "")
+  //       : renderUngradedBadge(this.question.pointsPossible)
+  //   );
     
-    this.updateRubricItemButtons(this.currentGroup.grading_result);
-  }
+  //   this.onGroupChanged(this.currentGroup.grading_result);
+  // }
 
   private pointsEarned(gr?: ManualGradingResult) {
     assert(this.rubric);
@@ -930,14 +905,13 @@ class RubricItemOutlet {
   private readonly elem: JQuery;
   private readonly contentElem: JQuery;
 
-  public constructor(elem: JQuery, ri: ManualGradingRubricItem) {
+  public constructor(elem: JQuery, ri: ManualGradingRubricItem, status?: ManualGradingRubricItemStatus, skin?: ExamComponentSkin) {
     this.elem = elem;
     this.rubricItem = ri;
+    this.status = status;
+    this.skin = skin;
 
     this.contentElem = $("<div></div>").appendTo(elem);
-    elem.on("click", () => {
-      // this.toggleRubricItem(i);
-    });
 
     $('<div class="examma-ray-rubric-item-avatar-bar" style="position: absolute; bottom: 0; right: 5px; text-align: right;"></div>').appendTo(elem);
 
@@ -945,32 +919,52 @@ class RubricItemOutlet {
     $(`<button class="btn btn-primary btn-xs">Edit</button>`)
       .appendTo(buttonBar)
       .on("click", async () => this.openEditModal());
+
+    this.refreshContent();
   }
 
   public update(rubric_item: ManualGradingRubricItem) {
     assert(rubric_item.rubric_item_uuid === this.rubricItem.rubric_item_uuid);
     this.rubricItem = rubric_item;
     this.refreshContent();
+    return this;
   }
 
   public updateStatus(status: ManualGradingRubricItemStatus | undefined) {
     this.status = status;
-    // this.refreshContent();
+    this.refreshContent();
+    return this;
   }
 
   public updateSkin(skin: ExamComponentSkin) {
     this.skin = skin;
     this.refreshContent();
+    return this;
   }
 
   public refreshContent() {
     let skinnedTitle = applySkin(this.rubricItem.title, this.skin);
     let skinnedDesc = applySkin(this.rubricItem.description, this.skin);
-    this.contentElem.html(`<button type="button" class="list-group-item">
+    this.contentElem.html(`
       ${renderShortPointsWorthBadge(this.rubricItem.points)}
       <div class="examma-ray-rubric-item-title"><b>${mk2html(skinnedTitle)}</b></div>
       ${mk2html(skinnedDesc)}
-    </button>`);
+    `);
+    
+    this.elem.removeClass("list-group-item-success").removeClass("list-group-item-danger").removeClass("list-group-item-warning");
+    this.elem.find(".examma-ray-unknown-rubric-item-icon").remove();
+    if (this.status === "on") {
+      if (this.rubricItem.points >= 0) {
+        this.elem.addClass("list-group-item-success");
+      }
+      else {
+        this.elem.addClass("list-group-item-danger");
+      }
+    }
+    else if (this.status === "unknown") {
+      this.elem.addClass("list-group-item-warning");
+      this.elem.append($(`<span class="examma-ray-unknown-rubric-item-icon"><i class="bi bi-question-diamond-fill"></i><span>`));
+    }
   }
 
   private openEditModal() {
@@ -986,4 +980,17 @@ class RubricItemOutlet {
 
   }
 
+  public highlight(grader_email: string | undefined) {
+    if (!grader_email) { return; }
+    let avatarElem = $(`<div style="display: inline-block" data-toggle="tooltip" data-placement="bottom" title="${grader_email}">
+      ${avatar(grader_email, { size: ACTIVE_GRADER_AVATAR_SIZE })}
+    </div>`);
+    this.elem.find(".examma-ray-rubric-item-avatar-bar").append(avatarElem);
+    setTimeout(() => avatarElem.fadeOut(3000, () => avatarElem.remove()), 5000);
+    return this;
+  }
+
+  public clearHighlights() {
+    this.elem.find(".examma-ray-rubric-item-avatar-bar").empty();
+  }
 }
