@@ -152,25 +152,37 @@ export class ServerExam {
   }
 }
 
-// NOTE: all operations must be idempotent and must not depend on previous state
-export type ManualGradingOperation = {
+export type SetRubricItemStatusOperation = {
   kind: "set_rubric_item_status",
   group_uuid: string,
   rubric_item_uuid: string,
   status: ManualGradingRubricItemStatus
-} | {
+};
+
+export type SetGroupFinishedOperation = {
   kind: "set_group_finished",
   group_uuid: string,
   finished: boolean
-} | {
+};
+
+export type EditRubricItemOperation = {
   kind: "edit_rubric_item",
   rubric_item_uuid: string,
   edits: Partial<ManualGradingRubricItem>  
-} | {
+};
+
+export type CreateRubricItemOperation = {
   kind: "create_rubric_item",
   rubric_item: ManualGradingRubricItem,
   // after: string
-}
+};
+
+// NOTE: all operations must be idempotent and must not depend on previous state
+export type ManualGradingOperation =
+ | SetRubricItemStatusOperation
+ | SetGroupFinishedOperation
+ | EditRubricItemOperation
+ | CreateRubricItemOperation;
 
 export type ManualGradingEpochTransition = {
   readonly client_uuid: string,
