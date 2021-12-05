@@ -42,17 +42,12 @@ type SubmissionsFilterCriterion = "all" | "graded" | "ungraded";
 type SubmissionsSortCriterion = "name" | "size" | "score";
 type SubmissionsSortOrdering = "asc" | "dsc";
 
-
-function isFullyGraded(sub: ManualGradingGroupRecord) {
-  return !!sub.grading_result?.verified;
-}
-
 const SUBMISSION_FILTERS : {
-  [k in SubmissionsFilterCriterion]: (sub: ManualGradingGroupRecord) => boolean
+  [k in SubmissionsFilterCriterion]: (group: ManualGradingGroupRecord) => boolean
 } = {
-  "all": (sub: ManualGradingGroupRecord) => true,
-  "graded": (sub: ManualGradingGroupRecord) => isFullyGraded(sub),
-  "ungraded": (sub: ManualGradingGroupRecord) => !isFullyGraded(sub),
+  "all": (group: ManualGradingGroupRecord) => true,
+  "graded": (group: ManualGradingGroupRecord) => !!group.finished,
+  "ungraded": (group: ManualGradingGroupRecord) => !group.finished,
 }
 
 // export type CodeWritingManualGraderAppSpecification = {
@@ -74,11 +69,14 @@ export class ManualCodeGraderApp {
 
   public readonly client: ExammaRayGraderClient;
   public readonly groupGrader: GroupGraderOutlet;
+  public readonly groupThumbnailsPanel: GroupThumbnailsPanel;
 
   public readonly exam_id: string;
   public readonly question: Question;
   public readonly rubric: ManualGradingRubricItem[];
   public readonly grading_records: ManualGradingQuestionRecords;
+
+  public readonly currentGroup?: ManualGradingGroupRecord;
 
   private local_changes: ManualGradingOperation[] = [];
   private pendingPing: boolean = false;
@@ -92,23 +90,6 @@ export class ManualCodeGraderApp {
   // private testHarness: string;
   // private groupingFunctionName: string;
 
-  private groupMemberThumbnailsElem: JQuery;
-
-  private thumbnailElems: {[index: string]: JQuery} = {};
-  
-  private submissionsFilterCriterion : SubmissionsFilterCriterion = "all";
-  private submissionsSortCriteria : SubmissionsSortCriterion = "name";
-  private submissionsSortOrdering : SubmissionsSortOrdering = "asc";
-  // private submissions
-
-  private SUBMISSION_SORTS : {
-    [k in SubmissionsSortCriterion]: (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => number
-  } = {
-    "name": (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => a.group_uuid.localeCompare(b.group_uuid, undefined, {numeric: true}),
-    "size": (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => a.submissions.length - b.submissions.length,
-    "score": (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => this.pointsEarned(a.grading_result) - this.pointsEarned(b.grading_result),
-    
-  }
   public readonly config?: ManualCodeGraderConfiguration;
   
   private constructor(client: ExammaRayGraderClient, exam_id: string, question: Question, rubric: ManualGradingRubricItem[], records: ManualGradingQuestionRecords) {
@@ -118,7 +99,8 @@ export class ManualCodeGraderApp {
     this.rubric = rubric;
     this.grading_records = records;
 
-    this.groupGrader = new GroupGraderOutlet(this, rubric);
+    this.groupGrader = new GroupGraderOutlet(this);
+    this.groupThumbnailsPanel = new GroupThumbnailsPanel(this, $(".examma-ray-group-thumbnails"));
 
     // this.testHarness = spec.testHarness;
     // this.extract_code = spec.extract_code ?? DEFAULT_EXTRACT_CODE;
@@ -127,57 +109,8 @@ export class ManualCodeGraderApp {
     // this.groupingFunctionName = spec.groupingFunctionName;
 
     $(".examma-ray-grading-title").html(this.question.question_id);
-    this.groupMemberThumbnailsElem = $(".examma-ray-group-member-thumbnails");
-
-    this.initComponents();
-
-    this.updateGroupThumbnails();
 
     setInterval(() => this.sendPing(), 1000);
-  }
-
-  private initComponents() {
-
-    $("#create-rubric-item-open-modal").on("click", async () => {
-      $("#edit-rubric-item-submit-button").html("Create");
-      $("#edit-rubric-item-input-uuid").val(uuidv4());
-      $("#edit-rubric-item-input-title").val("");
-      $("#edit-rubric-item-input-description").val("");
-      $("#edit-rubric-item-input-points").val("");
-      $("#edit-rubric-item-modal").data("edit-rubric-item-mode", "create");
-      $("#edit-rubric-item-modal").modal("show");
-    });
-      
-    $("#edit-rubric-item-submit-button").on("click", async () => {
-      let i = this.rubric?.length ?? 0;
-      
-      if ($("#edit-rubric-item-modal").data("edit-rubric-item-mode") === "create") {
-        this.performLocalOperation({
-          kind: "create_rubric_item",
-          rubric_item: {
-            rubric_item_uuid: ""+$("#edit-rubric-item-input-uuid").val(),
-            title: ""+$("#edit-rubric-item-input-title").val(),
-            description: ""+$("#edit-rubric-item-input-description").val(),
-            points: parseInt(""+$("#edit-rubric-item-input-points").val()),
-            active: true
-          }
-        });
-      }
-      else {
-        this.performLocalOperation({
-          kind: "edit_rubric_item",
-          rubric_item_uuid: ""+$("#edit-rubric-item-input-uuid").val(),
-          edits: {
-            title: ""+$("#edit-rubric-item-input-title").val(),
-            description: ""+$("#edit-rubric-item-input-description").val(),
-            points: parseInt(""+$("#edit-rubric-item-input-points").val()),
-            active: true
-          }
-        });
-      }
-
-      $("#edit-rubric-item-modal").modal("hide");
-    });
   }
 
   public static async create(exam_id: string, question_id: string) {
@@ -224,7 +157,7 @@ export class ManualCodeGraderApp {
       client_uuid: this.client.client_uuid,
       exam_id: this.exam_id,
       question_id: this.question.question_id,
-      group_uuid: this.groupGrader.currentGroup?.group_uuid,
+      group_uuid: this.currentGroup?.group_uuid,
       my_grading_epoch: this.grading_records.grading_epoch,
       my_operations: this.local_changes.slice() // copy
     };
@@ -303,24 +236,6 @@ export class ManualCodeGraderApp {
     // loadButton.on("click", () => GRADING_APP.loadGradingAssignmentFile());
   
     // autogradeButton.on("click", () => GRADING_APP.autograde());
-    const self = this;
-    $(".examma-ray-submissions-filter-button").on("click", function() {
-        $(".examma-ray-submissions-filter-button").removeClass("btn-primary").addClass("btn-default");
-        $(this).removeClass("btn-default").addClass("btn-primary");
-        self.setSubmissionsFilterCriterion($(this).data("filter-criterion"))
-    });
-  
-    $(".examma-ray-submissions-sort-button").on("click", function() {
-        $(".examma-ray-submissions-sort-button").removeClass("btn-primary").addClass("btn-default");
-        $(this).removeClass("btn-default").addClass("btn-primary");
-        self.setSubmissionsSortCriterion($(this).data("sort-criterion"))
-    });
-  
-    $(".examma-ray-submissions-sort-ordering-button").on("click", function() {
-        $(".examma-ray-submissions-sort-ordering-button").removeClass("btn-primary").addClass("btn-default");
-        $(this).removeClass("btn-default").addClass("btn-primary");
-        self.setSubmissionsSortOrdering($(this).data("sort-ordering"));
-    });
   
     // $(".examma-ray-auto-group-button").on("click", async function() {
     //     self.autoGroup();
@@ -344,7 +259,7 @@ export class ManualCodeGraderApp {
 
     if (op.kind === "set_rubric_item_status") {
       this.grading_records.groups[op.group_uuid].grading_result[op.rubric_item_uuid] = op.status;
-      if (op.group_uuid === this.groupGrader.currentGroup?.group_uuid) {
+      if (op.group_uuid === this.currentGroup?.group_uuid) {
         this.groupGrader.onRubricItemStatusSet(op.rubric_item_uuid, op.status, remote_grader_email);
       }
     }
@@ -379,70 +294,13 @@ export class ManualCodeGraderApp {
     }
   }
 
-  private updateGroupThumbnails() {
-
-    $(".examma-ray-submissions-column").empty();
-    this.thumbnailElems = {};
-
-    if (!this.grading_records) { return; }
-    let groups = Object.values(this.grading_records.groups)
-      .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
-      .sort(this.SUBMISSION_SORTS[this.submissionsSortCriteria]);
-
-    if (this.submissionsSortOrdering === "dsc") {
-      groups = groups.reverse();
-    }
-
-    groups.forEach(group => $(".examma-ray-submissions-column").append(this.createGroupThumbnail(group)));
-  }
-
-  private refreshGroups() {
-    this.updateGroupThumbnails();
-    // if (this.currentGroup) {
-    //   $(".examma-ray-grading-group-name").html(this.currentGroup.group_uuid);
-    //   $(".examma-ray-grading-group-num-members").html(""+this.currentGroup.submissions.length);
-    // }
-  }
-
-  private createGroupThumbnail(group: ManualGradingGroupRecord) {
-    assert(this.question);
-    assert(group.submissions.length > 0);
-    let firstSub = group.submissions[0];
-    let response = firstSub.submission;
-    let originalSkin = createRecordedSkin(firstSub);
-    let skin = this.skin_override ?? originalSkin;
-    let jq = $(`
-      <div class="panel panel-default examma-ray-grading-group-thumbnail">
-        <div class="panel-heading">
-          <span class="badge">${group.submissions.length}</span> ${group.group_uuid} 
-          ${group.grading_result ? renderScoreBadge(this.pointsEarned(group.grading_result), this.question.pointsPossible, group.grading_result.verified ? VERIFIED_ICON : "") : renderUngradedBadge(this.question.pointsPossible)}
-        </div>
-        <div class="panel-body">
-          <pre><code>${highlightCode(response, CODE_LANGUAGE)}</code></pre>
-        </div>
-      </div>
-    `);
-    jq.on("click", () => {
-      this.openGroup(group)
-    });
-    this.thumbnailElems[group.group_uuid] = jq;
-    return jq;
-  }
-
-  public setSubmissionsFilterCriterion(criterion: SubmissionsFilterCriterion) {
-    this.submissionsFilterCriterion = criterion;
-    this.updateGroupThumbnails();
-  }
-
-  public setSubmissionsSortCriterion(criterion: SubmissionsSortCriterion) {
-    this.submissionsSortCriteria = criterion;
-    this.updateGroupThumbnails();
-  }
-
-  public setSubmissionsSortOrdering(ordering: SubmissionsSortOrdering) {
-    this.submissionsSortOrdering = ordering;
-    this.updateGroupThumbnails();
-  }
+  // private refreshGroups() {
+  //   this.updateGroupThumbnails();
+  //   // if (this.currentGroup) {
+  //   //   $(".examma-ray-grading-group-name").html(this.currentGroup.group_uuid);
+  //   //   $(".examma-ray-grading-group-num-members").html(""+this.currentGroup.submissions.length);
+  //   // }
+  // }
 
   // private async reloadGradingRecords() {
   
@@ -485,16 +343,14 @@ export class ManualCodeGraderApp {
   // }
 
   public openGroup(group: ManualGradingGroupRecord) {
+    if (this.currentGroup) {
+      this.groupThumbnailsPanel.onGroupClosed(this.currentGroup);
+    }
+
     this.groupGrader.openGroup(group);
 
-    // TODO
-    this.groupMemberThumbnailsElem.empty();
-    group.submissions.forEach(sub => {
-      this.groupMemberThumbnailsElem.append(this.createMemberThumbnail(sub));
-    });
-
     $(".examma-ray-submissions-column").find(".panel-primary").removeClass("panel-primary");
-    this.thumbnailElems[group.group_uuid].addClass("panel-primary");
+    this.groupThumbnailsPanel.onGroupOpened(group);
 
   }
 
@@ -596,7 +452,7 @@ export class ManualCodeGraderApp {
   //   this.onGroupChanged(this.currentGroup.grading_result);
   // }
 
-  private pointsEarned(gr?: ManualGradingResult) {
+  public pointsEarned(gr?: ManualGradingResult) {
     assert(this.rubric);
 
     if (!gr || !this.question) {
@@ -665,9 +521,6 @@ const VERIFIED_ICON = `<i class="bi bi-check2-circle" style="vertical-align: tex
 class GroupGraderOutlet {
 
   public readonly app: ManualCodeGraderApp;
-  public readonly rubric: readonly ManualGradingRubricItem[];
-
-  public readonly currentGroup?: ManualGradingGroupRecord;
 
   private lobster: SimpleExerciseLobsterOutlet;
 
@@ -677,19 +530,63 @@ class GroupGraderOutlet {
 
   private rubricBarElem: JQuery;
 
-  public constructor(app: ManualCodeGraderApp, rubric: readonly ManualGradingRubricItem[]) {
+  public constructor(app: ManualCodeGraderApp) {
     this.app = app;
-    this.rubric = rubric;
 
     this.rubricBarElem = $(".examma-ray-grading-rubric-buttons")
       .addClass("list-group");
 
     this.lobster = this.createLobster();
     this.createRubricBar();
+    this.initComponents();
+  }
+
+  private initComponents() {
+
+    $("#create-rubric-item-open-modal").on("click", async () => {
+      $("#edit-rubric-item-submit-button").html("Create");
+      $("#edit-rubric-item-input-uuid").val(uuidv4());
+      $("#edit-rubric-item-input-title").val("");
+      $("#edit-rubric-item-input-description").val("");
+      $("#edit-rubric-item-input-points").val("");
+      $("#edit-rubric-item-modal").data("edit-rubric-item-mode", "create");
+      $("#edit-rubric-item-modal").modal("show");
+    });
+      
+    $("#edit-rubric-item-submit-button").on("click", async () => {
+      let i = this.app.rubric?.length ?? 0;
+      
+      if ($("#edit-rubric-item-modal").data("edit-rubric-item-mode") === "create") {
+        this.app.performLocalOperation({
+          kind: "create_rubric_item",
+          rubric_item: {
+            rubric_item_uuid: ""+$("#edit-rubric-item-input-uuid").val(),
+            title: ""+$("#edit-rubric-item-input-title").val(),
+            description: ""+$("#edit-rubric-item-input-description").val(),
+            points: parseInt(""+$("#edit-rubric-item-input-points").val()),
+            active: true
+          }
+        });
+      }
+      else {
+        this.app.performLocalOperation({
+          kind: "edit_rubric_item",
+          rubric_item_uuid: ""+$("#edit-rubric-item-input-uuid").val(),
+          edits: {
+            title: ""+$("#edit-rubric-item-input-title").val(),
+            description: ""+$("#edit-rubric-item-input-description").val(),
+            points: parseInt(""+$("#edit-rubric-item-input-points").val()),
+            active: true
+          }
+        });
+      }
+
+      $("#edit-rubric-item-modal").modal("hide");
+    });
   }
   
   public openGroup(group: ManualGradingGroupRecord) {
-    asMutable(this).currentGroup = group;
+    asMutable(this.app).currentGroup = group;
     $(".examma-ray-grading-group-name").html(group.group_uuid);
     $(".examma-ray-grading-group-num-members").html(""+group.submissions.length);
 
@@ -698,26 +595,26 @@ class GroupGraderOutlet {
     let code = this.app.applyHarness(rep);
     this.lobster.project.setFileContents(new SourceFile("file.cpp", code));
 
-    let gr = this.currentGroup?.grading_result;
-    this.rubric?.forEach((ri, i) => this.rubricItemOutlets[ri.rubric_item_uuid]?.updateStatus(gr && gr[ri.rubric_item_uuid]).clearHighlights());
+    let gr = this.app.currentGroup?.grading_result;
+    this.app.rubric?.forEach((ri, i) => this.rubricItemOutlets[ri.rubric_item_uuid]?.updateStatus(gr && gr[ri.rubric_item_uuid]).clearHighlights());
   }
 
   public closeGroup() {
-    delete asMutable(this).currentGroup;
+    delete asMutable(this.app).currentGroup;
     $(".examma-ray-grading-group-name").html("[No group selected]");
     this.lobster.project.setFileContents(new SourceFile("file.cpp", "No submissions opened"));
   }
 
   public toggleRubricItem(rubric_item_uuid: string) {
-    assert(this.rubric);
+    assert(this.app.rubric);
 
-    if(!this.currentGroup) {
+    if(!this.app.currentGroup) {
       return;
     }
 
-    this.currentGroup.grading_result ??= { };
+    this.app.currentGroup.grading_result ??= { };
 
-    let currentStatus = this.currentGroup.grading_result[rubric_item_uuid] ?? "off";
+    let currentStatus = this.app.currentGroup.grading_result[rubric_item_uuid] ?? "off";
     if (currentStatus === "off") {
       currentStatus = "on";
     }
@@ -730,7 +627,7 @@ class GroupGraderOutlet {
     
     this.app.performLocalOperation({
       kind: "set_rubric_item_status",
-      group_uuid: this.currentGroup.group_uuid,
+      group_uuid: this.app.currentGroup.group_uuid,
       rubric_item_uuid: rubric_item_uuid,
       status: currentStatus
     });
@@ -750,25 +647,25 @@ class GroupGraderOutlet {
   }
 
   public toggleGradingFinished() {
-    if(!this.currentGroup) {
+    if(!this.app.currentGroup) {
       return;
     }
 
-    this.currentGroup.grading_result ??= { };
+    this.app.currentGroup.grading_result ??= { };
 
-    this.currentGroup.finished = !this.currentGroup.finished;
+    this.app.currentGroup.finished = !this.app.currentGroup.finished;
 
     // this.updatedGradingResult();
   }
 
 
   private createRubricBar() {
-    this.rubric.forEach((ri, i) => this.createRubricItemOutlet(ri));
+    this.app.rubric.forEach((ri, i) => this.createRubricItemOutlet(ri));
   }
 
   private createRubricItemOutlet(ri: ManualGradingRubricItem) {
     let rubricItemElem = $(`<button type="button" class="list-group-item"></button>`).appendTo(this.rubricBarElem);
-    let sub = this.currentGroup?.submissions[0];
+    let sub = this.app.currentGroup?.submissions[0];
     let skin = this.app.skin_override ?? (sub && createRecordedSkin(sub));
     let outlet = new RubricItemOutlet(rubricItemElem, ri, undefined, skin);
     this.rubricItemOutlets[ri.rubric_item_uuid] = outlet;
@@ -908,6 +805,168 @@ class RubricItemOutlet {
 
   public clearHighlights() {
     this.elem.find(".examma-ray-rubric-item-avatar-bar").empty();
+  }
+}
+
+
+class GroupThumbnailsPanel {
+
+  public readonly app: ManualCodeGraderApp;
+
+  private elem: JQuery;
+
+  private groupThumbnailOutlets: {
+    [index: string]: GroupThumbnailOutlet | undefined
+  } = { };
+  
+  private submissionsFilterCriterion : SubmissionsFilterCriterion = "all";
+  private submissionsSortCriteria : SubmissionsSortCriterion = "name";
+  private submissionsSortOrdering : SubmissionsSortOrdering = "asc";
+
+  private SUBMISSION_SORTS : {
+    [k in SubmissionsSortCriterion]: (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => number
+  } = {
+    "name": (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => a.group_uuid.localeCompare(b.group_uuid, undefined, {numeric: true}),
+    "size": (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => a.submissions.length - b.submissions.length,
+    "score": (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => this.app.pointsEarned(a.grading_result) - this.app.pointsEarned(b.grading_result),
+  };
+
+  public constructor(app: ManualCodeGraderApp, elem: JQuery) {
+    this.app = app;
+    this.elem = elem;
+  
+    this.initComponents();
+
+    this.createGroupThumbnails();
+  }
+
+  private initComponents() {
+    
+    const self = this;
+    $(".examma-ray-submissions-filter-button").on("click", function() {
+        $(".examma-ray-submissions-filter-button").removeClass("btn-primary").addClass("btn-default");
+        $(this).removeClass("btn-default").addClass("btn-primary");
+        self.setSubmissionsFilterCriterion($(this).data("filter-criterion"))
+    });
+  
+    $(".examma-ray-submissions-sort-button").on("click", function() {
+        $(".examma-ray-submissions-sort-button").removeClass("btn-primary").addClass("btn-default");
+        $(this).removeClass("btn-default").addClass("btn-primary");
+        self.setSubmissionsSortCriterion($(this).data("sort-criterion"))
+    });
+  
+    $(".examma-ray-submissions-sort-ordering-button").on("click", function() {
+        $(".examma-ray-submissions-sort-ordering-button").removeClass("btn-primary").addClass("btn-default");
+        $(this).removeClass("btn-default").addClass("btn-primary");
+        self.setSubmissionsSortOrdering($(this).data("sort-ordering"));
+    });
+  }
+
+  private createGroupThumbnails() {
+
+    this.elem.empty();
+    Object.values(this.groupThumbnailOutlets).forEach(out => out!.dispose());
+    this.groupThumbnailOutlets = {};
+
+    Object.values(this.app.grading_records.groups).forEach(group => {
+      this.groupThumbnailOutlets[group.group_uuid] = new GroupThumbnailOutlet(this.app, $("<div></div>"), group);
+    });
+    this.updateDisplayedThumbnails();
+  }
+
+  public onGroupOpened(group: ManualGradingGroupRecord) {
+    this.groupThumbnailOutlets[group.group_uuid]?.onGroupOpened();
+  }
+
+  public onGroupClosed(group: ManualGradingGroupRecord) {
+    this.groupThumbnailOutlets[group.group_uuid]?.onGroupClosed();
+  }
+
+  public setSubmissionsFilterCriterion(criterion: SubmissionsFilterCriterion) {
+    this.submissionsFilterCriterion = criterion;
+    this.updateDisplayedThumbnails();
+  }
+
+  public setSubmissionsSortCriterion(criterion: SubmissionsSortCriterion) {
+    this.submissionsSortCriteria = criterion;
+    this.updateDisplayedThumbnails();
+  }
+
+  public setSubmissionsSortOrdering(ordering: SubmissionsSortOrdering) {
+    this.submissionsSortOrdering = ordering;
+    this.updateDisplayedThumbnails();
+  }
+
+  private updateDisplayedThumbnails() {
+    
+    // detach all thumbnail elements
+    Object.values(this.groupThumbnailOutlets).forEach(to => to!.elem.detach());
+
+    // Attached filtered, sorted, elements
+    let reorderedThumbnailOutlets = Object.values(this.groupThumbnailOutlets).map(to => to!.group)
+      .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
+      .sort(this.SUBMISSION_SORTS[this.submissionsSortCriteria])
+      .map(group => this.groupThumbnailOutlets[group.group_uuid]!);
+      
+    if (this.submissionsSortOrdering === "dsc") {
+      reorderedThumbnailOutlets = reorderedThumbnailOutlets.reverse();
+    }
+
+    reorderedThumbnailOutlets.forEach(to => to.elem.appendTo(this.elem));
+  }
+}
+
+class GroupThumbnailOutlet {
+
+  public readonly app: ManualCodeGraderApp;
+  public readonly group: ManualGradingGroupRecord;
+
+  public readonly elem: JQuery;
+
+  public constructor(app: ManualCodeGraderApp, elem: JQuery, group: ManualGradingGroupRecord) {
+    this.app = app;
+    this.elem = elem;
+    this.group = group;
+
+    elem.addClass("panel panel-default examma-ray-grading-group-thumbnail");
+    this.refreshContent();
+    
+    elem.on("click", () => {
+      this.app.openGroup(group);
+    });
+  }
+
+  public dispose() {
+    // nothing to do
+  }
+
+  private refreshContent() {
+    if (this.group.submissions.length === 0) {
+      this.elem.html("[EMPTY GROUP]");
+      return;
+    }
+
+    let response = this.group.submissions[0].submission;
+
+    this.elem.html(`
+      <div class="panel-heading">
+        <span class="badge">${this.group.submissions.length}</span> ${this.group.group_uuid} 
+        ${this.group.grading_result
+          ? renderScoreBadge(this.app.pointsEarned(this.group.grading_result), this.app.question.pointsPossible, this.group.grading_result.verified ? VERIFIED_ICON : "")
+          : renderUngradedBadge(this.app.question.pointsPossible)}
+      </div>
+      <div class="panel-body">
+        <pre><code>${highlightCode(response, CODE_LANGUAGE)}</code></pre>
+      </div>
+    `);
+  }
+
+  public onGroupOpened() {
+    this.elem.addClass("panel-primary");
+  }
+
+  public onGroupClosed() {
+    this.elem.removeClass("panel-primary");
   }
 }
 
