@@ -80,8 +80,10 @@ export type ManualGradingPingResponse = {
 };
 
 export type ActiveGraders = {
+  // Question ID
   [index: string]: {
     graders: {
+      // Client ID
       [index: string]: {
         group_uuid?: string,
         email: string

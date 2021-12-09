@@ -188,6 +188,7 @@ export class ManualCodeGraderApp {
   private async onPingResponse(pingResponse: ManualGradingPingResponse) {
 
     this.updateGraderAvatars(pingResponse);
+    this.groupThumbnailsPanel.updateGraderAvatars(pingResponse);
 
     if (pingResponse.epoch_transitions === "invalid") {
       alert("Uh oh, something went wrong synchronizing your work to the server. This should never happen. Try reloading the page, I guess? :(");
@@ -262,6 +263,8 @@ export class ManualCodeGraderApp {
       if (op.group_uuid === this.currentGroup?.group_uuid) {
         this.groupGrader.onRubricItemStatusSet(op.rubric_item_uuid, op.status, remote_grader_email);
       }
+
+      this.groupThumbnailsPanel.onGroupGradingResultUpdated(op.group_uuid);
     }
     else if (op.kind === "set_group_finished") {
       this.grading_records.groups[op.group_uuid].finished = op.finished;
@@ -271,6 +274,7 @@ export class ManualCodeGraderApp {
       if (existingRi) {
         Object.assign(existingRi, op.edits);
         this.groupGrader.onRubricItemEdit(op.rubric_item_uuid, remote_grader_email);
+        this.groupThumbnailsPanel.onRubricUpdated();
       }
       else {
         // tehcnically should never get here - rubric items can't be deleted, only hidden
@@ -282,10 +286,12 @@ export class ManualCodeGraderApp {
       if (existingRi) {
         Object.assign(existingRi, op.rubric_item);
         this.groupGrader.onRubricItemEdit(op.rubric_item.rubric_item_uuid, remote_grader_email);
+        this.groupThumbnailsPanel.onRubricUpdated();
       }
       else {
         asMutable(this.rubric).push(op.rubric_item);
         this.groupGrader.onRubricItemCreated(op.rubric_item);
+        this.groupThumbnailsPanel.onRubricUpdated();
       }
       
     }
@@ -914,6 +920,18 @@ class GroupThumbnailsPanel {
 
     reorderedThumbnailOutlets.forEach(to => to.elem.appendTo(this.elem));
   }
+
+  public onGroupGradingResultUpdated(group_uuid: string) {
+    this.groupThumbnailOutlets[group_uuid]?.onGroupGradingResultUpdated();
+  }
+
+  public onRubricUpdated() {
+    Object.values(this.groupThumbnailOutlets).forEach(to => to!.onRubricUpdated());
+  }
+
+  public updateGraderAvatars(pingResponse: ManualGradingPingResponse) {
+    Object.values(this.groupThumbnailOutlets).forEach(to => to!.updateActiveGraders(pingResponse));
+  }
 }
 
 class GroupThumbnailOutlet {
@@ -922,6 +940,11 @@ class GroupThumbnailOutlet {
   public readonly group: ManualGradingGroupRecord;
 
   public readonly elem: JQuery;
+  private readonly badgesElem : JQuery;
+  private readonly avatarsElem : JQuery;
+
+  private activeGraders: string[] = [];
+  
 
   public constructor(app: ManualCodeGraderApp, elem: JQuery, group: ManualGradingGroupRecord) {
     this.app = app;
@@ -929,7 +952,10 @@ class GroupThumbnailOutlet {
     this.group = group;
 
     elem.addClass("panel panel-default examma-ray-grading-group-thumbnail");
-    this.refreshContent();
+    this.createContent();
+    this.badgesElem = this.elem.find(".group-thumbnail-badges");
+    this.avatarsElem = this.elem.find(".group-thumbnail-avatars");
+    this.refreshBadges();
     
     elem.on("click", () => {
       this.app.openGroup(group);
@@ -940,7 +966,7 @@ class GroupThumbnailOutlet {
     // nothing to do
   }
 
-  private refreshContent() {
+  private createContent() {
     if (this.group.submissions.length === 0) {
       this.elem.html("[EMPTY GROUP]");
       return;
@@ -948,17 +974,26 @@ class GroupThumbnailOutlet {
 
     let response = this.group.submissions[0].submission;
 
+    this.elem.css("position", "relative");
     this.elem.html(`
       <div class="panel-heading">
-        <span class="badge">${this.group.submissions.length}</span> ${this.group.group_uuid} 
-        ${this.group.grading_result
-          ? renderScoreBadge(this.app.pointsEarned(this.group.grading_result), this.app.question.pointsPossible, this.group.grading_result.verified ? VERIFIED_ICON : "")
-          : renderUngradedBadge(this.app.question.pointsPossible)}
+        <span class="group-thumbnail-badges"></span>
+        <span class="badge">${this.group.submissions.length}</span>
+        ${this.group.group_uuid} 
       </div>
       <div class="panel-body">
         <pre><code>${highlightCode(response, CODE_LANGUAGE)}</code></pre>
       </div>
+      <span class="group-thumbnail-avatars"></span>
     `);
+  }
+
+  private refreshBadges() {
+    this.badgesElem.html(
+      this.group.grading_result
+        ? renderScoreBadge(this.app.pointsEarned(this.group.grading_result), this.app.question.pointsPossible, this.group.grading_result.verified ? VERIFIED_ICON : "")
+        : renderUngradedBadge(this.app.question.pointsPossible)
+    );
   }
 
   public onGroupOpened() {
@@ -967,6 +1002,28 @@ class GroupThumbnailOutlet {
 
   public onGroupClosed() {
     this.elem.removeClass("panel-primary");
+  }
+
+  public onGroupGradingResultUpdated() {
+    this.refreshBadges();
+  }
+
+  public onRubricUpdated() {
+    this.refreshBadges();
+  }
+
+  public updateActiveGraders(pingResponse: ManualGradingPingResponse) {
+    let clients = pingResponse.active_graders[this.app.question.question_id].graders;
+    this.avatarsElem.empty();
+    Object.values(clients).forEach(client => {
+      if (client.group_uuid === this.group.group_uuid) {
+        let avatarElem = $(`<div style="display: inline-block; margin-left: 5px;" data-toggle="tooltip" data-placement="bottom" title="${client.email}">
+          ${avatar(client.email, { size: ACTIVE_GRADER_AVATAR_SIZE })}
+        </div>`);
+        this.avatarsElem.append(avatarElem);
+      }
+    });
+    this.avatarsElem.children().tooltip();
   }
 }
 

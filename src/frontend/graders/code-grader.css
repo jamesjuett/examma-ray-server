@@ -47,12 +47,20 @@ body {
   cursor: pointer;
 }
 
+.examma-ray-grading-group-thumbnail .panel-heading {
+  overflow-x: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .examma-ray-grading-group-thumbnail .panel-body pre {
   font-size: 0.5em;
 }
 
-.examma-ray-grading-group-thumbnail .examma-ray-score-badge {
-  float: right;
+.group-thumbnail-avatars {
+  position: absolute;
+  right: 5px;
+  top: -13px;
 }
 
 .examma-ray-grading-rubric-buttons {
