@@ -2,15 +2,15 @@ import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { readdirSync } from "fs";
 import { copyFile, readFile } from "fs/promises";
 import { JwtUserInfo } from "./auth/jwt_auth";
-import { ActiveGraders, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus } from "./manual_grading";
-import { asMutable, assertExists, assertFalse, assertNever } from "./util/util";
+import { ActiveGraders, ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins } from "./manual_grading";
+import { asMutable, assert, assertExists, assertFalse, assertNever } from "./util/util";
 import { Worker } from "worker_threads";
 import { ExamGeneratorSpecification } from "examma-ray/dist/ExamGenerator";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { db_getExamEpoch, db_nextExamEpoch } from "./db/db_exams";
 import { WorkerData_Generate } from "./run/types";
-import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecord, db_updateManualGradingRubricItem } from "./db/db_rubrics";
-import { assert } from "console";
+import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecord, db_updateManualGradingRubricItem } from "./db/db_rubrics";
+import { db_createCodeGraderConfig, db_getCodeGraderConfig, db_updateCodeGraderConfig } from "./db/db_code_grader";
 
 const GRADER_IDLE_THRESHOLD = 10000; // ms
 
@@ -113,6 +113,10 @@ export class ServerExam {
 
     await this.workerTask(worker, "submissions");
     await this.nextEpoch();
+
+    // All question grading servers will need to reload new submission
+    // data from the DB
+    await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
   }
 
   private workerTask(worker: Worker, task: keyof ExamTaskStatus) {
@@ -168,7 +172,7 @@ export type SetGroupFinishedOperation = {
 export type EditRubricItemOperation = {
   kind: "edit_rubric_item",
   rubric_item_uuid: string,
-  edits: Partial<ManualGradingRubricItem>  
+  edits: Partial<ManualGradingRubricItem>
 };
 
 export type CreateRubricItemOperation = {
@@ -177,12 +181,18 @@ export type CreateRubricItemOperation = {
   // after: string
 };
 
+export type EditCodeGraderConfigOperation = {
+  kind: "edit_code_grader_config",
+  edits: Partial<ManualCodeGraderConfiguration>
+};
+
 // NOTE: all operations must be idempotent and must not depend on previous state
 export type ManualGradingOperation =
  | SetRubricItemStatusOperation
  | SetGroupFinishedOperation
  | EditRubricItemOperation
- | CreateRubricItemOperation;
+ | CreateRubricItemOperation
+ | EditCodeGraderConfigOperation;
 
 export type ManualGradingEpochTransition = {
   readonly client_uuid: string,
@@ -190,42 +200,60 @@ export type ManualGradingEpochTransition = {
   readonly ops: readonly ManualGradingOperation[]
 };
 
+const DEFAULT_TEST_HARNESS = "{{submission}}";
+const DEFAULT_GROUPING_FUNCTION = "main";
+
 export class QuestionGradingServer {
   
   public readonly exam_id: string;
   public readonly question_id: string;
+  public readonly config: ManualCodeGraderConfiguration;
   public readonly rubric: ManualGradingRubricItem[];
 
+  public readonly skins: ManualGradingSkins = {};
+
   public readonly grading_record: ManualGradingQuestionRecords;
+
   private history_starting_epoch: number;
   private transitionHistory: ManualGradingEpochTransition[] = [];
 
   private transitionRecorderQueue: ManualGradingEpochTransition[] = [];
-  private transitionRecorderQueueLock: boolean = false;
+  private transitionRecorderQueueLock?: Promise<void>;
 
   public readonly active_graders: ActiveGraders = {};
   private next_active_graders: ActiveGraders = {};
 
+  private reload_lock?: Promise<void>;
+
   public static async create(exam_id: string, question_id: string) {
+    console.log("creating question grading server for " + exam_id + " " + question_id);
     let question = await db_getManualGradingQuestion(question_id);
     if (!question) {
       await db_setManualGradingQuestion(question_id, 0);
-      question = await db_getManualGradingQuestion(question_id);
     }
-    assert(question);
+
+    let grader_config = await db_getCodeGraderConfig(question_id);
+    if (!grader_config) {
+      await db_createCodeGraderConfig(question_id, DEFAULT_TEST_HARNESS, DEFAULT_GROUPING_FUNCTION);
+      grader_config = await db_getCodeGraderConfig(question_id);
+    }
+    assert(grader_config);
+
     return new QuestionGradingServer(
       exam_id,
       question_id,
       await db_getManualGradingRubric(question_id),
+      grader_config,
       await db_getManualGradingRecords(question_id)
     );
   }
 
-  private constructor(exam_id: string, question_id: string, rubric: ManualGradingRubricItem[], grading_record: ManualGradingQuestionRecords) {
+  private constructor(exam_id: string, question_id: string, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, grading_record: ManualGradingQuestionRecords) {
     this.exam_id = exam_id;
     this.question_id = question_id;
     this.history_starting_epoch = grading_record.grading_epoch;
     this.rubric = rubric;
+    this.config = config;
     this.grading_record = grading_record;
     
 
@@ -235,7 +263,7 @@ export class QuestionGradingServer {
     }, GRADER_IDLE_THRESHOLD);
   }
 
-  public receiveTransition(transition: ManualGradingEpochTransition) {
+  private receiveTransition(transition: ManualGradingEpochTransition) {
 
     // all at once, synchronous transition to next epoch
     // so that clients won't ever get info halfway through
@@ -246,6 +274,7 @@ export class QuestionGradingServer {
     this.transitionHistory.push(transition);
     if (this.transitionHistory.length > 100) {
       this.transitionHistory.shift();
+      ++this.history_starting_epoch;
     }
 
     // This happens async, but with all transitions/operations in order
@@ -253,15 +282,20 @@ export class QuestionGradingServer {
     this.recordOperations();
   }
 
-  public async recordOperations() {
+  private async recordOperations() {
 
     // If an async call to process operations was already going,
     // then we won't spawn another one
     if (this.transitionRecorderQueueLock) {
       return;
     }
-    
-    this.transitionRecorderQueueLock = true;
+
+    this.transitionRecorderQueueLock = this.recordOperationsImpl();
+    await this.transitionRecorderQueueLock;
+    delete this.transitionRecorderQueueLock;
+  }
+
+  private async recordOperationsImpl() {
 
     while(this.transitionRecorderQueue.length > 0) {
       let nextTransition = this.transitionRecorderQueue.shift()!
@@ -271,7 +305,6 @@ export class QuestionGradingServer {
       await db_setManualGradingQuestion(this.question_id, this.grading_record.grading_epoch);
     }
     
-    this.transitionRecorderQueueLock = false;
   }
 
   private applyOperation(op: ManualGradingOperation) {
@@ -300,6 +333,9 @@ export class QuestionGradingServer {
         this.rubric.push(op.rubric_item);
       }
     }
+    else if (op.kind === "edit_code_grader_config") {
+      Object.assign(this.config, op.edits);
+    }
     else {
       return assertNever(op);
     }
@@ -327,12 +363,55 @@ export class QuestionGradingServer {
         return db_createManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_uuid, op.rubric_item)
       }
     }
+    else if (op.kind === "edit_code_grader_config") {
+      db_updateCodeGraderConfig(this.question_id, op.edits)
+    }
     else {
       return assertNever(op);
     }
   }
 
-  public processManualGradingPing(email: string, ping: ManualGradingPingRequest) : ManualGradingPingResponse {
+  public async reloadGradingRecords() {
+    this.reload_lock = this.reloadGradingRecordsImpl();
+    await this.reload_lock;
+    delete this.reload_lock;
+  }
+
+  private async reloadGradingRecordsImpl() {
+
+    // Wait for all pending transitions to be written to the database before reloading
+    await this.transitionRecorderQueueLock;
+
+    // Reload grading record
+    asMutable(this).grading_record = await db_getManualGradingRecords(this.question_id);
+
+    // Reload skins (may come with new submissions added to DB)
+    asMutable(this).skins = {};
+    (await db_getManualGradingQuestionSkins(this.question_id)).forEach(s => {
+      this.skins[s.skin_id] = {
+        skin_id: s.skin_id,
+        non_composite_skin_id: s.non_composite_skin_id,
+        replacements: s.replacements
+      };
+    });
+
+    // New grading epoch to represent new data in the DB
+    await db_setManualGradingQuestion(this.question_id, ++this.grading_record.grading_epoch);
+
+
+    // Force all clients to reload
+    this.clearTransitionHistory();
+  }
+
+  private clearTransitionHistory() {
+    this.transitionHistory.length = 0; // clear array
+    this.history_starting_epoch = this.grading_record.grading_epoch;
+  }
+
+  public async processManualGradingPing(email: string, ping: ManualGradingPingRequest) : Promise<ManualGradingPingResponse> {
+
+    if (this.reload_lock) { await this.reload_lock; }
+
     (this.active_graders[ping.question_id] ??= {graders: {}}).graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
     (this.next_active_graders[ping.question_id] ??= {graders: {}}).graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
 

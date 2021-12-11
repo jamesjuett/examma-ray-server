@@ -39,12 +39,12 @@ export class IndexExammaRayGraderApplication {
           }
         });
   
+        $(".examma-ray-exams-list").empty();
         response.data.forEach((exam_spec: Omit<ExamSpecification, "sections">) => {
           const exam_id = exam_spec.exam_id;
-          $(".examma-ray-exams-list").empty();
           $(".examma-ray-exams-list").append(`
             <li>
-              <a href="dashboard.html?exam-id=eecs280f21midterm">${exam_id}: ${exam_spec.title}</a>
+              <a href="dashboard.html?exam-id=${exam_id}">${exam_id}: ${exam_spec.title}</a>
               <button class="btn btn-success examma-ray-run-grading-button" data-exam-id="${exam_id}">Run Grading</button>
               <button class="btn btn-success examma-ray-run-reports-button" data-exam-id="${exam_id}">Generate Grading Reports</button>
             </li>

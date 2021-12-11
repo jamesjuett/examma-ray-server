@@ -21,7 +21,7 @@ import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
 
 import queryString from "query-string";
-import { ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSubmission } from "../../manual_grading";
+import { ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission } from "../../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../../util/util";
 import axios from "axios";
 import { ExammaRayGraderClient } from "../Application";
@@ -74,7 +74,9 @@ export class ManualCodeGraderApp {
   public readonly exam_id: string;
   public readonly question: Question;
   public readonly rubric: ManualGradingRubricItem[];
+  public readonly config: ManualCodeGraderConfiguration;
   public readonly grading_records: ManualGradingQuestionRecords;
+  public readonly skins: ManualGradingSkins;
 
   public readonly currentGroup?: ManualGradingGroupRecord;
 
@@ -85,19 +87,19 @@ export class ManualCodeGraderApp {
 
 
   // private extract_code: (raw_submission: string, skin: ExamComponentSkin) => string;
-  public skin_override?: ExamComponentSkin;
+  // public skin_override?: ExamComponentSkin;
   // private preprocess?: (submission: string) => string;
   // private testHarness: string;
   // private groupingFunctionName: string;
-
-  public readonly config?: ManualCodeGraderConfiguration;
   
-  private constructor(client: ExammaRayGraderClient, exam_id: string, question: Question, rubric: ManualGradingRubricItem[], records: ManualGradingQuestionRecords) {
+  private constructor(client: ExammaRayGraderClient, exam_id: string, question: Question, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, records: ManualGradingQuestionRecords, skins: ManualGradingSkins) {
     this.client = client;
     this.exam_id = exam_id;
     this.question = question;
+    this.config = config;
     this.rubric = rubric;
     this.grading_records = records;
+    this.skins = skins;
 
     this.groupGrader = new GroupGraderOutlet(this);
     this.groupThumbnailsPanel = new GroupThumbnailsPanel(this, $(".examma-ray-group-thumbnails"));
@@ -110,7 +112,32 @@ export class ManualCodeGraderApp {
 
     $(".examma-ray-grading-title").html(this.question.question_id);
 
+    this.initComponents();
+
     setInterval(() => this.sendPing(), 1000);
+  }
+
+  private initComponents() {
+    
+    $("#edit-code-grader-config-open-modal-button").on("click", async () => {
+      $("#edit-code-grader-config-input-grouping-function").val(this.config.grouping_function);
+      $("#edit-code-grader-config-input-test-harness").val(this.config.test_harness);
+      $("#edit-code-grader-config-modal").modal("show");
+    });
+
+    $("#edit-code-grader-config-submit-button").on("click", async () => {
+      this.performLocalOperation({
+        kind: "edit_code_grader_config",
+        edits: {
+          question_id: this.question.question_id,
+          grouping_function: ""+$("#edit-code-grader-config-input-grouping-function").val(),
+          test_harness: ""+$("#edit-code-grader-config-input-test-harness").val()
+        }
+      });
+
+      $("#edit-code-grader-config-modal").modal("hide");
+    });
+
   }
 
   public static async create(exam_id: string, question_id: string) {
@@ -129,9 +156,11 @@ export class ManualCodeGraderApp {
       
       const question = Question.create(<QuestionSpecification>question_response.data);
       const rubric = await loadRubric(client, exam_id, question_id);
+      const config = await loadConfig(client, exam_id, question_id);
       const records = await loadGradingRecords(client, exam_id, question_id);
+      const skins = await loadSkins(client, exam_id, question_id);
 
-      return new ManualCodeGraderApp(client, exam_id, question, rubric, records);
+      return new ManualCodeGraderApp(client, exam_id, question, rubric, config, records, skins);
     }
     catch(e: unknown) {
       alert("Error loading grading records :(");
@@ -243,7 +272,7 @@ export class ManualCodeGraderApp {
     // });
   
     // $(".examma-ray-grading-finished-button").on("click", async function() {
-    //     self.toggleGradingFinished();
+    //     self.toggleGroupFinished();
     // });
   
   }
@@ -268,6 +297,10 @@ export class ManualCodeGraderApp {
     }
     else if (op.kind === "set_group_finished") {
       this.grading_records.groups[op.group_uuid].finished = op.finished;
+      if (op.group_uuid === this.currentGroup?.group_uuid) {
+        this.groupGrader.onGroupFinishedSet(op.group_uuid, remote_grader_email);
+      }
+      this.groupThumbnailsPanel.onGroupFinishedSet(op.group_uuid, remote_grader_email);
     }
     else if (op.kind === "edit_rubric_item") {
       let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item_uuid);
@@ -290,10 +323,14 @@ export class ManualCodeGraderApp {
       }
       else {
         asMutable(this.rubric).push(op.rubric_item);
-        this.groupGrader.onRubricItemCreated(op.rubric_item);
+        this.groupGrader.onRubricItemCreated(op.rubric_item, remote_grader_email);
         this.groupThumbnailsPanel.onRubricUpdated();
       }
       
+    }
+    else if (op.kind === "edit_code_grader_config") {
+      Object.assign(this.config, op.edits);
+      this.groupGrader.onGraderConfigEdit(remote_grader_email);
     }
     else {
       return assertNever(op);
@@ -360,29 +397,17 @@ export class ManualCodeGraderApp {
 
   }
 
-  public applyHarness(rep: ManualGradingSubmission) {
-    if (!this.config) {
-      return rep.submission;
-    }
+  public applyHarness(sub: ManualGradingSubmission) {
 
-    let response = rep.submission;
-    let originalSkin = createRecordedSkin(rep);
-    let skin = this.skin_override ?? originalSkin;
-    let submittedCode = response;
+    let code = this.config.test_harness.replace("{{submission}}", indentString(sub.submission, 4));
 
-    // if (this.preprocess) {
-    //   submittedCode = this.preprocess(submittedCode);
-    // }
-
-    let code = this.config.test_harness.replace("{{submission}}", indentString(submittedCode, 4));
-    code = applySkin(code, skin);
+    code = applySkin(code, this.skins[sub.skin_id]);
     return code;
   }
 
   private createMemberThumbnail(sub: ManualGradingSubmission) {
     let response = sub.submission;
-    let originalSkin = createRecordedSkin(sub);
-    let skin = this.skin_override ?? originalSkin;
+    let skin = this.skins[sub.skin_id];
     let jq = $(`
       <div class="panel panel-default examma-ray-group-member-thumbnail">
         <div class="panel-heading">
@@ -451,7 +476,7 @@ export class ManualCodeGraderApp {
   //   let thumbElem = this.thumbnailElems[this.currentGroup.group_uuid];
   //   thumbElem.find(".examma-ray-score-badge").replaceWith(
   //     this.currentGroup.grading_result
-  //       ? renderScoreBadge(this.pointsEarned(this.currentGroup.grading_result), this.question.pointsPossible, this.currentGroup.grading_result.verified ? VERIFIED_ICON : "")
+  //       ? renderScoreBadge(this.pointsEarned(this.currentGroup.grading_result), this.question.pointsPossible, this.currentGroup.finished ? VERIFIED_ICON : "")
   //       : renderUngradedBadge(this.question.pointsPossible)
   //   );
     
@@ -516,12 +541,6 @@ function copyGradingResult(gr: ManualGradingResult) {
   return $.extend(true, {}, gr);
 }
 
-function createRecordedSkin(sub: ManualGradingSubmission) {
-  // use a v4 uuid as the skin ID to avoid caching issues
-  // return {skin_id: `[recorded-${uuidv4()}]`, replacements: sub.skin_replacements}; // TODO skins
-  return {skin_id: `[recorded-${uuidv4()}]`, replacements: {}};
-}
-
 const VERIFIED_ICON = `<i class="bi bi-check2-circle" style="vertical-align: text-top;"></i> `;
 
 class GroupGraderOutlet {
@@ -535,6 +554,7 @@ class GroupGraderOutlet {
   } = { };
 
   private rubricBarElem: JQuery;
+  private gradingFinishedButtonElem: JQuery;
 
   public constructor(app: ManualCodeGraderApp) {
     this.app = app;
@@ -545,6 +565,11 @@ class GroupGraderOutlet {
     this.lobster = this.createLobster();
     this.createRubricBar();
     this.initComponents();
+
+    this.gradingFinishedButtonElem = $(".examma-ray-grading-finished-button")
+      .on("click", () => {
+        this.toggleGroupFinished();
+      });
   }
 
   private initComponents() {
@@ -589,6 +614,7 @@ class GroupGraderOutlet {
 
       $("#edit-rubric-item-modal").modal("hide");
     });
+
   }
   
   public openGroup(group: ManualGradingGroupRecord) {
@@ -596,13 +622,16 @@ class GroupGraderOutlet {
     $(".examma-ray-grading-group-name").html(group.group_uuid);
     $(".examma-ray-grading-group-num-members").html(""+group.submissions.length);
 
-    let rep = group.submissions[0];
-
-    let code = this.app.applyHarness(rep);
-    this.lobster.project.setFileContents(new SourceFile("file.cpp", code));
+    this.updateDisplayedSubmission(group.submissions[0]);
 
     let gr = this.app.currentGroup?.grading_result;
     this.app.rubric?.forEach((ri, i) => this.rubricItemOutlets[ri.rubric_item_uuid]?.updateStatus(gr && gr[ri.rubric_item_uuid]).clearHighlights());
+    this.updateGroupFinishedButton();
+  }
+
+  private updateDisplayedSubmission(sub: ManualGradingSubmission) {
+    let code = this.app.applyHarness(sub);
+    this.lobster.project.setFileContents(new SourceFile("file.cpp", code));
   }
 
   public closeGroup() {
@@ -618,8 +647,6 @@ class GroupGraderOutlet {
       return;
     }
 
-    this.app.currentGroup.grading_result ??= { };
-
     let currentStatus = this.app.currentGroup.grading_result[rubric_item_uuid] ?? "off";
     if (currentStatus === "off") {
       currentStatus = "on";
@@ -630,6 +657,9 @@ class GroupGraderOutlet {
     else if (currentStatus === "unknown") {
       currentStatus = "off";
     }
+    else {
+      assertNever(currentStatus);
+    }
     
     this.app.performLocalOperation({
       kind: "set_rubric_item_status",
@@ -639,10 +669,10 @@ class GroupGraderOutlet {
     });
   }
 
-  private updateGradingFinishedButton(gr: ManualGradingResult | undefined) {
-    let elem = $(".examma-ray-grading-finished-button");
+  private updateGroupFinishedButton() {
+    let elem = this.gradingFinishedButtonElem;
     elem.removeClass("btn-default").removeClass("btn-success");
-    if (gr?.verified) {
+    if (this.app.currentGroup?.finished) {
       elem.html(`<i class="bi bi-check2-circle"></i> Finished`);
       elem.addClass("btn-success");
     }
@@ -652,16 +682,19 @@ class GroupGraderOutlet {
     }
   }
 
-  public toggleGradingFinished() {
+  public toggleGroupFinished() {
+    assert(this.app.rubric);
+
     if(!this.app.currentGroup) {
       return;
     }
+    
+    this.app.performLocalOperation({
+      kind: "set_group_finished",
+      group_uuid: this.app.currentGroup.group_uuid,
+      finished: !this.app.currentGroup.finished
+    });
 
-    this.app.currentGroup.grading_result ??= { };
-
-    this.app.currentGroup.finished = !this.app.currentGroup.finished;
-
-    // this.updatedGradingResult();
   }
 
 
@@ -672,7 +705,7 @@ class GroupGraderOutlet {
   private createRubricItemOutlet(ri: ManualGradingRubricItem) {
     let rubricItemElem = $(`<button type="button" class="list-group-item"></button>`).appendTo(this.rubricBarElem);
     let sub = this.app.currentGroup?.submissions[0];
-    let skin = this.app.skin_override ?? (sub && createRecordedSkin(sub));
+    let skin = sub ? this.app.skins[sub?.skin_id] : undefined;
     let outlet = new RubricItemOutlet(rubricItemElem, ri, undefined, skin);
     this.rubricItemOutlets[ri.rubric_item_uuid] = outlet;
     rubricItemElem.on("click", () => {
@@ -706,8 +739,20 @@ class GroupGraderOutlet {
     this.rubricItemOutlets[rubric_item_uuid]?.update().highlight(remote_grader_email);
   }
 
-  public onRubricItemCreated(ri: ManualGradingRubricItem) {
+  public onGroupFinishedSet(group_uuid: string, remote_grader_email?: string) {
+    this.updateGroupFinishedButton();
+  }
+
+  public onRubricItemCreated(ri: ManualGradingRubricItem, remote_grader_email?: string) {
     this.createRubricItemOutlet(ri);
+    this.rubricItemOutlets[ri.rubric_item_uuid]?.highlight(remote_grader_email);
+  }
+
+  public onGraderConfigEdit(remote_grader_email?: string) {
+    if (!this.app.currentGroup) {
+      return;
+    }
+    this.updateDisplayedSubmission(this.app.currentGroup?.submissions[0]);
   }
 }
 
@@ -793,10 +838,6 @@ class RubricItemOutlet {
     $("#edit-rubric-item-input-points").val(this.rubricItem.points);
     $("#edit-rubric-item-modal").data("edit-rubric-item-mode", "edit");
     $("#edit-rubric-item-modal").modal("show");
-  }
-
-  public toggle() {
-
   }
 
   public highlight(grader_email: string | undefined) {
@@ -925,6 +966,10 @@ class GroupThumbnailsPanel {
     this.groupThumbnailOutlets[group_uuid]?.onGroupGradingResultUpdated();
   }
 
+  public onGroupFinishedSet(group_uuid: string, remote_grader_email?: string) {
+    this.groupThumbnailOutlets[group_uuid]?.onGroupFinishedSet(remote_grader_email);
+  }
+
   public onRubricUpdated() {
     Object.values(this.groupThumbnailOutlets).forEach(to => to!.onRubricUpdated());
   }
@@ -968,7 +1013,7 @@ class GroupThumbnailOutlet {
 
   private createContent() {
     if (this.group.submissions.length === 0) {
-      this.elem.html("[EMPTY GROUP]");
+      this.elem.html("[EMPTY GROUP ] " + this.group.group_uuid);
       return;
     }
 
@@ -991,7 +1036,7 @@ class GroupThumbnailOutlet {
   private refreshBadges() {
     this.badgesElem.html(
       this.group.grading_result
-        ? renderScoreBadge(this.app.pointsEarned(this.group.grading_result), this.app.question.pointsPossible, this.group.grading_result.verified ? VERIFIED_ICON : "")
+        ? renderScoreBadge(this.app.pointsEarned(this.group.grading_result), this.app.question.pointsPossible, this.group.finished ? VERIFIED_ICON : "")
         : renderUngradedBadge(this.app.question.pointsPossible)
     );
   }
@@ -1005,6 +1050,10 @@ class GroupThumbnailOutlet {
   }
 
   public onGroupGradingResultUpdated() {
+    this.refreshBadges();
+  }
+
+  public onGroupFinishedSet(remote_grader_email?: string) {
     this.refreshBadges();
   }
 
@@ -1028,7 +1077,7 @@ class GroupThumbnailOutlet {
 }
 
 
-async function loadRubric(client: ExammaRayGraderClient, exam_id: string, question_id: string, ) {
+async function loadRubric(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
   const rubric_response = await axios({
     url: `api/manual_grading/${exam_id}/questions/${question_id}/rubric`,
     method: "GET",
@@ -1040,7 +1089,19 @@ async function loadRubric(client: ExammaRayGraderClient, exam_id: string, questi
   return <ManualGradingRubricItem[]>rubric_response.data;
 }
 
-async function loadGradingRecords(client: ExammaRayGraderClient, exam_id: string, question_id: string, ) {
+async function loadConfig(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
+  const rubric_response = await axios({
+    url: `api/manual_grading/${exam_id}/questions/${question_id}/config`,
+    method: "GET",
+    data: {},
+    headers: {
+        'Authorization': 'bearer ' + client.getBearerToken()
+    }
+  });
+  return <ManualCodeGraderConfiguration>rubric_response.data;
+}
+
+async function loadGradingRecords(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
   const records_response = await axios({
     url: `api/manual_grading/${exam_id}/questions/${question_id}/records`,
     method: "GET",
@@ -1050,4 +1111,16 @@ async function loadGradingRecords(client: ExammaRayGraderClient, exam_id: string
     }
   });
   return <ManualGradingQuestionRecords>records_response.data;
+}
+
+async function loadSkins(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
+  const records_response = await axios({
+    url: `api/manual_grading/${exam_id}/questions/${question_id}/skins`,
+    method: "GET",
+    data: {},
+    headers: {
+        'Authorization': 'bearer ' + client.getBearerToken()
+    }
+  });
+  return <ManualGradingSkins>records_response.data;
 }

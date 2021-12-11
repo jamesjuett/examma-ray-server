@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from "uuid";
 import { AssignedExam, Exam, TrustedExamSubmission } from "examma-ray";
 import { db_createGroup, db_createSubmission } from "../db/db_code_grader";
 import { stringify_response } from "examma-ray/dist/response/responses";
+import { db_insertManualGradingQuestionSkinIfNotExists } from "../db/db_rubrics";
 
 // type Upload_Status = {
 //   "complete" | 
@@ -53,10 +54,11 @@ async function addSubmission(exam: Exam, filepath: string, originalFilename: str
 async function assignGrading(exam: Exam, submission: TrustedExamSubmission) {
   let assigned_exam = AssignedExam.createFromSubmission(exam, submission);
 
-  await Promise.all(assigned_exam.assignedQuestions.map(async q => {
+  await Promise.all(assigned_exam.assignedQuestions.map(async aq => {
     const group_uuid = uuidv4();
-    await db_createGroup(group_uuid, q.question.question_id, false);
-    await db_createSubmission(q.uuid, q.question.question_id, exam.exam_id, q.student.uniqname, q.rawSubmission, group_uuid)
+    await db_createGroup(group_uuid, aq.question.question_id, false);
+    await db_insertManualGradingQuestionSkinIfNotExists(aq.question.question_id, aq.skin);
+    await db_createSubmission(aq.uuid, aq.question.question_id, aq.skin.skin_id, exam.exam_id, aq.student.uniqname, aq.rawSubmission, group_uuid);
   }));
 }
 
@@ -69,35 +71,38 @@ async function main() {
 
   const uploaded_files : Express.Multer.File[] = workerData.files ?? [];
 
+  let toProcess : {
+    filepath: string,
+    originalFilename: string
+  }[] = [];
   for(let i = 0; i < uploaded_files.length; ++i) {
     const file = uploaded_files[i];
-  
     if (file.originalname.toLowerCase().endsWith(".zip")) {
       // Extract any uploaded zip files
       await extract(`uploads/${file.filename}`, {
         dir: `${process.cwd()}/uploads/`,
         onEntry: (entry, zipFile) => {
           const filepath = `uploads/${entry.fileName}`;
-          // Add extracted submission
-          addSubmission(exam, filepath, entry.fileName);
-
-          // Remove extracted file
-          rmSync(filepath, { force: true });
+          toProcess.push({filepath: filepath, originalFilename: entry.fileName});
         }
       });
 
       rmSync(`uploads${file.filename}`, { force: true });
     }
     else {
-      const filepath = `uploads/${file.filename}`;
-      const originalFilename = file.originalname;
-
-      // Add uploaded submission
-      await addSubmission(exam, filepath, originalFilename);
-
-      // Remove uploaded file
-      rmSync(filepath, { force: true });
+      toProcess.push({filepath: `uploads/${file.filename}`, originalFilename: file.originalname});
     }
+  }
+
+  for(let i = 0; i < toProcess.length; ++i) {
+    const filepath = toProcess[i].filepath;
+    const originalFilename = toProcess[i].originalFilename;
+
+    // Add uploaded submission
+    await addSubmission(exam, filepath, originalFilename);
+
+    // Remove uploaded file
+    rmSync(filepath, { force: true });
   };
 
   console.log(`DONE processing submissions!`);

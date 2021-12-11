@@ -34,6 +34,13 @@ declare module "knex/types/tables" {
     grading_epoch: number;
   }
 
+  interface DB_Manual_Grading_Question_Skins {
+    question_id: string;
+    skin_id: string;
+    non_composite_skin_id?: string;
+    replacements: {[index: string]: string};
+  }
+
   interface DB_Manual_Grading_Rubrics {
     question_id: string;
     rubric_item_uuid: string;
@@ -58,6 +65,7 @@ declare module "knex/types/tables" {
   interface DB_Manual_Grading_Submissions {
     submission_uuid: string;
     question_id: string;
+    skin_id: string;
     exam_id: string;
     group_uuid: string;
     uniqname: string;
@@ -121,6 +129,17 @@ declare module "knex/types/tables" {
       // Update Type
       //   Only allowed to update epochs
       Partial<Pick<DB_Manual_Grading_Questions, "grading_epoch">>
+    >;
+
+    manual_grading_question_skins: Knex.CompositeTableType<
+      // Base Type
+      DB_Manual_Grading_Question_Skins,
+      // Insert Type
+      //   All required
+      DB_Manual_Grading_Question_Skins,
+      // Update Type
+      //   Doesn't make sense to update (you should be using insert/delete)
+      never
     >;
 
     manual_grading_rubrics: Knex.CompositeTableType<

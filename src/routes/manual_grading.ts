@@ -155,7 +155,7 @@ manual_grading_router
         let pr = <ManualGradingPingRequest>req.body;
         let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
         if (qs) {
-          return res.status(200).json(qs.processManualGradingPing(userInfo.email, pr));
+          return res.status(200).json(await qs.processManualGradingPing(userInfo.email, pr));
         }
         else {
           return res.sendStatus(404);
@@ -181,23 +181,46 @@ manual_grading_router
           return res.sendStatus(404);
         }
       }
-    }))
-    // .post(createRoute({
-    //   authorization: NO_AUTHORIZATION, // requireSuperUser,
-    //   preprocessing: jsonBodyParser,
-    //   validation: [
-    //     validateParamExammaRayId("exam_id"),
-    //     validateParamExammaRayId("question_id"),
-    //   ],
-    //   handler: async (req: Request, res: Response) => {
-    //     let ops = <ManualGradingOperation[]>req.body;
-    //     let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
-    //     if (qs) {
-    //       qs.receiveOperations(ops)
-    //       return res.sendStatus(200);
-    //     }
-    //     else {
-    //       return res.sendStatus(404);
-    //     }
-    //   }
-    // }));
+    }));
+
+
+manual_grading_router
+  .route("/:exam_id/questions/:question_id/skins")
+    .get(createRoute({
+      authorization: NO_AUTHORIZATION, // requireSuperUser,
+      preprocessing: NO_PREPROCESSING,
+      validation: [
+        validateParamExammaRayId("exam_id"),
+        validateParamExammaRayId("question_id"),
+      ],
+      handler: async (req: Request, res: Response) => {
+        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        if (qs) {
+          return res.status(200).json(qs.skins);
+        }
+        else {
+          return res.sendStatus(404);
+        }
+      }
+    }));
+
+
+manual_grading_router
+  .route("/:exam_id/questions/:question_id/config")
+    .get(createRoute({
+      authorization: NO_AUTHORIZATION, // requireSuperUser,
+      preprocessing: NO_PREPROCESSING,
+      validation: [
+        validateParamExammaRayId("exam_id"),
+        validateParamExammaRayId("question_id"),
+      ],
+      handler: async (req: Request, res: Response) => {
+        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        if (qs) {
+          return res.status(200).json(qs.config);
+        }
+        else {
+          return res.sendStatus(404);
+        }
+      }
+    }));

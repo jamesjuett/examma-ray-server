@@ -1,3 +1,4 @@
+import { ExamComponentSkin } from "examma-ray";
 import { Tables } from "knex/types/tables";
 import { ManualGradingGroupRecord, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus } from "../manual_grading";
 import { query } from "./db";
@@ -16,6 +17,35 @@ export async function db_setManualGradingQuestion(
     grading_epoch: grading_epoch
   }).onConflict("question_id").merge();
 }
+
+
+// SKINS
+
+export async function db_getManualGradingQuestionSkins(question_id: string) {
+  return await query("manual_grading_question_skins").where({
+    question_id: question_id,
+  }).select();
+}
+
+export async function db_getManualGradingQuestionSkin(question_id: string, skin_id: string) {
+  return await query("manual_grading_question_skins").where({
+    question_id: question_id,
+    skin_id: skin_id
+  }).select().first();
+}
+
+export async function db_insertManualGradingQuestionSkinIfNotExists(question_id: string, skin: ExamComponentSkin) {
+  return await query("manual_grading_question_skins").insert({
+    question_id: question_id,
+    skin_id: skin.skin_id,
+    non_composite_skin_id: skin.non_composite_skin_id,
+    replacements: skin.replacements
+  }).onConflict(["question_id", "skin_id"]).ignore().returning("*");
+}
+
+
+
+
 
 
 export async function db_getManualGradingRubric(question_id: string) {
@@ -133,7 +163,8 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
     record.submissions.push({
       submission_uuid: sub.submission_uuid,
       uniqname: sub.uniqname,
-      submission: sub.submission
+      submission: sub.submission,
+      skin_id: sub.skin_id
     });
   });
   records.forEach(r => {

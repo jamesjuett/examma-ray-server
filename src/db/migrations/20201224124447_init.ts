@@ -35,6 +35,16 @@ export async function up(knex: Knex): Promise<void> {
       table.index("question_id");
     })
 
+    .createTable("manual_grading_question_skins", table => {
+      table.string("question_id", 100).notNullable();
+      table.string("skin_id", 250).notNullable();
+      table.string("non_composite_skin_id", 100).nullable();
+      table.jsonb("replacements");
+
+      table.primary(["question_id", "skin_id"]);
+      table.index("question_id", "skin_id");
+    })
+
     .createTable("manual_grading_rubrics", table => {
       table.uuid("rubric_item_uuid").primary().notNullable();
       table.string("question_id", 100).notNullable()
@@ -68,6 +78,7 @@ export async function up(knex: Knex): Promise<void> {
       table.uuid("submission_uuid").primary().notNullable();
       table.string("question_id", 100).notNullable()
         .references("question_id").inTable("manual_grading_questions").onDelete("restrict");
+      table.string("skin_id", 100).notNullable()
       table.string("exam_id", 100).notNullable();
       table.uuid("group_uuid").nullable()
         .references("group_uuid").inTable("manual_grading_groups").onDelete("set null");
@@ -113,6 +124,7 @@ export async function down(knex: Knex): Promise<void> {
     .dropTable("manual_grading_submissions")
     .dropTable("manual_grading_groups")
     .dropTable("manual_grading_rubrics")
+    .dropTable("manual_grading_question_skins")
     .dropTable("manual_grading_questions")
     .dropTable("submissions_list")
     .dropTable("exams")

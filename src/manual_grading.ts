@@ -1,6 +1,8 @@
+import { ExamComponentSkin } from "examma-ray";
 import { ManualGradingEpochTransition, ManualGradingOperation } from "./ExammaRayGradingServer";
 
 export type ManualCodeGraderConfiguration = {
+  question_id: string,
   test_harness: string,
   grouping_function: string
 };
@@ -8,9 +10,9 @@ export type ManualCodeGraderConfiguration = {
 
 export type ManualGradingSubmission = {
   submission_uuid: string,
-  // skin_replacements: SkinReplacements,
   uniqname: string,
-  submission: string
+  submission: string,
+  skin_id: string
 }
 
 export type ManualGradingRubricItemStatus = "on" | "off" | "unknown";
@@ -44,6 +46,10 @@ export type ManualGradingQuestionRecords = {
   groups: {
     [index: string]: ManualGradingGroupRecord
   }
+};
+
+export type ManualGradingSkins = {
+  [index: string]: ExamComponentSkin
 };
 
 

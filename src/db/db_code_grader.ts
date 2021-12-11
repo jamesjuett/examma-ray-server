@@ -1,5 +1,6 @@
-import { query } from "./db";
+import { pick, query } from "./db";
 import { v4 as uuidv4 } from "uuid";
+import { ManualCodeGraderConfiguration } from "../manual_grading";
 
 
 export async function db_getCodeGraderConfig(question_id: string) {
@@ -16,13 +17,10 @@ export async function db_createCodeGraderConfig(question_id: string, test_harnes
   }).returning("*");
 }
 
-export async function db_updateCodeGraderConfig(question_id: string, test_harness: string, grouping_function: string) {
+export async function db_updateCodeGraderConfig(question_id: string, edits: Partial<Pick<ManualCodeGraderConfiguration, "test_harness" | "grouping_function">>) {
   return await query("manual_grading_code_grader_config").where({
     question_id: question_id
-  }).update({
-    test_harness: test_harness,
-    grouping_function: grouping_function
-  }).returning("*");
+  }).update(pick(edits, ["test_harness", "grouping_function"])).returning("*");
 }
 
 
@@ -47,6 +45,7 @@ export async function db_createGroup(
 export async function db_createSubmission(
   submission_uuid: string,
   question_id: string,
+  skin_id: string,
   exam_id: string,
   uniqname: string,
   submission: string,
@@ -66,6 +65,7 @@ export async function db_createSubmission(
   return await query("manual_grading_submissions").insert({
     submission_uuid: submission_uuid,
     question_id: question_id,
+    skin_id: skin_id,
     exam_id: exam_id,
     group_uuid: group_uuid,
     uniqname: uniqname,
