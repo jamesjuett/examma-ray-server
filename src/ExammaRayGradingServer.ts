@@ -2,15 +2,15 @@ import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { readdirSync } from "fs";
 import { copyFile, readFile } from "fs/promises";
 import { JwtUserInfo } from "./auth/jwt_auth";
-import { ActiveGraders, ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins } from "./manual_grading";
+import { ActiveGraders, ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission } from "./manual_grading";
 import { asMutable, assert, assertExists, assertFalse, assertNever } from "./util/util";
 import { Worker } from "worker_threads";
 import { ExamGeneratorSpecification } from "examma-ray/dist/ExamGenerator";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { db_getExamEpoch, db_nextExamEpoch } from "./db/db_exams";
 import { WorkerData_Generate } from "./run/types";
-import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecord, db_updateManualGradingRubricItem } from "./db/db_rubrics";
-import { db_createCodeGraderConfig, db_getCodeGraderConfig, db_updateCodeGraderConfig } from "./db/db_code_grader";
+import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecord, db_updateManualGradingRubricItem } from "./db/db_rubrics";
+import { db_createCodeGraderConfig, db_createGroup, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
 
 const GRADER_IDLE_THRESHOLD = 10000; // ms
 
@@ -186,13 +186,19 @@ export type EditCodeGraderConfigOperation = {
   edits: Partial<ManualCodeGraderConfiguration>
 };
 
+export type AssignGroupsOperation = {
+  kind: "assign_groups_operation",
+  assignment: {[index: string]: string} // mapping of submission uuids to group uuids
+};
+
 // NOTE: all operations must be idempotent and must not depend on previous state
 export type ManualGradingOperation =
  | SetRubricItemStatusOperation
  | SetGroupFinishedOperation
  | EditRubricItemOperation
  | CreateRubricItemOperation
- | EditCodeGraderConfigOperation;
+ | EditCodeGraderConfigOperation
+ | AssignGroupsOperation;
 
 export type ManualGradingEpochTransition = {
   readonly client_uuid: string,
@@ -244,16 +250,18 @@ export class QuestionGradingServer {
       question_id,
       await db_getManualGradingRubric(question_id),
       grader_config,
+      await loadSkins(question_id),
       await db_getManualGradingRecords(question_id)
     );
   }
 
-  private constructor(exam_id: string, question_id: string, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, grading_record: ManualGradingQuestionRecords) {
+  private constructor(exam_id: string, question_id: string, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, skins: ManualGradingSkins, grading_record: ManualGradingQuestionRecords) {
     this.exam_id = exam_id;
     this.question_id = question_id;
     this.history_starting_epoch = grading_record.grading_epoch;
     this.rubric = rubric;
     this.config = config;
+    this.skins = skins;
     this.grading_record = grading_record;
     
 
@@ -336,6 +344,33 @@ export class QuestionGradingServer {
     else if (op.kind === "edit_code_grader_config") {
       Object.assign(this.config, op.edits);
     }
+    else if (op.kind === "assign_groups_operation") {
+
+      // get a list of all submissions
+      let all_submissions : ManualGradingSubmission[] = []; 
+      Object.values(this.grading_record.groups).forEach(group => {
+        group.submissions.forEach(sub => all_submissions.push(sub));
+        group.submissions.length = 0; // clear out the group submissions list
+      });
+
+      // Add submissions back to the appropriate groups according to the operation
+      all_submissions.forEach(sub => {
+        let group_uuid = op.assignment[sub.submission_uuid];
+        let existing_group = this.grading_record.groups[group_uuid];
+        if (existing_group) {
+          existing_group.submissions.push(sub);
+        }
+        else {
+          // create new group
+          this.grading_record.groups[group_uuid] = {
+            group_uuid: group_uuid,
+            grading_result: {},
+            submissions: [sub],
+            finished: false
+          };
+        }
+      });
+    }
     else {
       return assertNever(op);
     }
@@ -366,6 +401,15 @@ export class QuestionGradingServer {
     else if (op.kind === "edit_code_grader_config") {
       db_updateCodeGraderConfig(this.question_id, op.edits)
     }
+    else if (op.kind === "assign_groups_operation") {
+      for (let submission_uuid in op.assignment) {
+        let group_uuid = op.assignment[submission_uuid];
+        if (!await db_getGroup(group_uuid)) {
+          await db_createGroup(group_uuid, this.question_id, false);
+        }
+        await db_setSubmissionGroup(submission_uuid, group_uuid);
+      }
+    }
     else {
       return assertNever(op);
     }
@@ -387,17 +431,9 @@ export class QuestionGradingServer {
 
     // Reload skins (may come with new submissions added to DB)
     asMutable(this).skins = {};
-    (await db_getManualGradingQuestionSkins(this.question_id)).forEach(s => {
-      this.skins[s.skin_id] = {
-        skin_id: s.skin_id,
-        non_composite_skin_id: s.non_composite_skin_id,
-        replacements: s.replacements
-      };
-    });
 
     // New grading epoch to represent new data in the DB
     await db_setManualGradingQuestion(this.question_id, ++this.grading_record.grading_epoch);
-
 
     // Force all clients to reload
     this.clearTransitionHistory();
@@ -485,4 +521,16 @@ export class ExammaRayGradingServer {
     this.exams_by_id[newExam.exam.exam_id] = newExam;
   }
 
+}
+
+async function loadSkins(question_id: string) {
+  let skins : ManualGradingSkins = {};
+  (await db_getManualGradingQuestionSkins(question_id)).forEach(s => {
+    skins[s.skin_id] = {
+      skin_id: s.skin_id,
+      non_composite_skin_id: s.non_composite_skin_id,
+      replacements: s.replacements
+    };
+  });
+  return skins;
 }

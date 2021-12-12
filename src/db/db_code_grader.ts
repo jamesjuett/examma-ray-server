@@ -25,6 +25,15 @@ export async function db_updateCodeGraderConfig(question_id: string, edits: Part
 
 
 
+export async function db_getGroup(
+  group_uuid: string
+) {
+
+  return await query("manual_grading_groups").where({
+    group_uuid: group_uuid,
+  }).select().first();
+}
+
 export async function db_createGroup(
   group_uuid: string,
   question_id: string,
@@ -73,6 +82,13 @@ export async function db_createSubmission(
   }).returning("*");
 }
 
+export async function db_setSubmissionGroup(submission_uuid: string, group_uuid: string) {
+  return await query("manual_grading_submissions").where({
+    submission_uuid: submission_uuid
+  }).update({
+    group_uuid: group_uuid
+  });
+}
 
 // export async function getSubmissionGroups(question_id: string) {
 //   const submissions = await query("manual_grading_submissions").where({

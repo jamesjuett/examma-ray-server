@@ -13,7 +13,7 @@ import "lobster-vis/dist/css/main.css"
 import "lobster-vis/dist/css/code.css"
 import "lobster-vis/dist/css/exercises.css"
 import "lobster-vis/dist/css/frontend.css"
-import { Checkpoint } from "lobster-vis/dist/js/analysis/checkpoints";
+import { Checkpoint, EndOfMainStateCheckpoint } from "lobster-vis/dist/js/analysis/checkpoints";
 import "lobster-vis/dist/js/lib/standard";
 import { renderScoreBadge, renderShortPointsWorthBadge, renderUngradedBadge } from "examma-ray/dist/core/ui_components";
 import { QuestionSpecification, ExamComponentSkin, Question } from "examma-ray";
@@ -27,6 +27,7 @@ import axios from "axios";
 import { ExammaRayGraderClient } from "../Application";
 import avatar from "animal-avatar-generator";
 import { EditRubricItemOperation, ManualGradingEpochTransition, ManualGradingOperation, SetRubricItemStatusOperation } from "../../ExammaRayGradingServer";
+import { Simulation } from "lobster-vis/dist/js/core/Simulation";
 
 // Because this grader is based on Lobster, it only works for C++ code
 // Perhaps in the future it will be generalized to other languages and
@@ -91,6 +92,8 @@ export class ManualCodeGraderApp {
   // private preprocess?: (submission: string) => string;
   // private testHarness: string;
   // private groupingFunctionName: string;
+
+  private groupMemberThumbnailsElem: JQuery;
   
   private constructor(client: ExammaRayGraderClient, exam_id: string, question: Question, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, records: ManualGradingQuestionRecords, skins: ManualGradingSkins) {
     this.client = client;
@@ -109,6 +112,8 @@ export class ManualCodeGraderApp {
     // this.skin_override = spec.skin_override;
     // this.preprocess = spec.preprocess;
     // this.groupingFunctionName = spec.groupingFunctionName;
+
+    this.groupMemberThumbnailsElem = $(".examma-ray-group-member-thumbnails");
 
     $(".examma-ray-grading-title").html(this.question.question_id);
 
@@ -137,6 +142,9 @@ export class ManualCodeGraderApp {
 
       $("#edit-code-grader-config-modal").modal("hide");
     });
+
+    
+    $(".examma-ray-auto-group-button").on("click", async () => this.autoGroup());
 
   }
 
@@ -332,6 +340,14 @@ export class ManualCodeGraderApp {
       Object.assign(this.config, op.edits);
       this.groupGrader.onGraderConfigEdit(remote_grader_email);
     }
+    else if (op.kind === "assign_groups_operation") {
+      if (remote_grader_email) {
+        alert("Looks like someone updated the grouping for this question. Please reload the page.");
+      }
+      else {
+        setTimeout(() => alert("Looks like someone updated the grouping for this question. Please reload the page."), 5000);
+      }
+    }
     else {
       return assertNever(op);
     }
@@ -390,7 +406,14 @@ export class ManualCodeGraderApp {
       this.groupThumbnailsPanel.onGroupClosed(this.currentGroup);
     }
 
-    this.groupGrader.openGroup(group);
+    asMutable(this).currentGroup = group;
+
+    this.groupMemberThumbnailsElem.empty();
+    group.submissions.forEach(sub => {
+      this.groupMemberThumbnailsElem.append(this.createMemberThumbnail(sub));
+    })
+    
+    this.groupGrader.onGroupOpen(group);
 
     $(".examma-ray-submissions-column").find(".panel-primary").removeClass("panel-primary");
     this.groupThumbnailsPanel.onGroupOpened(group);
@@ -407,7 +430,6 @@ export class ManualCodeGraderApp {
 
   private createMemberThumbnail(sub: ManualGradingSubmission) {
     let response = sub.submission;
-    let skin = this.skins[sub.skin_id];
     let jq = $(`
       <div class="panel panel-default examma-ray-group-member-thumbnail">
         <div class="panel-heading">
@@ -429,10 +451,6 @@ export class ManualCodeGraderApp {
     return jq;
   }
 
-  private closeGroup() {
-    this.groupGrader.closeGroup();
-  }
-
   // private removeFromCurrentGroup(subToRemove: ManualGradingSubmission) {
   //   if (!this.grading_records || !this.currentGroup || this.currentGroup.submissions.length <= 1) {
   //     return;
@@ -451,37 +469,11 @@ export class ManualCodeGraderApp {
   //   this.refreshGroups();
   // }
 
-  // public setRubricItemStatus(rubric_item_uuid: string, status: ManualGradingRubricItemStatus) {
-  //   assert(this.rubric);
-  //   if (!this.currentGroup?.grading_result) {
-  //     return;
-  //   }
-  //   let gr = this.currentGroup.grading_result;
-
-  //   if (status === "off") {
-  //     delete gr[rubric_item_uuid];
-  //   }
-  //   else {
-  //     gr[rubric_item_uuid] = status;
-  //   }
-
-  // }
-
-
-  // private updatedGradingResult() {
-  //   if (!this.currentGroup || !this.question) {
-  //     return;
-  //   }
-
-  //   let thumbElem = this.thumbnailElems[this.currentGroup.group_uuid];
-  //   thumbElem.find(".examma-ray-score-badge").replaceWith(
-  //     this.currentGroup.grading_result
-  //       ? renderScoreBadge(this.pointsEarned(this.currentGroup.grading_result), this.question.pointsPossible, this.currentGroup.finished ? VERIFIED_ICON : "")
-  //       : renderUngradedBadge(this.question.pointsPossible)
-  //   );
-    
-  //   this.onGroupChanged(this.currentGroup.grading_result);
-  // }
+  private closeGroup() {
+    this.groupGrader.onGroupClose();
+    this.groupMemberThumbnailsElem.empty();
+    delete asMutable(this).currentGroup;
+  }
 
   public pointsEarned(gr?: ManualGradingResult) {
     assert(this.rubric);
@@ -494,16 +486,144 @@ export class ManualCodeGraderApp {
     ));
   }
 
-  // public autograde() {
-  //   if (!this.currentGroup) {
+  
+  public async autoGroup() {
+
+    $("#examma-ray-grouping-progress-modal").modal("show");
+
+    // let equivalenceGroups : (ManualGradingGroupRecord & { repProgram?: Program })[] = [];
+
+    // Create a set of single-submission groups with the first from each original group
+    // THAT HAS A GRADING RESULT while all remaining submissions go into a list.
+    let submissionsToPlace : ManualGradingSubmission[] = [];
+    let newGroups : (ManualGradingGroupRecord & { repProgram?: Program })[] = [];
+    Object.values(this.grading_records.groups).forEach(group => {
+      if (group.submissions.length === 0) {
+        return; // ignore empty groups
+      }
+
+      if (group.finished || Object.values(group.grading_result).length > 0) {
+        // A group with some grading already done. Keep this group together.
+        newGroups.push(group);
+      }
+      else {
+        // A group that has not been graded at all. Break it up.
+        group.submissions.forEach(sub => submissionsToPlace.push(sub));
+      }
+    });
+
+    for(let i = 0; i < submissionsToPlace.length; ++i) {
+      let sub = submissionsToPlace[i];
+      let percent = 100*i/submissionsToPlace.length;
+      if (Math.floor(percent/5) % 2 === 0) {
+        $(".examma-ray-grouping-progress .progress-bar").html("♪┏(・o･)┛♪┗( ･o･)┓♪")
+      }
+      else {
+        $(".examma-ray-grouping-progress .progress-bar").html("♪┗( ･o･)┓♪┏(・o･)┛♪")
+      }
+      $(".examma-ray-grouping-progress .progress-bar").css("width", percent + "%");
+      console.log(i);
+      await this.autoGroupHelper(newGroups, sub);
+    }
+
+    let assignment : {[index: string]: string} = {};
+    newGroups.forEach(group => group.submissions.forEach(sub => assignment[sub.submission_uuid] = group.group_uuid));
+
+    this.performLocalOperation({
+      kind: "assign_groups_operation",
+      assignment: assignment
+    });
+
+    $("#examma-ray-grouping-progress-modal").modal("hide");
+  }
+
+  private getGroupingFunctionName(sub: ManualGradingSubmission) {
+    return applySkin(this.config.grouping_function, this.skins[sub.skin_id]);
+  }
+
+  private autoGroupHelper(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program })[], sub: ManualGradingSubmission) {
+
+    return new Promise<void>((resolve, reject) => {
+
+      window.setTimeout(() => {
+        let code = this.applyHarness(sub);
+
+        try {
+    
+          let p = new SimpleProgram(code);
+    
+          let fn = getFunc(p, this.getGroupingFunctionName(sub));
+          if (!fn) {
+            // Didn't parse or can't find function, make a new group
+            equivalenceGroups.push({
+              group_uuid: uuidv4(),
+              finished: false,
+              repProgram: p,
+              submissions: [sub],
+              grading_result: {}
+            });
+            resolve();
+            return;
+          }
+    
+          let matchingGroup = equivalenceGroups.find(group => {
+
+            // Only group blank submissions with other blank submissions
+            if ( (group.submissions[0].submission === "") !== (sub.submission === "")) {
+              return false;
+            }
+            
+            let rep = group.repProgram;
+            if (!rep) { return false; }
+            let repFunc = getFunc(rep, this.getGroupingFunctionName(group.submissions[0]));
+            return repFunc && getFunc(p, this.getGroupingFunctionName(sub))!.isSemanticallyEquivalent(repFunc, {});
+          });
+    
+          if (matchingGroup) {
+            matchingGroup.submissions.push(sub);
+          }
+          else {
+            equivalenceGroups.push({
+              group_uuid: uuidv4(),
+              finished: false,
+              repProgram: p,
+              submissions: [sub],
+              grading_result: {}
+            });
+          }
+        }
+        catch(e) {
+          // Lobster might randomly crash on an obscure case. Just add to
+          // a new group with no representative program.
+          equivalenceGroups.push({
+            group_uuid: uuidv4(),
+            finished: false,
+            submissions: [sub],
+            grading_result: {}
+          });
+        }
+        
+        resolve();
+      }, 0);
+   });
+  }
+
+  // private removeFromCurrentGroup(subToRemove: CodeWritingSubmission) {
+  //   if (!this.assn || !this.currentGroup || this.currentGroup.submissions.length <= 1) {
   //     return;
   //   }
 
-  //   if (this.autograder) {
-  //     this.currentGroup.grading_result = this.autograder(this.lobster.project.exercise);
-  //   }
+  //   let i = this.currentGroup.submissions.findIndex(sub => sub.question_uuid === subToRemove.question_uuid);
+  //   i !== -1 && this.currentGroup.submissions.splice(i, 1);
 
-  //   this.updatedGradingResult();
+  //   this.assn.groups.push({
+  //     name: "group_" + this.assn.groups.length,
+  //     representative_index: 0,
+  //     submissions: [subToRemove],
+  //     grading_result: copyGradingResult(this.currentGroup.grading_result)
+  //   });
+
+  //   this.refreshGroups();
   // }
 
 };
@@ -538,7 +658,7 @@ function areEquivalentGradingResults(gr1: ManualGradingResult | undefined, gr2: 
 }
 
 function copyGradingResult(gr: ManualGradingResult) {
-  return $.extend(true, {}, gr);
+  return Object.assign({}, gr);
 }
 
 const VERIFIED_ICON = `<i class="bi bi-check2-circle" style="vertical-align: text-top;"></i> `;
@@ -617,8 +737,7 @@ class GroupGraderOutlet {
 
   }
   
-  public openGroup(group: ManualGradingGroupRecord) {
-    asMutable(this.app).currentGroup = group;
+  public onGroupOpen(group: ManualGradingGroupRecord) {
     $(".examma-ray-grading-group-name").html(group.group_uuid);
     $(".examma-ray-grading-group-num-members").html(""+group.submissions.length);
 
@@ -634,8 +753,7 @@ class GroupGraderOutlet {
     this.lobster.project.setFileContents(new SourceFile("file.cpp", code));
   }
 
-  public closeGroup() {
-    delete asMutable(this.app).currentGroup;
+  public onGroupClose() {
     $(".examma-ray-grading-group-name").html("[No group selected]");
     this.lobster.project.setFileContents(new SourceFile("file.cpp", "No submissions opened"));
   }
@@ -719,7 +837,11 @@ class GroupGraderOutlet {
     lobsterElem.append(createRunestoneExerciseOutlet("1"));
   
     let ex = new Exercise({
-      checkpoints: [],
+      checkpoints: [
+        new EndOfMainStateCheckpoint("Passes Test Cases", (sim: Simulation) => {
+          return !sim.hasAnyEventOccurred
+        }, "", 5000)
+      ],
       completionCriteria: COMPLETION_ALL_CHECKPOINTS,
       starterCode: "",
       completionMessage: "Code passes all checkpoints."
