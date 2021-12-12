@@ -149,7 +149,7 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
     })
     .select("manual_grading_records.group_uuid", "rubric_item_uuid", "status");
 
-  const group_records_by_id : {[index: string]: ManualGradingGroupRecord } = {};
+  const group_records_by_id : {[index: string]: ManualGradingGroupRecord | undefined } = {};
   groups.forEach(g => {
     group_records_by_id[g.group_uuid] = {
       group_uuid: g.group_uuid,
@@ -160,7 +160,7 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
   });
   submissions.forEach(sub => {
     let record = group_records_by_id[sub.group_uuid];
-    record.submissions.push({
+    record?.submissions.push({
       submission_uuid: sub.submission_uuid,
       uniqname: sub.uniqname,
       submission: sub.submission,
@@ -169,7 +169,14 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
   });
   records.forEach(r => {
     let record = group_records_by_id[r.group_uuid];
-    record.grading_result[r.rubric_item_uuid] = r.status;
+    if (record) { record.grading_result[r.rubric_item_uuid] = r.status };
+  });
+
+  // Remove empty groups
+  Object.entries(group_records_by_id).forEach(([group_uuid, group]) => {
+    if (group!.submissions.length === 0) {
+      delete group_records_by_id[group_uuid];
+    }
   });
 
   return {

@@ -44,7 +44,7 @@ export type ManualGradingQuestionRecords = {
   grading_epoch: number,
   question_id: string,
   groups: {
-    [index: string]: ManualGradingGroupRecord
+    [index: string]: ManualGradingGroupRecord | undefined
   }
 };
 

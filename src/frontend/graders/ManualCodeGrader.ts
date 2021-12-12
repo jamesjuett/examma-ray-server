@@ -296,7 +296,8 @@ export class ManualCodeGraderApp {
     }
 
     if (op.kind === "set_rubric_item_status") {
-      this.grading_records.groups[op.group_uuid].grading_result[op.rubric_item_uuid] = op.status;
+      let group = this.grading_records.groups[op.group_uuid]
+      if (group) { group.grading_result[op.rubric_item_uuid] = op.status; }
       if (op.group_uuid === this.currentGroup?.group_uuid) {
         this.groupGrader.onRubricItemStatusSet(op.rubric_item_uuid, op.status, remote_grader_email);
       }
@@ -304,7 +305,8 @@ export class ManualCodeGraderApp {
       this.groupThumbnailsPanel.onGroupGradingResultUpdated(op.group_uuid);
     }
     else if (op.kind === "set_group_finished") {
-      this.grading_records.groups[op.group_uuid].finished = op.finished;
+      let group = this.grading_records.groups[op.group_uuid];
+      if (group) { group.finished = op.finished; }
       if (op.group_uuid === this.currentGroup?.group_uuid) {
         this.groupGrader.onGroupFinishedSet(op.group_uuid, remote_grader_email);
       }
@@ -498,17 +500,17 @@ export class ManualCodeGraderApp {
     let submissionsToPlace : ManualGradingSubmission[] = [];
     let newGroups : (ManualGradingGroupRecord & { repProgram?: Program })[] = [];
     Object.values(this.grading_records.groups).forEach(group => {
-      if (group.submissions.length === 0) {
+      if (group!.submissions.length === 0) {
         return; // ignore empty groups
       }
 
-      if (group.finished || Object.values(group.grading_result).length > 0) {
+      if (group!.finished || Object.values(group!.grading_result).length > 0) {
         // A group with some grading already done. Keep this group together.
-        newGroups.push(group);
+        newGroups.push(group!);
       }
       else {
         // A group that has not been graded at all. Break it up.
-        group.submissions.forEach(sub => submissionsToPlace.push(sub));
+        group!.submissions.forEach(sub => submissionsToPlace.push(sub));
       }
     });
 
@@ -1038,7 +1040,7 @@ class GroupThumbnailsPanel {
     this.groupThumbnailOutlets = {};
 
     Object.values(this.app.grading_records.groups).forEach(group => {
-      this.groupThumbnailOutlets[group.group_uuid] = new GroupThumbnailOutlet(this.app, $("<div></div>"), group);
+      this.groupThumbnailOutlets[group!.group_uuid] = new GroupThumbnailOutlet(this.app, $("<div></div>"), group!);
     });
     this.updateDisplayedThumbnails();
   }

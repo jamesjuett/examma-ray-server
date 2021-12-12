@@ -317,10 +317,12 @@ export class QuestionGradingServer {
 
   private applyOperation(op: ManualGradingOperation) {
     if (op.kind === "set_rubric_item_status") {
-      this.grading_record.groups[op.group_uuid].grading_result[op.rubric_item_uuid] = op.status;
+      let group = this.grading_record.groups[op.group_uuid];
+      if (group) { group.grading_result[op.rubric_item_uuid] = op.status; }
     }
     else if (op.kind === "set_group_finished") {
-      this.grading_record.groups[op.group_uuid].finished = op.finished;
+      let group = this.grading_record.groups[op.group_uuid];
+      if (group) { group.finished = op.finished; }
     }
     else if (op.kind === "edit_rubric_item") {
       let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item_uuid);
@@ -349,8 +351,8 @@ export class QuestionGradingServer {
       // get a list of all submissions
       let all_submissions : ManualGradingSubmission[] = []; 
       Object.values(this.grading_record.groups).forEach(group => {
-        group.submissions.forEach(sub => all_submissions.push(sub));
-        group.submissions.length = 0; // clear out the group submissions list
+        group!.submissions.forEach(sub => all_submissions.push(sub));
+        group!.submissions.length = 0; // clear out the group submissions list
       });
 
       // Add submissions back to the appropriate groups according to the operation
@@ -368,6 +370,13 @@ export class QuestionGradingServer {
             submissions: [sub],
             finished: false
           };
+        }
+      });
+
+      // Remove empty groups
+      Object.entries(this.grading_record.groups).forEach(([group_uuid, group]) => {
+        if (group!.submissions.length === 0) {
+          delete this.grading_record.groups[group_uuid];
         }
       });
     }
