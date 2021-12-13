@@ -1,5 +1,4 @@
 import { ExamComponentSkin } from "examma-ray";
-import { ManualGradingEpochTransition, ManualGradingOperation } from "./ExammaRayGradingServer";
 
 export type ManualCodeGraderConfiguration = {
   question_id: string,
@@ -25,8 +24,13 @@ export type ManualGradingRubricItem = {
   active: boolean
 };
 
+export type RubricItemGradingResult = {
+  status?: ManualGradingRubricItemStatus,
+  notes?: string
+}
+
 export type ManualGradingResult = {
-  [index: string]: ManualGradingRubricItemStatus | undefined
+  [index: string]: RubricItemGradingResult | undefined
 };
 
 export type ManualGradingGroupRecord = {
@@ -96,4 +100,69 @@ export type ActiveGraders = {
       }
     }
   }
+};
+
+
+
+
+
+
+
+
+export type SetRubricItemStatusOperation = {
+  kind: "set_rubric_item_status",
+  group_uuid: string,
+  rubric_item_uuid: string,
+  status: ManualGradingRubricItemStatus
+};
+
+export type SetRubricItemNotesOperation = {
+  kind: "set_rubric_item_notes",
+  group_uuid: string,
+  rubric_item_uuid: string,
+  notes: string
+};
+
+export type SetGroupFinishedOperation = {
+  kind: "set_group_finished",
+  group_uuid: string,
+  finished: boolean
+};
+
+export type EditRubricItemOperation = {
+  kind: "edit_rubric_item",
+  rubric_item_uuid: string,
+  edits: Partial<ManualGradingRubricItem>
+};
+
+export type CreateRubricItemOperation = {
+  kind: "create_rubric_item",
+  rubric_item: ManualGradingRubricItem,
+  // after: string
+};
+
+export type EditCodeGraderConfigOperation = {
+  kind: "edit_code_grader_config",
+  edits: Partial<ManualCodeGraderConfiguration>
+};
+
+export type AssignGroupsOperation = {
+  kind: "assign_groups_operation",
+  assignment: {[index: string]: string} // mapping of submission uuids to group uuids
+};
+
+// NOTE: all operations must be idempotent and must not depend on previous state
+export type ManualGradingOperation =
+ | SetRubricItemStatusOperation
+ | SetRubricItemNotesOperation
+ | SetGroupFinishedOperation
+ | EditRubricItemOperation
+ | CreateRubricItemOperation
+ | EditCodeGraderConfigOperation
+ | AssignGroupsOperation;
+
+export type ManualGradingEpochTransition = {
+  readonly client_uuid: string,
+  readonly grader_email: string,
+  readonly ops: readonly ManualGradingOperation[]
 };

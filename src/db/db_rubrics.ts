@@ -95,7 +95,7 @@ export async function db_updateManualGradingRubricItem(question_id: string, rubr
 }
 
 
-export async function db_setManualGradingRecord(
+export async function db_setManualGradingRecordStatus(
   group_uuid: string,
   rubric_item_uuid: string,
   status: ManualGradingRubricItemStatus) {
@@ -105,6 +105,19 @@ export async function db_setManualGradingRecord(
     group_uuid: group_uuid,
     rubric_item_uuid: rubric_item_uuid,
     status: status
+  }).onConflict(["group_uuid", "rubric_item_uuid"]).merge();
+}
+
+export async function db_setManualGradingRecordNotes(
+  group_uuid: string,
+  rubric_item_uuid: string,
+  notes: string) {
+
+  // Create and get a copy of the new rubric item
+  return await query("manual_grading_records").insert({
+    group_uuid: group_uuid,
+    rubric_item_uuid: rubric_item_uuid,
+    notes: notes
   }).onConflict(["group_uuid", "rubric_item_uuid"]).merge();
 }
 
@@ -147,7 +160,7 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
     .where({
       question_id: question_id
     })
-    .select("manual_grading_records.group_uuid", "rubric_item_uuid", "status");
+    .select("manual_grading_records.group_uuid", "rubric_item_uuid", "status", "notes");
 
   const group_records_by_id : {[index: string]: ManualGradingGroupRecord | undefined } = {};
   groups.forEach(g => {
@@ -169,7 +182,12 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
   });
   records.forEach(r => {
     let record = group_records_by_id[r.group_uuid];
-    if (record) { record.grading_result[r.rubric_item_uuid] = r.status };
+    if (record && (r.status || r.notes)) {
+      record.grading_result[r.rubric_item_uuid] = {
+        status: r.status,
+        notes: r.notes
+      };
+    };
   });
 
   // Remove empty groups

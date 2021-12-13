@@ -2,14 +2,14 @@ import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { readdirSync } from "fs";
 import { copyFile, readFile } from "fs/promises";
 import { JwtUserInfo } from "./auth/jwt_auth";
-import { ActiveGraders, ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission } from "./manual_grading";
+import { ActiveGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission } from "./manual_grading";
 import { asMutable, assert, assertExists, assertFalse, assertNever } from "./util/util";
 import { Worker } from "worker_threads";
 import { ExamGeneratorSpecification } from "examma-ray/dist/ExamGenerator";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { db_getExamEpoch, db_nextExamEpoch } from "./db/db_exams";
 import { WorkerData_Generate } from "./run/types";
-import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecord, db_updateManualGradingRubricItem } from "./db/db_rubrics";
+import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
 import { db_createCodeGraderConfig, db_createGroup, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
 
 const GRADER_IDLE_THRESHOLD = 10000; // ms
@@ -156,55 +156,6 @@ export class ServerExam {
   }
 }
 
-export type SetRubricItemStatusOperation = {
-  kind: "set_rubric_item_status",
-  group_uuid: string,
-  rubric_item_uuid: string,
-  status: ManualGradingRubricItemStatus
-};
-
-export type SetGroupFinishedOperation = {
-  kind: "set_group_finished",
-  group_uuid: string,
-  finished: boolean
-};
-
-export type EditRubricItemOperation = {
-  kind: "edit_rubric_item",
-  rubric_item_uuid: string,
-  edits: Partial<ManualGradingRubricItem>
-};
-
-export type CreateRubricItemOperation = {
-  kind: "create_rubric_item",
-  rubric_item: ManualGradingRubricItem,
-  // after: string
-};
-
-export type EditCodeGraderConfigOperation = {
-  kind: "edit_code_grader_config",
-  edits: Partial<ManualCodeGraderConfiguration>
-};
-
-export type AssignGroupsOperation = {
-  kind: "assign_groups_operation",
-  assignment: {[index: string]: string} // mapping of submission uuids to group uuids
-};
-
-// NOTE: all operations must be idempotent and must not depend on previous state
-export type ManualGradingOperation =
- | SetRubricItemStatusOperation
- | SetGroupFinishedOperation
- | EditRubricItemOperation
- | CreateRubricItemOperation
- | EditCodeGraderConfigOperation
- | AssignGroupsOperation;
-
-export type ManualGradingEpochTransition = {
-  readonly client_uuid: string,
-  readonly grader_email: string,
-  readonly ops: readonly ManualGradingOperation[]
-};
 
 const DEFAULT_TEST_HARNESS = "{{submission}}";
 const DEFAULT_GROUPING_FUNCTION = "main";
@@ -318,7 +269,17 @@ export class QuestionGradingServer {
   private applyOperation(op: ManualGradingOperation) {
     if (op.kind === "set_rubric_item_status") {
       let group = this.grading_record.groups[op.group_uuid];
-      if (group) { group.grading_result[op.rubric_item_uuid] = op.status; }
+      if (group) {
+        group.grading_result[op.rubric_item_uuid] ??= {};
+        group.grading_result[op.rubric_item_uuid]!.status = op.status;
+      }
+    }
+    else if (op.kind === "set_rubric_item_notes") {
+      let group = this.grading_record.groups[op.group_uuid];
+      if (group) {
+        group.grading_result[op.rubric_item_uuid] ??= {};
+        group.grading_result[op.rubric_item_uuid]!.notes = op.notes;
+      }
     }
     else if (op.kind === "set_group_finished") {
       let group = this.grading_record.groups[op.group_uuid];
@@ -387,7 +348,10 @@ export class QuestionGradingServer {
 
   private async recordOperation(op: ManualGradingOperation) {
     if (op.kind === "set_rubric_item_status") {
-      return db_setManualGradingRecord(op.group_uuid, op.rubric_item_uuid, op.status);
+      return db_setManualGradingRecordStatus(op.group_uuid, op.rubric_item_uuid, op.status);
+    }
+    else if (op.kind === "set_rubric_item_notes") {
+      return db_setManualGradingRecordNotes(op.group_uuid, op.rubric_item_uuid, op.notes);
     }
     else if (op.kind === "set_group_finished") {
       return db_setManualGradingGroupFinished(op.group_uuid, op.finished);

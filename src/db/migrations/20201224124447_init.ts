@@ -96,6 +96,7 @@ export async function up(knex: Knex): Promise<void> {
         .references("group_uuid").inTable("manual_grading_groups").onDelete("cascade");
       table.uuid("rubric_item_uuid").notNullable();
       table.string("status", 100).notNullable();
+      table.text("notes").nullable();
       // table.timestamps(true, true);
 
       table.primary(["group_uuid", "rubric_item_uuid"]);

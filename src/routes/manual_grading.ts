@@ -8,7 +8,6 @@ import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_
 import { ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingRubricItem } from "../manual_grading";
 import { getJwtUserInfo } from "../auth/jwt_auth";
 import { db_getCodeGraderConfig } from "../db/db_code_grader";
-import { ManualGradingOperation } from "../ExammaRayGradingServer";
 const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyQuestionId = validateBody("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyGroupId = validateBody("group_id").trim().isLength({min: 1, max: 100});

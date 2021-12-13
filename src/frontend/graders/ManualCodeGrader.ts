@@ -3,7 +3,7 @@ import { Program, SimpleProgram, SourceFile } from "lobster-vis/dist/js/core/Pro
 import { SimpleExerciseLobsterOutlet } from "lobster-vis/dist/js/view/SimpleExerciseLobsterOutlet"
 import { createRunestoneExerciseOutlet } from "lobster-vis/dist/js/view/embeddedExerciseOutlet"
 
-import { applySkin, highlightCode, mk2html } from "examma-ray/dist/core/render";
+import { applySkin, highlightCode, mk2html, mk2html_unwrapped } from "examma-ray/dist/core/render";
 import "highlight.js/styles/github.css";
 
 import "./code-grader.css";
@@ -21,13 +21,15 @@ import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
 
 import queryString from "query-string";
-import { ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission } from "../../manual_grading";
+import { ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, RubricItemGradingResult } from "../../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../../util/util";
 import axios from "axios";
 import { ExammaRayGraderClient } from "../Application";
 import avatar from "animal-avatar-generator";
-import { EditRubricItemOperation, ManualGradingEpochTransition, ManualGradingOperation, SetRubricItemStatusOperation } from "../../ExammaRayGradingServer";
+import { EditRubricItemOperation, ManualGradingEpochTransition, ManualGradingOperation, SetRubricItemStatusOperation } from "../../manual_grading";
 import { Simulation } from "lobster-vis/dist/js/core/Simulation";
+
+import hotkeys from "hotkeys-js";
 
 // Because this grader is based on Lobster, it only works for C++ code
 // Perhaps in the future it will be generalized to other languages and
@@ -297,9 +299,24 @@ export class ManualCodeGraderApp {
 
     if (op.kind === "set_rubric_item_status") {
       let group = this.grading_records.groups[op.group_uuid]
-      if (group) { group.grading_result[op.rubric_item_uuid] = op.status; }
+      if (group) {
+        group.grading_result[op.rubric_item_uuid] ??= {};
+        group.grading_result[op.rubric_item_uuid]!.status = op.status;
+      }
       if (op.group_uuid === this.currentGroup?.group_uuid) {
         this.groupGrader.onRubricItemStatusSet(op.rubric_item_uuid, op.status, remote_grader_email);
+      }
+
+      this.groupThumbnailsPanel.onGroupGradingResultUpdated(op.group_uuid);
+    }
+    else if (op.kind === "set_rubric_item_notes") {
+      let group = this.grading_records.groups[op.group_uuid]
+      if (group) {
+        group.grading_result[op.rubric_item_uuid] ??= {};
+        group.grading_result[op.rubric_item_uuid]!.notes = op.notes;
+      }
+      if (op.group_uuid === this.currentGroup?.group_uuid) {
+        this.groupGrader.onRubricItemNotesSet(op.rubric_item_uuid, op.notes, remote_grader_email);
       }
 
       this.groupThumbnailsPanel.onGroupGradingResultUpdated(op.group_uuid);
@@ -484,7 +501,7 @@ export class ManualCodeGraderApp {
       return 0;
     }
     return Math.max(0, Math.min(this.question.pointsPossible,
-      this.rubric.reduce((p, ri) => p + (gr[ri.rubric_item_uuid] === "on" ? ri.points : 0), 0)
+      this.rubric.reduce((p, ri) => p + (gr[ri.rubric_item_uuid]?.status === "on" ? ri.points : 0), 0)
     ));
   }
 
@@ -692,6 +709,8 @@ class GroupGraderOutlet {
       .on("click", () => {
         this.toggleGroupFinished();
       });
+
+    this.initHotkeys();
   }
 
   private initComponents() {
@@ -707,7 +726,6 @@ class GroupGraderOutlet {
     });
       
     $("#edit-rubric-item-submit-button").on("click", async () => {
-      let i = this.app.rubric?.length ?? 0;
       
       if ($("#edit-rubric-item-modal").data("edit-rubric-item-mode") === "create") {
         this.app.performLocalOperation({
@@ -737,6 +755,40 @@ class GroupGraderOutlet {
       $("#edit-rubric-item-modal").modal("hide");
     });
 
+    $("#edit-rubric-notes-submit-button").on("click", async () => {
+      
+      this.app.performLocalOperation({
+        kind: "create_rubric_item",
+        rubric_item: {
+          rubric_item_uuid: ""+$("#edit-rubric-item-input-uuid").val(),
+          title: ""+$("#edit-rubric-item-input-title").val(),
+          description: ""+$("#edit-rubric-item-input-description").val(),
+          points: parseInt(""+$("#edit-rubric-item-input-points").val()),
+          active: true
+        }
+      });
+
+      $("#edit-rubric-item-modal").modal("hide");
+    });
+
+  }
+
+  private initHotkeys() {
+    hotkeys('1,2,3,4,5,6,7,8,9', (event, handler) => {
+
+      // do nothing if any modal is open
+      if ($(".modal.in").length > 0) {
+        return;
+      }
+      
+      let num = parseInt(handler.key);
+
+      Object.values(this.rubricItemOutlets).forEach(ri => {
+        if (ri!.displayIndex === num) {
+          this.toggleRubricItem(ri!.rubricItem.rubric_item_uuid);
+        }
+      });
+    });
   }
   
   public onGroupOpen(group: ManualGradingGroupRecord) {
@@ -746,7 +798,7 @@ class GroupGraderOutlet {
     this.updateDisplayedSubmission(group.submissions[0]);
 
     let gr = this.app.currentGroup?.grading_result;
-    this.app.rubric?.forEach((ri, i) => this.rubricItemOutlets[ri.rubric_item_uuid]?.updateStatus(gr && gr[ri.rubric_item_uuid]).clearHighlights());
+    this.app.rubric?.forEach((ri, i) => this.rubricItemOutlets[ri.rubric_item_uuid]?.updateStatus(gr && gr[ri.rubric_item_uuid]?.status).clearHighlights());
     this.updateGroupFinishedButton();
   }
 
@@ -767,19 +819,25 @@ class GroupGraderOutlet {
       return;
     }
 
-    let currentStatus = this.app.currentGroup.grading_result[rubric_item_uuid] ?? "off";
+    let currentStatus = this.app.currentGroup.grading_result[rubric_item_uuid]?.status ?? "off";
     if (currentStatus === "off") {
       currentStatus = "on";
     }
-    else if (currentStatus === "on") {
-      currentStatus = "unknown";
-    }
-    else if (currentStatus === "unknown") {
+    else {
       currentStatus = "off";
     }
-    else {
-      assertNever(currentStatus);
-    }
+    // if (currentStatus === "off") {
+    //   currentStatus = "on";
+    // }
+    // else if (currentStatus === "on") {
+    //   currentStatus = "unknown";
+    // }
+    // else if (currentStatus === "unknown") {
+    //   currentStatus = "off";
+    // }
+    // else {
+    //   assertNever(currentStatus);
+    // }
     
     this.app.performLocalOperation({
       kind: "set_rubric_item_status",
@@ -819,14 +877,14 @@ class GroupGraderOutlet {
 
 
   private createRubricBar() {
-    this.app.rubric.forEach((ri, i) => this.createRubricItemOutlet(ri));
+    this.app.rubric.forEach((ri, i) => this.createRubricItemOutlet(ri, i+1));
   }
 
-  private createRubricItemOutlet(ri: ManualGradingRubricItem) {
+  private createRubricItemOutlet(ri: ManualGradingRubricItem, display_index: number | undefined) {
     let rubricItemElem = $(`<button type="button" class="list-group-item"></button>`).appendTo(this.rubricBarElem);
     let sub = this.app.currentGroup?.submissions[0];
     let skin = sub ? this.app.skins[sub?.skin_id] : undefined;
-    let outlet = new RubricItemOutlet(rubricItemElem, ri, undefined, skin);
+    let outlet = new RubricItemOutlet(this.app, rubricItemElem, ri, display_index, undefined, skin);
     this.rubricItemOutlets[ri.rubric_item_uuid] = outlet;
     rubricItemElem.on("click", () => {
       this.toggleRubricItem(ri.rubric_item_uuid);
@@ -859,6 +917,10 @@ class GroupGraderOutlet {
       this.rubricItemOutlets[rubric_item_uuid]?.updateStatus(status).highlight(remote_grader_email);
   }
 
+  public onRubricItemNotesSet(rubric_item_uuid: string, notes: string, remote_grader_email?: string) {
+      this.rubricItemOutlets[rubric_item_uuid]?.updateNotes(notes).highlight(remote_grader_email);
+  }
+
   public onRubricItemEdit(rubric_item_uuid: string, remote_grader_email?: string) {
     this.rubricItemOutlets[rubric_item_uuid]?.update().highlight(remote_grader_email);
   }
@@ -868,7 +930,7 @@ class GroupGraderOutlet {
   }
 
   public onRubricItemCreated(ri: ManualGradingRubricItem, remote_grader_email?: string) {
-    this.createRubricItemOutlet(ri);
+    this.createRubricItemOutlet(ri, this.app.rubric.length);
     this.rubricItemOutlets[ri.rubric_item_uuid]?.highlight(remote_grader_email);
   }
 
@@ -882,22 +944,30 @@ class GroupGraderOutlet {
 
 class RubricItemOutlet {
 
-  private rubricItem: ManualGradingRubricItem;
+  public readonly app: ManualCodeGraderApp;
+
+  public readonly rubricItem: ManualGradingRubricItem;
   private status?: ManualGradingRubricItemStatus;
+  private notes?: string;
   private skin?: ExamComponentSkin;
+
+  public readonly displayIndex?: number;
 
   private readonly elem: JQuery;
   private readonly contentElem: JQuery;
 
-  public constructor(elem: JQuery, ri: ManualGradingRubricItem, status?: ManualGradingRubricItemStatus, skin?: ExamComponentSkin) {
+  public constructor(app: ManualCodeGraderApp, elem: JQuery, ri: ManualGradingRubricItem, displayIndex: number | undefined, grading_result?: RubricItemGradingResult, skin?: ExamComponentSkin) {
+    this.app = app;
     this.elem = elem;
     this.rubricItem = ri;
-    this.status = status;
+    this.displayIndex = displayIndex;
+    this.status = grading_result?.status;
+    this.notes = grading_result?.notes;
     this.skin = skin;
 
     this.contentElem = $("<div></div>").appendTo(elem);
 
-    $('<div class="examma-ray-rubric-item-avatar-bar" style="position: absolute; bottom: 0; right: 5px; text-align: right;"></div>').appendTo(elem);
+    $('<div class="examma-ray-rubric-item-avatar-bar" style="position: absolute; bottom: 0; left: 5px; text-align: left;"></div>').appendTo(elem);
 
     let buttonBar = $('<div class="examma-ray-rubric-item-button-bar"></div>').appendTo(elem);
     $(`<button class="btn btn-primary btn-xs">Edit</button>`)
@@ -905,6 +975,13 @@ class RubricItemOutlet {
       .on("click", async (e) => {
         e.stopPropagation();
         this.openEditModal()
+      });
+    buttonBar.append(" ");
+    $(`<button class="btn btn-primary btn-xs">Notes</button>`)
+      .appendTo(buttonBar)
+      .on("click", async (e) => {
+        e.stopPropagation();
+        this.openNotesModal()
       });
 
     this.refreshContent();
@@ -923,6 +1000,12 @@ class RubricItemOutlet {
     return this;
   }
 
+  public updateNotes(notes: string | undefined) {
+    this.notes = notes;
+    this.refreshContent();
+    return this;
+  }
+
   public updateSkin(skin: ExamComponentSkin) {
     this.skin = skin;
     this.refreshContent();
@@ -934,7 +1017,7 @@ class RubricItemOutlet {
     let skinnedDesc = applySkin(this.rubricItem.description, this.skin);
     this.contentElem.html(`
       ${renderShortPointsWorthBadge(this.rubricItem.points)}
-      <div class="examma-ray-rubric-item-title"><b>${mk2html(skinnedTitle)}</b></div>
+      <div class="examma-ray-rubric-item-title"><b>${this.renderDisplayIndexLabel()} ${mk2html_unwrapped(skinnedTitle)}</b></div>
       ${mk2html(skinnedDesc)}
     `);
     
@@ -952,6 +1035,14 @@ class RubricItemOutlet {
       this.elem.addClass("list-group-item-warning");
       this.elem.append($(`<span class="examma-ray-unknown-rubric-item-icon"><i class="bi bi-question-diamond-fill"></i><span>`));
     }
+
+    if (this.notes) {
+      this.elem.append($(`<span class="examma-ray-rubric-item-notes-icon"><i class="bi bi-info-circle-fill"></i><span>`));
+    }
+  }
+
+  private renderDisplayIndexLabel() {
+    return this.displayIndex !== undefined ? `<span class="label label-primary">${this.displayIndex}</span>` : "";
   }
 
   private openEditModal() {
@@ -962,6 +1053,19 @@ class RubricItemOutlet {
     $("#edit-rubric-item-input-points").val(this.rubricItem.points);
     $("#edit-rubric-item-modal").data("edit-rubric-item-mode", "edit");
     $("#edit-rubric-item-modal").modal("show");
+  }
+
+  private openNotesModal() {
+    if (!this.app.currentGroup) {
+      return;
+    }
+
+    $("#edit-rubric-notes-input-group-uuid").val(this.app.currentGroup.group_uuid);
+    $("#edit-rubric-notes-input-rubric-item-uuid").val(this.rubricItem.rubric_item_uuid);
+    $("#edit-rubric-notes-title").html(this.rubricItem.title);
+    $("#edit-rubric-notes-description").html(this.rubricItem.description);
+    $("#edit-rubric-notes-input-description").val(this.notes ?? "");
+    $("#edit-rubric-notes-modal").modal("show");
   }
 
   public highlight(grader_email: string | undefined) {

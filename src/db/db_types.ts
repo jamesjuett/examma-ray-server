@@ -78,6 +78,7 @@ declare module "knex/types/tables" {
     group_uuid: string;
     rubric_item_uuid: string;
     status: ManualGradingRubricItemStatus;
+    notes?: string;
     // created_at: string; // timestamp
     // updated_at: string; // timestamp
   }
@@ -179,11 +180,11 @@ declare module "knex/types/tables" {
       // Base Type
       DB_Manual_Grading_Records,
       // Insert Type
-      //   All required, except status is optional (may be null)
-      Omit<DB_Manual_Grading_Records, "status"> & Partial<Pick<DB_Manual_Grading_Records, "status">>,
+      //   All required, except status and notes are optional (may be null)
+      Omit<DB_Manual_Grading_Records, "status" | "notes"> & Partial<Pick<DB_Manual_Grading_Records, "status" | "notes">>,
       // Update Type
-      //   Only allowed to update status
-      Partial<Pick<DB_Manual_Grading_Records, "status">>
+      //   Only allowed to update status and notes
+      Partial<Pick<DB_Manual_Grading_Records, "status" | "notes">>
     >;
   }
 }
