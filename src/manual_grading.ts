@@ -21,6 +21,7 @@ export type ManualGradingRubricItem = {
   points: number,
   title: string,
   description: string,
+  sort_index?: string,
   active: boolean
 };
 

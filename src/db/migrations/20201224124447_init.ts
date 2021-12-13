@@ -52,6 +52,7 @@ export async function up(knex: Knex): Promise<void> {
       table.double("points");
       table.text("title");
       table.text("description");
+      table.string("sort_index", 10).nullable();
       table.boolean("active").notNullable().defaultTo(true);
       // table.timestamps(true, true);
 
@@ -95,7 +96,7 @@ export async function up(knex: Knex): Promise<void> {
       table.uuid("group_uuid").notNullable()
         .references("group_uuid").inTable("manual_grading_groups").onDelete("cascade");
       table.uuid("rubric_item_uuid").notNullable();
-      table.string("status", 100).notNullable();
+      table.string("status", 100).nullable();
       table.text("notes").nullable();
       // table.timestamps(true, true);
 

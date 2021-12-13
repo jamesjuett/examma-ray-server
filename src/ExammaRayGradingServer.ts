@@ -12,7 +12,7 @@ import { WorkerData_Generate } from "./run/types";
 import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
 import { db_createCodeGraderConfig, db_createGroup, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
 
-const GRADER_IDLE_THRESHOLD = 10000; // ms
+const GRADER_IDLE_THRESHOLD = 4000; // ms
 
 export type ExamTaskStatus = {
   submissions?: string,

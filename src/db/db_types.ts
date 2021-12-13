@@ -47,6 +47,7 @@ declare module "knex/types/tables" {
     points: number;
     title: string;
     description: string;
+    sort_index?: string;
     active: boolean;
     // created_at: string; // timestamp
     // updated_at: string; // timestamp
@@ -147,8 +148,8 @@ declare module "knex/types/tables" {
       // Base Type
       DB_Manual_Grading_Rubrics,
       // Insert Type
-      //   All required, except active is optional (default true)
-      Omit<DB_Manual_Grading_Rubrics, "active"> & Partial<Pick<DB_Manual_Grading_Rubrics, "active">>,
+      //   All required, except active (default true) and sort_index (optional)
+      Omit<DB_Manual_Grading_Rubrics, "active" | "sort_index"> & Partial<Pick<DB_Manual_Grading_Rubrics, "active" | "sort_index">>,
       // Update Type
       //   All optional except question_id and rubric_item_uuid may not be updated
       Partial<Omit<DB_Manual_Grading_Rubrics, "question_id" | "rubric_item_uuid">> & Partial<Record<"question_id" | "rubric_item_uuid", undefined>>
