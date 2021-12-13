@@ -37,7 +37,7 @@ services:
     environment:
       POSTGRES_USER: exammaray
       POSTGRES_DB: exammaray
-      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_PASSWORD_FILE: /secrets/db_password
     secrets:
       - db_password
     ports: 
