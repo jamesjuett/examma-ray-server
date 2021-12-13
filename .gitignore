@@ -108,7 +108,6 @@ build/
 secrets/*
 !secrets/.gitkeep
 certs/
-data/*.json
 public/*
 !public/.gitkeep
 data/

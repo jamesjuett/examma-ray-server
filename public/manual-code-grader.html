@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"
+    integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@popperjs/core@2" crossorigin="anonymous"></script>
+
+  <!-- Bootstrap 3 (for compatibility with lobster) -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+  <!-- bootstrap icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+
+  <script src="js/manual-code-grader.js"></script>
+</head>
+
+<body>
+  <div class="examma-ray-grading-sidebar">
+    <div class="examma-ray-grading-controls">
+      <div class="examma-ray-grading-title" style="text-align: center;">[No question selected]</div>
+      <div class="examma-ray-active-graders" style="text-align: left;"></div>
+      <div style="text-align: center; margin-bottom: 0.5em;">
+        <button id="edit-code-grader-config-open-modal-button" type="button" class="btn btn-primary"><i class="bi bi-gear"></i> Grader Config</button>
+        <button type="button" class="btn btn-primary examma-ray-auto-group-button"><i class="bi bi-lightning"></i> Auto-Group</button>
+      </div>
+      <div style="padding-left: 1em; margin-bottom: 0.5em;">
+        <b>Filter</b>
+        <div class="btn-group" role="group">
+          <button data-filter-criterion="all" type="button" class="examma-ray-submissions-filter-button btn btn-primary">All</button>
+          <button data-filter-criterion="ungraded" type="button" class="examma-ray-submissions-filter-button btn btn-default">Ungraded</button>
+          <button data-filter-criterion="graded" type="button" class="examma-ray-submissions-filter-button btn btn-default">Graded</button>
+        </div>
+      </div>
+      <div style="padding-left: 1em; margin-bottom: 0.5em;">
+        <b>Sort</b>
+        <div class="btn-group" role="group">
+          <button data-sort-criterion="name" type="button" class="examma-ray-submissions-sort-button btn btn-primary">Name</button>
+          <button data-sort-criterion="size" type="button" class="examma-ray-submissions-sort-button btn btn-default">Size</button>
+          <button data-sort-criterion="score" type="button" class="examma-ray-submissions-sort-button btn btn-default">Score</button>
+        </div>
+      </div>
+      <div style="padding-left: 1em; margin-bottom: 0.5em;">
+        <b>Sort Ordering</b>
+        <div class="btn-group" role="group">
+          <button data-sort-ordering="asc" type="button" class="examma-ray-submissions-sort-ordering-button btn btn-primary">Asc</button>
+          <button data-sort-ordering="dsc" type="button" class="examma-ray-submissions-sort-ordering-button btn btn-default">Dsc</button>
+        </div>
+      </div>
+    </div>
+    <div class="examma-ray-group-thumbnails" style="border-top: solid 1px #dedede">
+    
+    </div>
+  </div>
+  <div class="examma-ray-grading-main-panel">
+    <div style="margin-bottom: 3px;">
+      <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#groups-modal"><span class="badge examma-ray-grading-group-num-members">N/A</span> Group Members</button>
+      <span style="display: inline-block; vertical-align: middle; margin-top: 0; margin-bottom: 0; margin-left: 0.25em; font-weight: bold">You are grading: <code class="examma-ray-grading-group-name">[No group selected]</code></span>
+      <!-- <button class="btn btn-primary" id="examma-ray-grading-autograde-button">Autograde!</button> -->
+    </div>
+    <div id="lobster-exercise">
+
+    </div>
+  </div>
+  <div class="examma-ray-grading-right-panel">
+    <div style="margin: 0.25em;">
+      <div style="vertical-align: middle;">
+        <a class="btn btn-primary examma-ray-log-in-button" href="auth/google">Sign In</a>
+        <button style="display:none;" class="btn btn-warning examma-ray-log-out-button"><i class="bi bi-person-x-fill"></i> Sign Out</button>
+      </div>
+    </div>
+    <div style="position: sticky; top: 0; text-align: center; background: white; z-index: 10; padding-top: 1em;">
+      <button class="btn btn-default examma-ray-grading-finished-button">Mark as Finished</button>
+      <hr />
+    </div>
+    <div class="examma-ray-grading-rubric-buttons">
+    </div>
+    <div>
+      <button type="button" class="btn btn-sm btn-success" id="create-rubric-item-open-modal">Add Item</button> 
+    </div>
+  </div>
+  
+  <div class="modal fade" id="groups-modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" style="width: 95vw" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title"><b>Group Members</b></h4>
+        </div>
+        <div class="modal-body examma-ray-group-member-thumbnails">
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="modal fade" id="examma-ray-grouping-progress-modal" tabindex="-1" role="dialog" data-backdrop="static">
+    <div class="modal-dialog modal-sm" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+          <h4 class="modal-title"><b>Auto-Grouping...</b></h4>
+        </div>
+        <div class="modal-body examma-ray-grouping-progress">
+          Processing...
+          <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width: 2%;">
+              0%
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="edit-rubric-item-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <h5 class="modal-title"><b>Create Rubric Item</b></h5>
+        </div>
+        <div class="modal-body">
+          <div class="row">
+            <div class="form-group col-xs-12">
+              <label for="edit-rubric-item-input-uuid">UUID</label>
+              <input type="text" disabled="disabled" class="form-control" id="edit-rubric-item-input-uuid">
+            </div>
+          </div>
+          <div class="row">
+            <div class="form-group col-xs-8">
+              <label for="edit-rubric-item-input-title">Title</label>
+              <input type="text" class="form-control" id="edit-rubric-item-input-title" maxlength="100">
+            </div>
+            <div class="form-group col-xs-2">
+              <label for="edit-rubric-item-input-points">Points</label>
+              <input type="number" class="form-control" id="edit-rubric-item-input-points">
+            </div>
+            <div class="form-group col-xs-2">
+              <label for="edit-rubric-item-input-sort-index">Sort Index</label>
+              <input type="text" class="form-control" id="edit-rubric-item-input-sort-index" maxlength="10">
+            </div>
+          </div>
+          <div class="row">
+            <div class="form-group col-xs-12">
+              <label for="edit-rubric-item-input-description">Description</label>
+              <textarea class="form-control" id="edit-rubric-item-input-description" style="max-width: 100%;"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="button" id="edit-rubric-item-submit-button" class="btn btn-primary">Create</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="edit-rubric-notes-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <h5 class="modal-title"><b>Attach Notes</b></h5>
+          <div>
+            <p>Attach notes to explain this rubric item:</p>
+            <p>
+              <b><span id="edit-rubric-notes-title"></span></b><br />
+              <span id="edit-rubric-notes-description"></span>
+            </p>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="row">
+            <div class="form-group col-xs-12">
+              <label for="edit-rubric-notes-input-group-uuid">Group UUID</label>
+              <input type="text" disabled="disabled" class="form-control" id="edit-rubric-notes-input-group-uuid">
+            </div>
+          </div>
+          <div class="row">
+            <div class="form-group col-xs-12">
+              <label for="edit-rubric-notes-input-rubric-item-uuid">Rubric Item UUID</label>
+              <input type="text" disabled="disabled" class="form-control" id="edit-rubric-notes-input-rubric-item-uuid">
+            </div>
+          </div>
+          <div class="row">
+            <div class="form-group col-xs-12">
+              <label for="edit-rubric-notes-input-notes">Notes</label>
+              <textarea class="form-control" id="edit-rubric-notes-input-notes" style="max-width: 100%;"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="button" id="edit-rubric-notes-submit-button" class="btn btn-primary">Update</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  
+  <div class="modal fade" id="edit-code-grader-config-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog"  style="width: 80vw" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <h5 class="modal-title"><b>Code Grader Configuration</b></h5>
+        </div>
+        <div class="modal-body">
+          <div class="row">
+            <div class="form-group col-xs-12">
+              <label for="edit-code-grader-config-input-grouping-function">Grouping Function</label>
+              <input type="text" class="form-control" id="edit-code-grader-config-input-grouping-function" maxlength="100">
+            </div>
+          </div>
+          <div class="row">
+            <div class="form-group col-xs-12">
+              <label for="edit-code-grader-config-input-test-harness">Test Harness</label>
+              <textarea style="font-family: monospace; resize: vertical;" class="form-control" id="edit-code-grader-config-input-test-harness">{{submission}}</textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="button" id="edit-code-grader-config-submit-button" class="btn btn-primary">Update</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+
+</html>
