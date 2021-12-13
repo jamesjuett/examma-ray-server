@@ -26,6 +26,7 @@ services:
     volumes:
       - ./data:/usr/src/app/data
       - ./out:/usr/src/app/out
+      - ./uploads:/usr/src/app/uploads
     networks:
         - http
         - db
@@ -47,7 +48,7 @@ services:
       - db
 
   caddy:
-    image: caddy:2.1.1
+    image: caddy:2.4.6
     restart: always
     volumes:
       - ./Caddyfile-prod:/etc/caddy/Caddyfile
