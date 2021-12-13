@@ -6,6 +6,7 @@ COPY ./src ./src
 COPY ./.env ./.env
 COPY ./public/*.html ./public/
 COPY ./webpack.config.js ./webpack.config.js
+COPY ./Caddyfile-prod ./Caddyfile-prod
 RUN npm install
 RUN npm install -g node-wait-for-it
 RUN npm run build
