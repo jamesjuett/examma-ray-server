@@ -4,6 +4,7 @@ COPY package.json ./
 COPY tsconfig.json ./
 COPY ./src ./src
 COPY ./.env ./.env
+COPY ./public/*.html ./public
 COPY ./webpack.config.js ./webpack.config.js
 RUN npm install
 RUN npm install -g node-wait-for-it
