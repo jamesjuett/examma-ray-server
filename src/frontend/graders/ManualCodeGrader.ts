@@ -510,8 +510,8 @@ export class ManualCodeGraderApp {
         </div>
       </div>
     `);
-    let closeButton = jq.find(".examma-ray-group-member-remove-button");
-    closeButton.on("click", () => {
+    let removeButton = jq.find(".examma-ray-group-member-remove-button");
+    removeButton.on("click", () => {
       // if (this.currentGroup && this.currentGroup.submissions.length > 1) {
       //   this.removeFromCurrentGroup(sub);
       //   jq.fadeOut(() => jq.remove());
@@ -856,6 +856,11 @@ class GroupGraderOutlet {
       if ($(".modal.in").length > 0) {
         return;
       }
+
+      // do nothing if modifier keys are held
+      if (event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
       
       let num = parseInt(handler.key);
 
@@ -864,6 +869,20 @@ class GroupGraderOutlet {
           this.toggleRubricItem(ri!.rubricItem.rubric_item_uuid);
         }
       });
+    });
+    hotkeys('f', (event, handler) => {
+
+      // do nothing if any modal is open
+      if ($(".modal.in").length > 0) {
+        return;
+      }
+
+      // do nothing if modifier keys are held
+      if (event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+      
+      this.toggleGroupFinished();
     });
   }
   
