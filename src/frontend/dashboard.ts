@@ -108,6 +108,7 @@ export class DashboardExammaRayGraderApplication {
       const exam_spec = <ExamSpecification>exam_spec_response.data;
 
       asMutable(this).exam = Exam.create(exam_spec);
+      assert(this.exam);
 
       const submissions_response = await axios({
         url: `api/exams/${this.exam_id}/submissions`,
@@ -152,6 +153,11 @@ export class DashboardExammaRayGraderApplication {
       
         }
       </li>`).join(""));
+
+      $("#examma-ray-question-grading-list").html(
+        this.exam!.allQuestions
+          .filter(q => q.response.kind === "code_editor")
+          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a></li>`).join(""));
       
     }
     catch(e: unknown) {
