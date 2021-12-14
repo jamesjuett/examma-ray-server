@@ -177,6 +177,7 @@ export class QuestionGradingServer {
   private transitionRecorderQueue: ManualGradingEpochTransition[] = [];
   private transitionRecorderQueueLock?: Promise<void>;
 
+  // TODO: these unnecessarily index based on question_id which is always the same for a single question server
   public readonly active_graders: ActiveGraders = {};
   private next_active_graders: ActiveGraders = {};
 
@@ -215,7 +216,6 @@ export class QuestionGradingServer {
     this.skins = skins;
     this.grading_record = grading_record;
     
-
     setInterval(() => {
       asMutable(this).active_graders = this.next_active_graders;
       this.next_active_graders = {};
@@ -283,7 +283,9 @@ export class QuestionGradingServer {
     }
     else if (op.kind === "set_group_finished") {
       let group = this.grading_record.groups[op.group_uuid];
-      if (group) { group.finished = op.finished; }
+      if (group) {
+        group.finished = op.finished;
+      }
     }
     else if (op.kind === "edit_rubric_item") {
       let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item_uuid);
@@ -340,6 +342,7 @@ export class QuestionGradingServer {
           delete this.grading_record.groups[group_uuid];
         }
       });
+
     }
     else {
       return assertNever(op);
@@ -415,6 +418,26 @@ export class QuestionGradingServer {
   private clearTransitionHistory() {
     this.transitionHistory.length = 0; // clear array
     this.history_starting_epoch = this.grading_record.grading_epoch;
+  }
+
+  public claimNextUngradedGroup(email: string, client_uuid: string) {
+    let claimed = new Set<string>(Object.values(this.active_graders[this.question_id].graders).map(g => g.group_uuid ?? ""))
+
+    let available : string[] = [];
+    Object.values(this.grading_record.groups).forEach(group => {
+      if (!group!.finished && !claimed.has(group!.group_uuid)) {
+        available.push(group!.group_uuid);
+      }
+    });
+
+    let next_uuid = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : undefined;
+
+    if (next_uuid) {
+      (this.active_graders[this.question_id] ??= {graders: {}}).graders[client_uuid] = {group_uuid: next_uuid, email: email};
+      (this.next_active_graders[this.question_id] ??= {graders: {}}).graders[client_uuid] = {group_uuid: next_uuid, email: email};
+    }
+
+    return next_uuid;
   }
 
   public async processManualGradingPing(email: string, ping: ManualGradingPingRequest) : Promise<ManualGradingPingResponse> {

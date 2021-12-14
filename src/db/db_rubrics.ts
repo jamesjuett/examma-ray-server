@@ -168,7 +168,8 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
       group_uuid: g.group_uuid,
       grader: g.grader,
       submissions: [],
-      grading_result: {}
+      grading_result: {},
+      finished: g.finished
     }
   });
   submissions.forEach(sub => {

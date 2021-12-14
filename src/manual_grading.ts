@@ -107,6 +107,13 @@ export type ActiveGraders = {
 
 
 
+export type NextUngradedRequest = {
+  client_uuid: string
+};
+
+export type NextUngradedResponse = {
+  group_uuid?: string;
+}
 
 
 

@@ -21,7 +21,7 @@ import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
 
 import queryString from "query-string";
-import { ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, RubricItemGradingResult } from "../../manual_grading";
+import { ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, NextUngradedRequest, NextUngradedResponse, RubricItemGradingResult } from "../../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../../util/util";
 import axios from "axios";
 import { ExammaRayGraderClient } from "../Application";
@@ -96,6 +96,7 @@ export class ManualCodeGraderApp {
   // private groupingFunctionName: string;
 
   private groupMemberThumbnailsElem: JQuery;
+  private statusElem: JQuery;
   
   private constructor(client: ExammaRayGraderClient, exam_id: string, question: Question, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, records: ManualGradingQuestionRecords, skins: ManualGradingSkins) {
     this.client = client;
@@ -105,6 +106,8 @@ export class ManualCodeGraderApp {
     this.rubric = rubric;
     this.grading_records = records;
     this.skins = skins;
+
+    this.statusElem = $("#examma-ray-manual-grader-app-status");
 
     this.groupGrader = new GroupGraderOutlet(this);
     this.groupThumbnailsPanel = new GroupThumbnailsPanel(this, $(".examma-ray-group-thumbnails"));
@@ -120,6 +123,7 @@ export class ManualCodeGraderApp {
     $(".examma-ray-grading-title").html(this.question.question_id);
 
     this.initComponents();
+    this.initHotkeys();
 
     setInterval(() => this.sendPing(), 1000);
   }
@@ -148,6 +152,24 @@ export class ManualCodeGraderApp {
     
     $(".examma-ray-auto-group-button").on("click", async () => this.autoGroup());
 
+    $("#examma-ray-next-ungraded-button").on("click", async() => this.claimNextUngraded());
+  }
+
+  private initHotkeys() {
+    hotkeys('z', (event, handler) => {
+
+      // do nothing if any modal is open
+      if ($(".modal.in").length > 0) {
+        return;
+      }
+      
+      // do nothing if modifier keys are held
+      if (event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      this.claimNextUngraded();
+    });
   }
 
   public static async create(exam_id: string, question_id: string) {
@@ -206,25 +228,32 @@ export class ManualCodeGraderApp {
     // epoch, so they'll be reapplied and we don't need to keep them.
     this.local_changes.length = 0; // clear the array
 
-    const ping_response = await axios({
-      url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
-      method: "POST",
-      data: pingRequest,
-      headers: {
-          'Authorization': 'bearer ' + this.client.getBearerToken()
-      }
-    });
-
-    // Note that after this promise resolves, there may be new local changes
-    // that will be reapplied after processing the remote ones via the call
-    // here
-    
-    this.onPingResponse(<ManualGradingPingResponse>ping_response.data);
+    try {
+      const ping_response = await axios({
+        url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
+        method: "POST",
+        data: pingRequest,
+        headers: {
+            'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      });
+  
+      // Note that after this promise resolves, there may be new local changes
+      // that will be reapplied after processing the remote ones via the call
+      // here
+      
+      this.onPingResponse(<ManualGradingPingResponse>ping_response.data);
+      this.statusElem.html('<span class="label label-success"><i class="bi bi-cloud-check-fill"></i> Connected to Server</span>');
+    }
+    catch(e: unknown) {
+      console.log(e);
+      this.statusElem.html('<span class="label label-danger"><i class="bi bi-cloud-slash-fill"></i> Error: Not Connected</span>');
+    }
     
     this.pendingPing = false;
   }
 
-  private async onPingResponse(pingResponse: ManualGradingPingResponse) {
+  private onPingResponse(pingResponse: ManualGradingPingResponse) {
 
     this.updateGraderAvatars(pingResponse);
     this.groupThumbnailsPanel.updateGraderAvatars(pingResponse);
@@ -420,7 +449,13 @@ export class ManualCodeGraderApp {
   //   this.createRubricBar();
   // }
 
-  public openGroup(group: ManualGradingGroupRecord) {
+  public openGroup(group_uuid: string) {
+    let group = this.grading_records.groups[group_uuid];
+
+    if (!group) {
+      return;
+    }
+
     if (this.currentGroup) {
       this.groupThumbnailsPanel.onGroupClosed(this.currentGroup);
     }
@@ -492,6 +527,33 @@ export class ManualCodeGraderApp {
     this.groupGrader.onGroupClose();
     this.groupMemberThumbnailsElem.empty();
     delete asMutable(this).currentGroup;
+  }
+
+  public async claimNextUngraded() {
+    try {
+      const response = await axios({
+        url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/claim_next_ungraded`,
+        method: "POST",
+        data: <NextUngradedRequest>{
+          client_uuid: this.client.client_uuid
+        },
+        headers: {
+            'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      });
+
+      let next_uuid = (<NextUngradedResponse>response.data).group_uuid;
+      if (next_uuid) {
+        this.openGroup(next_uuid)
+      }
+      else {
+        alert("all groups have been graded yay");
+      }
+    }
+    catch(e: unknown) {
+      console.log(e);
+      this.statusElem.html('<span class="label label-danger"><i class="bi bi-cloud-slash-fill"></i> Error: Not Connected</span>');
+    }
   }
 
   public pointsEarned(gr?: ManualGradingResult) {
@@ -1067,7 +1129,7 @@ class RubricItemOutlet {
   }
 
   private renderDisplayIndexLabel() {
-    return this.display_index !== undefined ? `<span class="label label-primary">${this.display_index}</span>` : "";
+    return this.display_index !== undefined ? `<code>${this.display_index}</code>` : "";
   }
 
   private openEditModal() {
@@ -1257,7 +1319,7 @@ class GroupThumbnailOutlet {
     this.refreshBadges();
     
     elem.on("click", () => {
-      this.app.openGroup(group);
+      this.app.openGroup(group.group_uuid);
     });
   }
 
@@ -1297,6 +1359,7 @@ class GroupThumbnailOutlet {
 
   public onGroupOpened() {
     this.elem.addClass("panel-primary");
+    this.elem[0].scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
   }
 
   public onGroupClosed() {

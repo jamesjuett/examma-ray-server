@@ -5,12 +5,13 @@ import { Worker } from "worker_threads";
 import { readFileSync } from "fs";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
-import { ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingRubricItem } from "../manual_grading";
+import { ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingRubricItem, NextUngradedRequest, NextUngradedResponse } from "../manual_grading";
 import { getJwtUserInfo } from "../auth/jwt_auth";
 import { db_getCodeGraderConfig } from "../db/db_code_grader";
 const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyQuestionId = validateBody("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyGroupId = validateBody("group_id").trim().isLength({min: 1, max: 100});
+const validateBodyClientUuid = validateBody("client_uuid").isUUID();
 // const validateParamTerm = validateParam("term").isIn(["fall", "winter", "spring", "summer"]);
 // const validateParamYear = validateParam("year").isInt();
 
@@ -147,6 +148,7 @@ manual_grading_router
         validateParamExammaRayId("exam_id"),
         validateParamExammaRayId("question_id"),
         validateBodyGroupId.optional(),
+        validateBodyClientUuid,
         validateBody("my_grading_epoch").isInt().optional()
       ],
       handler: async (req: Request, res: Response) => {
@@ -155,6 +157,31 @@ manual_grading_router
         let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
         if (qs) {
           return res.status(200).json(await qs.processManualGradingPing(userInfo.email, pr));
+        }
+        else {
+          return res.sendStatus(404);
+        }
+      }
+    }));
+
+manual_grading_router
+  .route("/:exam_id/questions/:question_id/claim_next_ungraded")
+    .post(createRoute({
+      authorization: NO_AUTHORIZATION, // requireSuperUser,
+      preprocessing: jsonBodyParser,
+      validation: [
+        validateParamExammaRayId("exam_id"),
+        validateParamExammaRayId("question_id"),
+        validateBodyClientUuid,
+      ],
+      handler: async (req: Request, res: Response) => {
+        let userInfo = getJwtUserInfo(req);
+        let next_ungraded_request = <NextUngradedRequest>req.body;
+        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        if (qs) {
+          return res.status(200).json(<NextUngradedResponse>{
+            group_uuid: qs.claimNextUngradedGroup(userInfo.email, next_ungraded_request.client_uuid)
+          });
         }
         else {
           return res.sendStatus(404);

@@ -8,17 +8,18 @@ body {
   top: 0;
   width: 300px;
   height: 100vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .examma-ray-grading-controls {
-  position: -webkit-sticky;
-  position: sticky;
-  background: white;
-  top: 0;
-  z-index: 100;
-  margin-bottom: 0.25em;
-  border-bottom: solid 1px #999;
+  flex-grow: 0;
+  flex-shrink: 0;
+}
+
+.examma-ray-group-thumbnails {
+  flex-grow: 1;
+  overflow-y: auto;
 }
 
 .examma-ray-grading-title {
