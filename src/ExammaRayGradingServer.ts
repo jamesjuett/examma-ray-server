@@ -2,7 +2,7 @@ import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { readdirSync } from "fs";
 import { copyFile, readFile } from "fs/promises";
 import { JwtUserInfo } from "./auth/jwt_auth";
-import { ActiveGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission } from "./manual_grading";
+import { ActiveGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, reassignGradingGroups } from "./manual_grading";
 import { asMutable, assert, assertExists, assertFalse, assertNever } from "./util/util";
 import { Worker } from "worker_threads";
 import { ExamGeneratorSpecification } from "examma-ray/dist/ExamGenerator";
@@ -310,39 +310,7 @@ export class QuestionGradingServer {
       Object.assign(this.config, op.edits);
     }
     else if (op.kind === "assign_groups_operation") {
-
-      // get a list of all submissions
-      let all_submissions : ManualGradingSubmission[] = []; 
-      Object.values(this.grading_record.groups).forEach(group => {
-        group!.submissions.forEach(sub => all_submissions.push(sub));
-        group!.submissions.length = 0; // clear out the group submissions list
-      });
-
-      // Add submissions back to the appropriate groups according to the operation
-      all_submissions.forEach(sub => {
-        let group_uuid = op.assignment[sub.submission_uuid];
-        let existing_group = this.grading_record.groups[group_uuid];
-        if (existing_group) {
-          existing_group.submissions.push(sub);
-        }
-        else {
-          // create new group
-          this.grading_record.groups[group_uuid] = {
-            group_uuid: group_uuid,
-            grading_result: {},
-            submissions: [sub],
-            finished: false
-          };
-        }
-      });
-
-      // Remove empty groups
-      Object.entries(this.grading_record.groups).forEach(([group_uuid, group]) => {
-        if (group!.submissions.length === 0) {
-          delete this.grading_record.groups[group_uuid];
-        }
-      });
-
+      reassignGradingGroups(this.grading_record, op.assignment);
     }
     else {
       return assertNever(op);
@@ -379,7 +347,7 @@ export class QuestionGradingServer {
     }
     else if (op.kind === "assign_groups_operation") {
       for (let submission_uuid in op.assignment) {
-        let group_uuid = op.assignment[submission_uuid];
+        let group_uuid = op.assignment[submission_uuid]!;
         if (!await db_getGroup(group_uuid)) {
           await db_createGroup(group_uuid, this.question_id, false);
         }
