@@ -813,7 +813,7 @@ class GroupGraderOutlet {
             title: ""+$("#edit-rubric-item-input-title").val(),
             description: ""+$("#edit-rubric-item-input-description").val(),
             sort_index: sort_index ?? undefined, // pass undefined if it was falsey, which includes ""
-            points: parseInt(""+$("#edit-rubric-item-input-points").val()),
+            points: parseFloat(""+$("#edit-rubric-item-input-points").val()),
             active: true
           }
         });
@@ -826,7 +826,7 @@ class GroupGraderOutlet {
             title: ""+$("#edit-rubric-item-input-title").val(),
             description: ""+$("#edit-rubric-item-input-description").val(),
             sort_index: sort_index ?? undefined, // pass undefined if it was falsey, which includes ""
-            points: parseInt(""+$("#edit-rubric-item-input-points").val()),
+            points: parseFloat(""+$("#edit-rubric-item-input-points").val()),
             active: true
           }
         });
