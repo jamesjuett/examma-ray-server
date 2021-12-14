@@ -97,6 +97,7 @@ export class ManualCodeGraderApp {
 
   private groupMemberThumbnailsElem: JQuery;
   private statusElem: JQuery;
+  private gradingProgressBarElem: JQuery;
   
   private constructor(client: ExammaRayGraderClient, exam_id: string, question: Question, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, records: ManualGradingQuestionRecords, skins: ManualGradingSkins) {
     this.client = client;
@@ -108,6 +109,7 @@ export class ManualCodeGraderApp {
     this.skins = skins;
 
     this.statusElem = $("#examma-ray-manual-grader-app-status");
+    this.gradingProgressBarElem = $("#examma-ray-grading-progress-bar");
 
     this.groupGrader = new GroupGraderOutlet(this);
     this.groupThumbnailsPanel = new GroupThumbnailsPanel(this, $(".examma-ray-group-thumbnails"));
@@ -124,6 +126,8 @@ export class ManualCodeGraderApp {
 
     this.initComponents();
     this.initHotkeys();
+
+    this.updateGradingProgressBar();
 
     setInterval(() => this.sendPing(), 1000);
   }
@@ -170,6 +174,16 @@ export class ManualCodeGraderApp {
 
       this.claimNextUngraded();
     });
+  }
+
+  private updateGradingProgressBar() {
+    let groups = Object.values(this.grading_records.groups);
+    let n_graded = groups.filter(g => g!.finished).length;
+    this.gradingProgressBarElem.html(`${n_graded} / ${groups.length}`);
+    this.gradingProgressBarElem.css("width", `${n_graded / groups.length * 100}%`);
+    // if (n_graded/groups.length < 0.15) {
+    //   this.gradingProgressBarElem.append(`<span class="float: right;">${groups.length} groups</span>`)
+    // }
   }
 
   public static async create(exam_id: string, question_id: string) {
@@ -357,6 +371,7 @@ export class ManualCodeGraderApp {
         this.groupGrader.onGroupFinishedSet(op.group_uuid, remote_grader_email);
       }
       this.groupThumbnailsPanel.onGroupFinishedSet(op.group_uuid, remote_grader_email);
+      this.updateGradingProgressBar();
     }
     else if (op.kind === "edit_rubric_item") {
       let existingRi = this.rubric.find(ri => ri.rubric_item_uuid === op.rubric_item_uuid);
