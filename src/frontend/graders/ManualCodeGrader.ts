@@ -949,11 +949,11 @@ class GroupGraderOutlet {
     let elem = this.gradingFinishedButtonElem;
     elem.removeClass("btn-default").removeClass("btn-success");
     if (this.app.currentGroup?.finished) {
-      elem.html(`<i class="bi bi-check2-circle"></i> Finished`);
+      elem.html(`<code>F</code> <i class="bi bi-check2-circle"></i> Finished`);
       elem.addClass("btn-success");
     }
     else {
-      elem.html("Mark as Finished");
+      elem.html("<code>F</code> Mark as Finished");
       elem.addClass("btn-default");
     }
   }
