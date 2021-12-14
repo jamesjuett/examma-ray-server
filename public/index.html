@@ -45,16 +45,19 @@
       </ul>
     </div>
 
-    <form id="create-exam-form">
-      Upload the <code>exam-spec.json</code> file here.
-      <input id="exam-spec-file-input" type="file" name="exam-spec"/>
-      <button type="submit">Submit</button>
-    </form>
-
-    <form class = "file-input-form" enctype="multipart/form-data">
-      <input id="file-input" type="file" name="submissions" multiple/>
-      <button type="submit">Submit</button>
-    </form>
+    <div class="alert alert-danger" role="alert">
+      <h2>DANGER DO NOT CLICK THESE</h2>
+      <form id="create-exam-form">
+        Upload the <code>exam-spec.json</code> file here.
+        <input id="exam-spec-file-input" type="file" name="exam-spec"/>
+        <button type="submit">Submit</button>
+      </form>
+  
+      <form class = "file-input-form" enctype="multipart/form-data">
+        <input id="file-input" type="file" name="submissions" multiple/>
+        <button type="submit">Submit</button>
+      </form>
+    </div>
 
     
   </div>
