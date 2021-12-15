@@ -1,7 +1,8 @@
+import avatar from "animal-avatar-generator";
 import axios from "axios";
 import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import queryString from "query-string";
-import { ExamSubmissionRecord } from "../dashboard";
+import { ExamPingResponse, ExamSubmissionRecord } from "../dashboard";
 import { ExamTaskStatus } from "../ExammaRayGradingServer";
 import { asMutable, assert } from "../util/util";
 import { ExammaRayGraderClient } from "./Application";
@@ -76,20 +77,29 @@ export class DashboardExammaRayGraderApplication {
 
   private async sendPing() {
 
-    const epoch_response = await axios({
-      url: `api/exams/${this.exam_id}/epoch`,
+    const ping_response = <ExamPingResponse>(await axios({
+      url: `api/exams/${this.exam_id}/ping`,
       method: "GET",
       headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken()
       }
-    });
-    const current_epoch = <number>epoch_response.data.epoch;
+    })).data;
+    const current_epoch = ping_response.epoch;
 
     if (this.exam_epoch !== current_epoch) {
       this.exam_epoch = current_epoch;
-      this.reloadExam();
+      await this.reloadExam();
     }
     
+    $(".question-grader-avatars").empty();
+    Object.keys(ping_response.active_graders).forEach(question_id => {
+      let questionElem = $(`#question-grader-avatars-${question_id}`);
+      Object.values(ping_response.active_graders[question_id].graders).forEach(grader => {
+        $(`<div style="display: inline-block;" data-toggle="tooltip" data-placement="bottom" title="${grader.email}">
+          ${avatar(grader.email, { size: 30 })}
+        </div>`).appendTo(questionElem);
+      });
+    });
   }
 
 
@@ -157,7 +167,7 @@ export class DashboardExammaRayGraderApplication {
       $("#examma-ray-question-grading-list").html(
         this.exam!.allQuestions
           .filter(q => q.response.kind === "code_editor")
-          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a></li>`).join(""));
+          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join(""));
       
     }
     catch(e: unknown) {

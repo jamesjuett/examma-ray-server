@@ -2,7 +2,7 @@ import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { readdirSync } from "fs";
 import { copyFile, readFile } from "fs/promises";
 import { JwtUserInfo } from "./auth/jwt_auth";
-import { ActiveGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, reassignGradingGroups } from "./manual_grading";
+import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, reassignGradingGroups } from "./manual_grading";
 import { asMutable, assert, assertExists, assertFalse, assertNever } from "./util/util";
 import { Worker } from "worker_threads";
 import { ExamGeneratorSpecification } from "examma-ray/dist/ExamGenerator";
@@ -23,7 +23,7 @@ export type ExamTaskStatus = {
 export class ServerExam {
 
   public readonly exam: Exam;
-  public readonly epoch?: number;
+  public readonly epoch: number;
 
   public readonly taskStatus: ExamTaskStatus = { };
 
@@ -31,8 +31,9 @@ export class ServerExam {
     [index: string]: QuestionGradingServer | undefined
   } = {};
 
-  private constructor(exam: Exam, question_servers: readonly QuestionGradingServer[]) {
+  private constructor(exam: Exam, epoch: number, question_servers: readonly QuestionGradingServer[]) {
     this.exam = exam;
+    this.epoch = epoch;
     question_servers.forEach(qs => this.questionGradingServers[qs.question_id] = qs);
   }
 
@@ -40,6 +41,7 @@ export class ServerExam {
     const exam = Exam.create(exam_spec);
     return new ServerExam(
       exam,
+      0,
       await Promise.all(exam.allQuestions.map(q => QuestionGradingServer.create(exam.exam_id, q.question_id)))
     );
   }
@@ -154,6 +156,12 @@ export class ServerExam {
   public getGradingServer(question_id: string) {
     return this.questionGradingServers[question_id];
   }
+
+  public getActiveGraders() {
+    let active_graders: ActiveExamGraders = {};
+    Object.values(this.questionGradingServers).forEach(qgs => active_graders[qgs!.question_id] = qgs!.active_graders)
+    return active_graders;
+  }
 }
 
 
@@ -178,8 +186,8 @@ export class QuestionGradingServer {
   private transitionRecorderQueueLock?: Promise<void>;
 
   // TODO: these unnecessarily index based on question_id which is always the same for a single question server
-  public readonly active_graders: ActiveGraders = {};
-  private next_active_graders: ActiveGraders = {};
+  public readonly active_graders: ActiveQuestionGraders = {graders: {}};
+  private next_active_graders: ActiveQuestionGraders = {graders: {}};
 
   private reload_lock?: Promise<void>;
 
@@ -218,7 +226,7 @@ export class QuestionGradingServer {
     
     setInterval(() => {
       asMutable(this).active_graders = this.next_active_graders;
-      this.next_active_graders = {};
+      this.next_active_graders = {graders: {}};
     }, GRADER_IDLE_THRESHOLD);
   }
 
@@ -389,7 +397,7 @@ export class QuestionGradingServer {
   }
 
   public claimNextUngradedGroup(email: string, client_uuid: string, desired: string[]) {
-    let claimed = new Set<string>(Object.values(this.active_graders[this.question_id].graders).map(g => g.group_uuid ?? ""));
+    let claimed = new Set<string>(Object.values(this.active_graders.graders).map(g => g.group_uuid ?? ""));
 
     // Check the client's desired next groups in order to see if one is ok
     let next_uuid = desired.find(uuid => {
@@ -399,8 +407,8 @@ export class QuestionGradingServer {
 
     // If we found one to give to the client, go ahead and mark them as active on that
     if (next_uuid) {
-      (this.active_graders[this.question_id] ??= {graders: {}}).graders[client_uuid] = {group_uuid: next_uuid, email: email};
-      (this.next_active_graders[this.question_id] ??= {graders: {}}).graders[client_uuid] = {group_uuid: next_uuid, email: email};
+      this.active_graders.graders[client_uuid] = {group_uuid: next_uuid, email: email};
+      this.next_active_graders.graders[client_uuid] = {group_uuid: next_uuid, email: email};
     }
 
     // May be undefined if there were none available, client will handle that
@@ -411,8 +419,8 @@ export class QuestionGradingServer {
 
     if (this.reload_lock) { await this.reload_lock; }
 
-    (this.active_graders[ping.question_id] ??= {graders: {}}).graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
-    (this.next_active_graders[ping.question_id] ??= {graders: {}}).graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
+    this.active_graders.graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
+    this.next_active_graders.graders[ping.client_uuid] = {group_uuid: ping.group_uuid, email: email};
 
     // if the ping contained some new local operations from the client, apply them and advance the epoch
     if (ping.my_operations.length > 0) {

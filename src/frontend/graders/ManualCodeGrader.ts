@@ -21,7 +21,7 @@ import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
 
 import queryString from "query-string";
-import { ActiveGraders, GradingGroupReassignment, isMeaningfulRubricItemGradingResult, ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, NextUngradedRequest, NextUngradedResponse, reassignGradingGroups, RubricItemGradingResult } from "../../manual_grading";
+import { ActiveExamGraders, ActiveQuestionGraders, GradingGroupReassignment, isMeaningfulRubricItemGradingResult, ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, NextUngradedRequest, NextUngradedResponse, reassignGradingGroups, RubricItemGradingResult } from "../../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../../util/util";
 import axios from "axios";
 import { ExammaRayGraderClient } from "../Application";
@@ -87,12 +87,7 @@ export class ManualCodeGraderApp {
   private local_changes: ManualGradingOperation[] = [];
   private pendingPing: boolean = false;
 
-  public readonly active_graders: {
-    [index: string]: {
-        group_uuid?: string | undefined;
-        email: string;
-    };
-  } = {};
+  public readonly active_graders: ActiveQuestionGraders = {graders: {}};
 
   // public readonly currentGroup?: ManualGradingGroupRecord;
 
@@ -306,17 +301,17 @@ export class ManualCodeGraderApp {
   }
 
   private updateGraderAvatars(pingResponse: ManualGradingPingResponse) {
-    let graders = pingResponse.active_graders[this.question.question_id].graders;
-    asMutable(this).active_graders = graders;
+    let active_graders = pingResponse.active_graders;
+    asMutable(this).active_graders = active_graders;
     let avatarsElem = $(".examma-ray-active-graders").empty();
-    Object.entries(graders)
+    Object.entries(active_graders.graders)
       .map(([client_uuid, grader]) => ({client_uuid: client_uuid, ...grader}))
       .sort((g1, g2) => g1.email.localeCompare(g2.email))
       .forEach(grader => {
       $(`<div style="display: inline-block;" data-toggle="tooltip" data-placement="bottom" title="${grader.email}">
         ${avatar(grader.email, { size: ACTIVE_GRADER_AVATAR_SIZE })}
       </div>`).appendTo(avatarsElem).on("click", () => {
-        let jump_to = this.active_graders[grader.client_uuid].group_uuid;
+        let jump_to = this.active_graders.graders[grader.client_uuid].group_uuid;
         if (jump_to) {
           this.openGroup(jump_to);
         }
@@ -1455,7 +1450,7 @@ class GroupThumbnailOutlet {
   }
 
   public updateActiveGraders(pingResponse: ManualGradingPingResponse) {
-    let clients = pingResponse.active_graders[this.app.question.question_id].graders;
+    let clients = pingResponse.active_graders.graders;
     this.avatarsElem.empty();
     Object.values(clients).forEach(client => {
       if (client.group_uuid === this.group.group_uuid) {
