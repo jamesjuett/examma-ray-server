@@ -29,6 +29,7 @@ async function addSubmission(exam: Exam, filepath: string, originalFilename: str
     const existing_submission = await db_getExamSubmissionByUuid(new_submission.uuid);
 
     if (existing_submission) {
+      console.log("skipping duplicate submission for " + filepath);
       return;
     }
   

@@ -30,6 +30,10 @@ export type RubricItemGradingResult = {
   notes?: string
 }
 
+export function isMeaningfulRubricItemGradingResult(gr: RubricItemGradingResult | undefined) {
+  return gr && (gr.status !== undefined && gr.status !== "off" || gr.notes)
+}
+
 export type ManualGradingResult = {
   [index: string]: RubricItemGradingResult | undefined
 };
@@ -108,7 +112,8 @@ export type ActiveGraders = {
 
 
 export type NextUngradedRequest = {
-  client_uuid: string
+  client_uuid: string,
+  desired: string[]
 };
 
 export type NextUngradedResponse = {

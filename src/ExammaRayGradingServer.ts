@@ -293,7 +293,7 @@ export class QuestionGradingServer {
         Object.assign(existingRi, op.edits);
       }
       else {
-        // tehcnically should never get here - rubric items can't be deleted, only hidden
+        // technically should never get here - rubric items can't be deleted, only hidden
         return assertFalse();
       }
     }
@@ -388,23 +388,22 @@ export class QuestionGradingServer {
     this.history_starting_epoch = this.grading_record.grading_epoch;
   }
 
-  public claimNextUngradedGroup(email: string, client_uuid: string) {
-    let claimed = new Set<string>(Object.values(this.active_graders[this.question_id].graders).map(g => g.group_uuid ?? ""))
+  public claimNextUngradedGroup(email: string, client_uuid: string, desired: string[]) {
+    let claimed = new Set<string>(Object.values(this.active_graders[this.question_id].graders).map(g => g.group_uuid ?? ""));
 
-    let available : string[] = [];
-    Object.values(this.grading_record.groups).forEach(group => {
-      if (!group!.finished && !claimed.has(group!.group_uuid)) {
-        available.push(group!.group_uuid);
-      }
+    // Check the client's desired next groups in order to see if one is ok
+    let next_uuid = desired.find(uuid => {
+      let group = this.grading_record.groups[uuid];
+      return group && !group.finished && !claimed.has(uuid);
     });
 
-    let next_uuid = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : undefined;
-
+    // If we found one to give to the client, go ahead and mark them as active on that
     if (next_uuid) {
       (this.active_graders[this.question_id] ??= {graders: {}}).graders[client_uuid] = {group_uuid: next_uuid, email: email};
       (this.next_active_graders[this.question_id] ??= {graders: {}}).graders[client_uuid] = {group_uuid: next_uuid, email: email};
     }
 
+    // May be undefined if there were none available, client will handle that
     return next_uuid;
   }
 

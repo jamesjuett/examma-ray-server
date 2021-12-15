@@ -21,7 +21,7 @@ import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
 
 import queryString from "query-string";
-import { GradingGroupReassignment, ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, NextUngradedRequest, NextUngradedResponse, reassignGradingGroups, RubricItemGradingResult } from "../../manual_grading";
+import { ActiveGraders, GradingGroupReassignment, isMeaningfulRubricItemGradingResult, ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, NextUngradedRequest, NextUngradedResponse, reassignGradingGroups, RubricItemGradingResult } from "../../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../../util/util";
 import axios from "axios";
 import { ExammaRayGraderClient } from "../Application";
@@ -39,6 +39,7 @@ const CODE_LANGUAGE = "cpp";
 
 const ACTIVE_GRADER_AVATAR_SIZE = 30;
 
+const N_CLAIM_NEXT_UNGRADED = 10;
 
 
 type SubmissionsFilterCriterion = "all" | "graded" | "ungraded";
@@ -85,6 +86,13 @@ export class ManualCodeGraderApp {
 
   private local_changes: ManualGradingOperation[] = [];
   private pendingPing: boolean = false;
+
+  public readonly active_graders: {
+    [index: string]: {
+        group_uuid?: string | undefined;
+        email: string;
+    };
+  } = {};
 
   // public readonly currentGroup?: ManualGradingGroupRecord;
 
@@ -299,13 +307,21 @@ export class ManualCodeGraderApp {
 
   private updateGraderAvatars(pingResponse: ManualGradingPingResponse) {
     let graders = pingResponse.active_graders[this.question.question_id].graders;
-    $(".examma-ray-active-graders").empty().html(
-      Object.values(graders).map(grader => grader.email).sort().map(
-        email => `<div style="display: inline-block;" data-toggle="tooltip" data-placement="bottom" title="${email}">
-          ${avatar(email, { size: ACTIVE_GRADER_AVATAR_SIZE })}
-        </div>`
-      ).join("")
-    );
+    asMutable(this).active_graders = graders;
+    let avatarsElem = $(".examma-ray-active-graders").empty();
+    Object.entries(graders)
+      .map(([client_uuid, grader]) => ({client_uuid: client_uuid, ...grader}))
+      .sort((g1, g2) => g1.email.localeCompare(g2.email))
+      .forEach(grader => {
+      $(`<div style="display: inline-block;" data-toggle="tooltip" data-placement="bottom" title="${grader.email}">
+        ${avatar(grader.email, { size: ACTIVE_GRADER_AVATAR_SIZE })}
+      </div>`).appendTo(avatarsElem).on("click", () => {
+        let jump_to = this.active_graders[grader.client_uuid].group_uuid;
+        if (jump_to) {
+          this.openGroup(jump_to);
+        }
+      });
+    });
     $(".examma-ray-active-graders div").tooltip();
   }
 
@@ -544,7 +560,8 @@ export class ManualCodeGraderApp {
         url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/claim_next_ungraded`,
         method: "POST",
         data: <NextUngradedRequest>{
-          client_uuid: this.client.client_uuid
+          client_uuid: this.client.client_uuid,
+          desired: this.groupThumbnailsPanel.getNextNGroups(N_CLAIM_NEXT_UNGRADED)
         },
         headers: {
             'Authorization': 'bearer ' + this.client.getBearerToken()
@@ -555,9 +572,7 @@ export class ManualCodeGraderApp {
       if (next_uuid) {
         this.openGroup(next_uuid)
       }
-      else {
-        alert("all groups have been graded yay");
-      }
+      // else do nothing
     }
     catch(e: unknown) {
       console.log(e);
@@ -592,7 +607,7 @@ export class ManualCodeGraderApp {
         return; // ignore empty groups
       }
 
-      if (group!.finished || Object.values(group!.grading_result).length > 0) {
+      if (group!.finished || Object.values(group!.grading_result).filter(isMeaningfulRubricItemGradingResult).length > 0) {
         // A group with some grading already done. Keep this group together.
         newGroups.push(group!);
       }
@@ -1219,10 +1234,12 @@ class GroupThumbnailsPanel {
 
   private elem: JQuery;
 
-  private groupThumbnailOutlets: {
+  private groupThumbnailOutletsMap: {
     [index: string]: GroupThumbnailOutlet | undefined
   } = { };
   
+  private groupThumbnailOutlets: GroupThumbnailOutlet[] = [];
+
   private submissionsFilterCriterion : SubmissionsFilterCriterion = "all";
   private submissionsSortCriteria : SubmissionsSortCriterion = "name";
   private submissionsSortOrdering : SubmissionsSortOrdering = "asc";
@@ -1269,21 +1286,35 @@ class GroupThumbnailsPanel {
   private createGroupThumbnails() {
 
     this.elem.empty();
-    Object.values(this.groupThumbnailOutlets).forEach(out => out!.dispose());
-    this.groupThumbnailOutlets = {};
+    Object.values(this.groupThumbnailOutletsMap).forEach(out => out!.dispose());
+    this.groupThumbnailOutletsMap = {};
 
-    Object.values(this.app.grading_records.groups).forEach(group => {
-      this.groupThumbnailOutlets[group!.group_uuid] = new GroupThumbnailOutlet(this.app, $("<div></div>"), group!);
+    this.groupThumbnailOutlets = Object.values(this.app.grading_records.groups).map(group => {
+      let outlet = new GroupThumbnailOutlet(this.app, $("<div></div>"), group!);
+      this.groupThumbnailOutletsMap[group!.group_uuid] = outlet;
+      return outlet
     });
     this.updateDisplayedThumbnails();
   }
 
+  public getNextNGroups(n: number) {
+    let start = 0;
+    if (this.app.currentGroup) {
+      start = this.groupThumbnailOutlets.findIndex(outlet => outlet.group.group_uuid === this.app.currentGroup!.group_uuid);
+    }
+    let outlets = this.groupThumbnailOutlets.slice(start, start + 10);
+    if (outlets.length < n) {
+      outlets = outlets.concat(this.groupThumbnailOutlets.slice(0, n - outlets.length));
+    }
+    return outlets.map(outlet => outlet.group.group_uuid);
+  }
+
   public onGroupOpened(group: ManualGradingGroupRecord) {
-    this.groupThumbnailOutlets[group.group_uuid]?.onGroupOpened();
+    this.groupThumbnailOutletsMap[group.group_uuid]?.onGroupOpened();
   }
 
   public onGroupClosed(group: ManualGradingGroupRecord) {
-    this.groupThumbnailOutlets[group.group_uuid]?.onGroupClosed();
+    this.groupThumbnailOutletsMap[group.group_uuid]?.onGroupClosed();
   }
 
   public setSubmissionsFilterCriterion(criterion: SubmissionsFilterCriterion) {
@@ -1304,35 +1335,35 @@ class GroupThumbnailsPanel {
   private updateDisplayedThumbnails() {
     
     // detach all thumbnail elements
-    Object.values(this.groupThumbnailOutlets).forEach(to => to!.elem.detach());
+    Object.values(this.groupThumbnailOutletsMap).forEach(to => to!.elem.detach());
 
     // Attached filtered, sorted, elements
-    let reorderedThumbnailOutlets = Object.values(this.groupThumbnailOutlets).map(to => to!.group)
+    this.groupThumbnailOutlets = Object.values(this.groupThumbnailOutletsMap).map(to => to!.group)
       .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
       .sort(this.SUBMISSION_SORTS[this.submissionsSortCriteria])
-      .map(group => this.groupThumbnailOutlets[group.group_uuid]!);
+      .map(group => this.groupThumbnailOutletsMap[group.group_uuid]!);
       
     if (this.submissionsSortOrdering === "dsc") {
-      reorderedThumbnailOutlets = reorderedThumbnailOutlets.reverse();
+      this.groupThumbnailOutlets = this.groupThumbnailOutlets.reverse();
     }
 
-    reorderedThumbnailOutlets.forEach(to => to.elem.appendTo(this.elem));
+    this.groupThumbnailOutlets.forEach(to => to.elem.appendTo(this.elem));
   }
 
   public onGroupGradingResultUpdated(group_uuid: string) {
-    this.groupThumbnailOutlets[group_uuid]?.onGroupGradingResultUpdated();
+    this.groupThumbnailOutletsMap[group_uuid]?.onGroupGradingResultUpdated();
   }
 
   public onGroupFinishedSet(group_uuid: string, remote_grader_email?: string) {
-    this.groupThumbnailOutlets[group_uuid]?.onGroupFinishedSet(remote_grader_email);
+    this.groupThumbnailOutletsMap[group_uuid]?.onGroupFinishedSet(remote_grader_email);
   }
 
   public onRubricUpdated() {
-    Object.values(this.groupThumbnailOutlets).forEach(to => to!.onRubricUpdated());
+    Object.values(this.groupThumbnailOutletsMap).forEach(to => to!.onRubricUpdated());
   }
 
   public updateGraderAvatars(pingResponse: ManualGradingPingResponse) {
-    Object.values(this.groupThumbnailOutlets).forEach(to => to!.updateActiveGraders(pingResponse));
+    Object.values(this.groupThumbnailOutletsMap).forEach(to => to!.updateActiveGraders(pingResponse));
   }
 
   public onGroupsChanged(remote_grader_email?: string) {
