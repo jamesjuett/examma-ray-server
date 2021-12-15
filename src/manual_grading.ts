@@ -30,6 +30,10 @@ export type RubricItemGradingResult = {
   notes?: string
 }
 
+export function isMeaningfulRubricItemGradingResult(gr: RubricItemGradingResult | undefined) {
+  return gr && (gr.status !== undefined && gr.status !== "off" || gr.notes)
+}
+
 export type ManualGradingResult = {
   [index: string]: RubricItemGradingResult | undefined
 };
@@ -108,7 +112,8 @@ export type ActiveGraders = {
 
 
 export type NextUngradedRequest = {
-  client_uuid: string
+  client_uuid: string,
+  desired: string[]
 };
 
 export type NextUngradedResponse = {
@@ -156,7 +161,7 @@ export type EditCodeGraderConfigOperation = {
 
 export type AssignGroupsOperation = {
   kind: "assign_groups_operation",
-  assignment: {[index: string]: string} // mapping of submission uuids to group uuids
+  assignment: {[index: string]: string | undefined} // mapping of submission uuids to group uuids. undefined means leave it in current group
 };
 
 // NOTE: all operations must be idempotent and must not depend on previous state
@@ -174,3 +179,51 @@ export type ManualGradingEpochTransition = {
   readonly grader_email: string,
   readonly ops: readonly ManualGradingOperation[]
 };
+
+export type GradingGroupReassignment = {[index: string]: string | undefined};
+
+export function reassignGradingGroups(grading_record: ManualGradingQuestionRecords, reassignment: GradingGroupReassignment) {
+  
+  Object.values(grading_record.groups).forEach(group => {
+
+    // A list of new submissions for this group
+    let new_subs : ManualGradingSubmission[] = [];
+
+    group!.submissions.forEach(sub => {
+      let new_group_uuid = reassignment[sub.submission_uuid];
+      if (!new_group_uuid || new_group_uuid === group!.group_uuid) {
+        // wasn't in the reassignment or it was reassigned
+        // to its existing group, so we keep it in this group
+        new_subs.push(sub);
+        return;
+      }
+
+      // Otherwise, were are we going?
+      let existing_group = grading_record.groups[new_group_uuid];
+      
+      if (existing_group) {
+        // joining another existing group
+        existing_group.submissions.push(sub);
+      }
+      else {
+        // create new group
+        grading_record.groups[new_group_uuid] = {
+          group_uuid: new_group_uuid,
+          grading_result: {},
+          submissions: [sub],
+          finished: false
+        };
+      }
+    });
+
+    // change to filtered list of submissions we're keeping.
+    group!.submissions = new_subs;
+  });
+
+  // Remove empty groups
+  Object.entries(grading_record.groups).forEach(([group_uuid, group]) => {
+    if (group!.submissions.length === 0) {
+      delete grading_record.groups[group_uuid];
+    }
+  });
+}

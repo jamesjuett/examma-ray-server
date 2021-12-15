@@ -180,7 +180,7 @@ manual_grading_router
         let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
         if (qs) {
           return res.status(200).json(<NextUngradedResponse>{
-            group_uuid: qs.claimNextUngradedGroup(userInfo.email, next_ungraded_request.client_uuid)
+            group_uuid: qs.claimNextUngradedGroup(userInfo.email, next_ungraded_request.client_uuid, next_ungraded_request.desired)
           });
         }
         else {

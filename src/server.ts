@@ -18,8 +18,74 @@ import { Exam } from "examma-ray";
 import { exams_router } from './routes/exams';
 import { manual_grading_router } from './routes/manual_grading';
 import { questions_router } from './routes/questions';
+import { getJwtUserInfo } from './auth/jwt_auth';
 
 export let EXAMMA_RAY_GRADING_SERVER: ExammaRayGradingServer;
+
+const STAFF = new Set<string>([
+  "jjuett@umich.edu",
+  "jbbeau@umich.edu",
+  "sofias@umich.edu",
+  "smolaei@umich.edu",
+  "rosendon@umich.edu",
+  "zccarey@umich.edu",
+  "rushilk@umich.edu",
+  "abifox@umich.edu",
+  "aravikum@umich.edu",
+  "akminch@umich.edu",
+  "aelhamah@umich.edu",
+  "ajamalud@umich.edu",
+  "ashvink@umich.edu",
+  "bxwang@umich.edu",
+  "ciheanyi@umich.edu",
+  "eylu@umich.edu",
+  "ellahath@umich.edu",
+  "ejzamora@umich.edu",
+  "gjac@umich.edu",
+  "gurish@umich.edu",
+  "hniswand@umich.edu",
+  "iabouara@umich.edu",
+  "schjasp@umich.edu",
+  "tranjenn@umich.edu",
+  "houghj@umich.edu",
+  "jonahnan@umich.edu",
+  "macekj@umich.edu",
+  "joshsieg@umich.edu",
+  "jcaoun@umich.edu",
+  "kamiz@umich.edu",
+  "mariamhm@umich.edu",
+  "saputran@umich.edu",
+  "nishuk@umich.edu",
+  "ptaneja@umich.edu",
+  "sjaehnig@umich.edu",
+  "yiranshi@umich.edu",
+  "tshete@umich.edu",
+  "unserh@umich.edu",
+  "vrnayak@umich.edu",
+  "qwzhao@umich.edu",
+  "wsoltas@umich.edu",
+  "zalsaedy@umich.edu",
+  "brightxu@umich.edu",
+  "metzkm@umich.edu",
+  "rnag@umich.edu",
+  "stoneann@umich.edu",
+  "schabseb@umich.edu",
+  "mkau@umich.edu",
+  "fiahmed@umich.edu",
+  "gsev@umich.edu",
+  "omidsh@umich.edu",
+]);
+
+function requireStaff(req: Request, res: Response, next: NextFunction) {
+  let userInfo = getJwtUserInfo(req);
+  if (STAFF.has(userInfo.email)) {
+    next();
+  }
+  else {
+    res.sendStatus(403);
+    console.log(`Blocked access by: ${userInfo.email}`);
+  }
+}
 
 async function main() {
 
@@ -42,6 +108,7 @@ async function main() {
     cookieParser(),
     passport.initialize(),
     passport.authenticate('jwt-cookie', { session: false }),
+    requireStaff,
     express.static("out")
   );
 
@@ -49,7 +116,8 @@ async function main() {
   // token in the request authorization header
   app.use('/api',
     passport.initialize(),
-    passport.authenticate('jwt-bearer', { session: false })
+    passport.authenticate('jwt-bearer', { session: false }),
+    requireStaff
   );
 
   // Regular API Routes
@@ -64,6 +132,7 @@ async function main() {
   app.use('/run',
     passport.initialize(),
     passport.authenticate('jwt-bearer', { session: false }),
+    requireStaff,
     run_router
   );
 
