@@ -243,6 +243,31 @@ exams_router
     }
   }));
 
+
+
+exams_router
+  .route("/:exam_id/ping")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      
+      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+      if (exam) {
+        res.status(200).json({
+          epoch: exam.epoch,
+          active_graders: exam.getActiveGraders()
+        });
+      }
+      else {
+        res.sendStatus(404);
+      }
+    }
+  }));
+
   
 
 exams_router
@@ -261,5 +286,25 @@ exams_router
       }
 
       res.status(200).json(exam.getTaskStatus());
+    }
+  }));
+
+
+
+exams_router
+  .route("/:exam_id/active_graders")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+      if (!exam) {
+        res.sendStatus(404);
+        return;
+      }
+      res.status(200).json(exam.getActiveGraders());
     }
   }));

@@ -91,20 +91,20 @@ export type ManualGradingPingResponse = {
   /**
    * Who has active browser tabs open on this question?
    */
-  active_graders: ActiveGraders
+  active_graders: ActiveQuestionGraders
 };
 
-export type ActiveGraders = {
+export type ActiveQuestionGraders = {
+  // Client ID
+  graders: {[index: string]: {
+    group_uuid?: string,
+    email: string
+  }}
+};
+
+export type ActiveExamGraders = {
   // Question ID
-  [index: string]: {
-    graders: {
-      // Client ID
-      [index: string]: {
-        group_uuid?: string,
-        email: string
-      }
-    }
-  }
+  [index: string]: ActiveQuestionGraders
 };
 
 
