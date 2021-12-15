@@ -76,7 +76,8 @@ export async function db_createManualGradingRubricItem(question_id: string, rubr
     points: rubric_item.points,
     title: rubric_item.title,
     description: rubric_item.description,
-    active: rubric_item.active
+    active: rubric_item.active,
+    sort_index: rubric_item.sort_index
   }).returning("*");
 }
 
@@ -89,7 +90,8 @@ export async function db_updateManualGradingRubricItem(question_id: string, rubr
     points: updates.points,
     description: updates.description,
     title: updates.title,
-    active: updates.active
+    active: updates.active,
+    sort_index: updates.sort_index
   });
 
 }
