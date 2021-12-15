@@ -1293,13 +1293,16 @@ class GroupThumbnailsPanel {
   }
 
   public getNextNGroups(n: number) {
+
+    let candidates = this.groupThumbnailOutlets.filter(outlet => !outlet.group.finished);
+
     let start = 0;
     if (this.app.currentGroup) {
-      start = this.groupThumbnailOutlets.findIndex(outlet => outlet.group.group_uuid === this.app.currentGroup!.group_uuid);
+      start = candidates.findIndex(outlet => outlet.group.group_uuid === this.app.currentGroup!.group_uuid);
     }
-    let outlets = this.groupThumbnailOutlets.slice(start, start + 10);
+    let outlets = candidates.slice(start, start + 10);
     if (outlets.length < n) {
-      outlets = outlets.concat(this.groupThumbnailOutlets.slice(0, n - outlets.length));
+      outlets = outlets.concat(candidates.slice(0, n - outlets.length));
     }
     return outlets.map(outlet => outlet.group.group_uuid);
   }
