@@ -50,30 +50,32 @@ export class IndexExammaRayGraderApplication {
             </li>
           `);
 
-          $(".examma-ray-run-grading-button").on("click", async function() {
-            let response = await axios({
-              url: `run/grade/${$(this).data("exam-id")}`,
-              method: "POST",
-              data: {},
-              headers: {
-                  'Authorization': 'bearer ' + app.client.getBearerToken()
-              }
-            });
-            alert(JSON.stringify(response.data));
-          });
+         
   
-          $(".examma-ray-run-reports-button").on("click", async function() {
-            let response = await axios({
-              url: `run/reports/${$(this).data("exam-id")}`,
-              method: "POST",
-              data: {},
-              headers: {
-                  'Authorization': 'bearer ' + app.client.getBearerToken()
-              }
-            });
-            alert(JSON.stringify(response.data));
+        });
+
+        $(".examma-ray-run-grading-button").on("click", async function() {
+          let response = await axios({
+            url: `run/grade/${$(this).data("exam-id")}`,
+            method: "POST",
+            data: {},
+            headers: {
+                'Authorization': 'bearer ' + app.client.getBearerToken()
+            }
           });
-  
+          alert(JSON.stringify(response.data));
+        });
+
+        $(".examma-ray-run-reports-button").on("click", async function() {
+          let response = await axios({
+            url: `run/reports/${$(this).data("exam-id")}`,
+            method: "POST",
+            data: {},
+            headers: {
+                'Authorization': 'bearer ' + app.client.getBearerToken()
+            }
+          });
+          alert(JSON.stringify(response.data));
         });
       }
       catch (e: unknown) {

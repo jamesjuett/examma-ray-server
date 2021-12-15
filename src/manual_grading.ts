@@ -30,13 +30,17 @@ export type RubricItemGradingResult = {
   notes?: string
 }
 
-export function isMeaningfulRubricItemGradingResult(gr: RubricItemGradingResult | undefined) {
-  return gr && (gr.status !== undefined && gr.status !== "off" || gr.notes)
+export function isMeaningfulRubricItemGradingResult(ri: RubricItemGradingResult | undefined) {
+  return ri && (ri.status !== undefined && ri.status !== "off" || ri.notes)
 }
 
 export type ManualGradingResult = {
   [index: string]: RubricItemGradingResult | undefined
 };
+
+export function isMeaningfulManualGradingResult(gr: ManualGradingResult | undefined) {
+  return gr && Object.values(gr).some(ri => isMeaningfulRubricItemGradingResult(ri));
+}
 
 export type ManualGradingGroupRecord = {
   // name: string,

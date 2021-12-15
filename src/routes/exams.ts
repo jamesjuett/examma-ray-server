@@ -56,7 +56,9 @@ exams_router
         await rm(uploaded_filepath, { force: true });
 
         if (EXAMMA_RAY_GRADING_SERVER.exams_by_id[new_exam_spec.exam_id]) {
-          return res.sendStatus(403);
+          // just update file
+          await writeFile(`data/${new_exam_spec.exam_id}/exam-spec.json`, JSON.stringify(new_exam_spec, null, 2), "utf8");
+          return res.sendStatus(201);
         }
         
         const exam_id = new_exam_spec.exam_id;
