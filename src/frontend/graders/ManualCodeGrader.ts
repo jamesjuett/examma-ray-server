@@ -1290,21 +1290,30 @@ class GroupThumbnailsPanel {
       return outlet
     });
     this.updateDisplayedThumbnails();
+
+    if (this.app.currentGroup) {
+      this.onGroupOpened(this.app.currentGroup);
+    }
   }
 
   public getNextNGroups(n: number) {
 
-    let candidates = this.groupThumbnailOutlets.filter(outlet => !outlet.group.finished);
+    let candidates = this.groupThumbnailOutlets;
 
-    let start = 0;
     if (this.app.currentGroup) {
-      start = candidates.findIndex(outlet => outlet.group.group_uuid === this.app.currentGroup!.group_uuid);
+      let currentGroupIndex = this.groupThumbnailOutlets.findIndex(outlet => outlet.group.group_uuid === this.app.currentGroup!.group_uuid);
+      if (currentGroupIndex != -1) {
+        // lets say current group is X:
+        // [ A B C X D E F G]
+        // This rearranges to:
+        // [ D E F G A B C]
+        candidates = candidates.slice(currentGroupIndex + 1).concat(candidates.slice(0, currentGroupIndex))
+      }
     }
-    let outlets = candidates.slice(start, start + 10);
-    if (outlets.length < n) {
-      outlets = outlets.concat(candidates.slice(0, n - outlets.length));
-    }
-    return outlets.map(outlet => outlet.group.group_uuid);
+
+    candidates = candidates.filter(outlet => !outlet.group.finished);
+
+    return candidates.slice(0, 10).map(outlet => outlet.group.group_uuid);
   }
 
   public onGroupOpened(group: ManualGradingGroupRecord) {
