@@ -922,7 +922,7 @@ class GroupGraderOutlet {
         // prefer to have it scroll so the submission is more in the middle
         let magic_offset = Math.floor(Math.max(0, 10 - n/5));
 
-        this.lobster.projectEditor.codeMirror.scrollIntoView({from: {line: line, ch: 0}, to: {line: line + n + magic_offset, ch: 0}});
+        this.lobster.projectEditor.codeMirror.scrollIntoView({from: {line: line, ch: 0}, to: {line: line + n - 1, ch: 0}});
 
         for(let i = line; i < line + n; ++i) {
           this.lobster.projectEditor.codeMirror.addLineClass(i, "background", "examma-ray-codemirror-submission");
