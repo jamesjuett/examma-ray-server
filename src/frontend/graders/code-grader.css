@@ -168,3 +168,17 @@ body {
 #lobster-exercise > .tab-content {
   height: calc(100vh - 225px) !important;
 }
+
+.examma-ray-codemirror-submission {
+  background-color: #23241f;
+}
+
+.examma-ray-codemirror-submission-first {
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+
+.examma-ray-codemirror-submission-last {
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+}

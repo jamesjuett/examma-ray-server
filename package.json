@@ -39,7 +39,7 @@
     "jsonwebtoken": "^8.5.1",
     "katex": "^0.15.1",
     "knex": "^0.95.14",
-    "lobster-vis": "^1.0.11",
+    "lobster-vis": "^1.0.12",
     "multer": "^1.4.3",
     "p-limit": "^3.1.0",
     "papaparse": "^5.3.1",
@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@types/bootstrap": "^4.6.1",
+    "@types/codemirror": "^5.60.5",
     "@types/cookie-parser": "^1.4.2",
     "@types/cors": "^2.8.9",
     "@types/debug": "^4.1.5",

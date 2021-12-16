@@ -909,6 +909,27 @@ class GroupGraderOutlet {
     if (sub) {
       let code = this.app.applyHarness(sub);
       this.lobster.project.setFileContents(new SourceFile("file.cpp", code));
+
+      // get line number of submission
+      let i = this.app.config.test_harness.indexOf("{{submission}}");
+      if (i !== -1) {
+        // number of lines
+        let line = this.app.config.test_harness.slice(0, i).split("\n").length - 1;
+        
+        // number of lines in the submission
+        let n = sub.submission.split("\n").length;
+
+        // prefer to have it scroll so the submission is more in the middle
+        let magic_offset = Math.floor(Math.max(0, 10 - n/5));
+
+        this.lobster.projectEditor.codeMirror.scrollIntoView({from: {line: line, ch: 0}, to: {line: line + n + magic_offset, ch: 0}});
+
+        for(let i = line; i < line + n; ++i) {
+          this.lobster.projectEditor.codeMirror.addLineClass(i, "background", "examma-ray-codemirror-submission");
+        }
+        this.lobster.projectEditor.codeMirror.addLineClass(line, "background", "examma-ray-codemirror-submission-first");
+        this.lobster.projectEditor.codeMirror.addLineClass(line + n - 1, "background", "examma-ray-codemirror-submission-last");
+      }
     }
     else {
       this.lobster.project.setFileContents(new SourceFile("file.cpp", "[EMPTY GROUP]"));
