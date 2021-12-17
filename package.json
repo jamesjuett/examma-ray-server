@@ -28,7 +28,7 @@
     "cors": "^2.8.5",
     "debug": "^4.3.1",
     "dotenv": "^8.2.0",
-    "examma-ray": "^1.0.239",
+    "examma-ray": "^1.0.240",
     "express": "^5.0.0-alpha.8",
     "express-validator": "^6.9.0",
     "express-winston": "^4.0.5",
