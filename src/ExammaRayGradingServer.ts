@@ -147,7 +147,8 @@ export class ServerExam {
       });
       worker.on("exit", (exitCode) => {
         if (exitCode === 0) {
-          delete this.taskStatus[task];
+          this.taskStatus[task] = "DONE";
+          setTimeout(() => this.taskStatus[task] === "DONE" && delete this.taskStatus[task], 10000);
           resolve();
         }
         else {

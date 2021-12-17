@@ -4,9 +4,11 @@ import { ExamGrader, ExamGraderOptions, ExceptionMap, GraderSpecificationMap } f
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
-import { workerData } from "worker_threads";
+import { parentPort, workerData } from "worker_threads";
 import { query } from "../db/db";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
+
+const MESSAGE_RATE_LIMIT = 1000; // ms
 
 class WebExamGrader extends ExamGrader {
   
@@ -14,14 +16,14 @@ class WebExamGrader extends ExamGrader {
     [index: string]: CodeWritingGraderData
   };
 
-  private constructor(exam: Exam, options: Partial<ExamGraderOptions> = {}, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[], grading_data: {
+  private constructor(exam: Exam, options: Partial<ExamGraderOptions> = {}, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[], onStatus?: (status: string) => void, grading_data: {
     [index: string]: CodeWritingGraderData
   } = {}) {
-    super(exam, options, graders, exceptions);
+    super(exam, options, graders, exceptions, onStatus);
     this.grading_data = grading_data;
   }
 
-  public static async create(exam: Exam, options: Partial<ExamGraderOptions> = {}, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[]) {
+  public static async create(exam: Exam, options: Partial<ExamGraderOptions> = {}, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[], onStatus?: (status: string) => void) {
     let grading_data : { [index: string]: CodeWritingGraderData } = {};
     for(let question of exam.allQuestions) {
       if (question.kind === "code_editor") {
@@ -41,7 +43,7 @@ class WebExamGrader extends ExamGrader {
         }
       }
     }
-    return new WebExamGrader(exam, options, graders, exceptions, grading_data);
+    return new WebExamGrader(exam, options, graders, exceptions, onStatus, grading_data);
   }
 
   protected override prepareGradingData(question: Question, grader: QuestionGrader) {
@@ -60,7 +62,15 @@ async function main() {
 
   const EXAM = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
   
-  const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, {});
+  let lastMessage = Date.now();
+  
+  const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, {},
+    (status: string) => {
+      if (Date.now() > lastMessage + MESSAGE_RATE_LIMIT) {
+        lastMessage = Date.now();
+        parentPort?.postMessage(status);
+      }
+    });
 
   // Load and verify answers
   console.log("loading submissions...");

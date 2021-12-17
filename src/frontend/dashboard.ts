@@ -38,6 +38,7 @@ export class DashboardExammaRayGraderApplication {
 
   private initComponents() {
     $(".examma-ray-exam-id").html(this.exam_id);
+    $("#examma-ray-grading-overview-link").attr("href", `out/${this.exam_id}/graded/overview.html`);
 
     $("#upload-roster-modal-button").on("click", async () => {
       
@@ -69,7 +70,6 @@ export class DashboardExammaRayGraderApplication {
             'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
-      alert(JSON.stringify(response.data));
     });
 
     $(".examma-ray-run-reports-button").on("click", async () => {
@@ -81,7 +81,6 @@ export class DashboardExammaRayGraderApplication {
             'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
-      alert(JSON.stringify(response.data));
     });
   }
 
@@ -96,7 +95,17 @@ export class DashboardExammaRayGraderApplication {
     });
     const task_status = <ExamTaskStatus>task_status_response.data;
 
-    $("#examma-ray-task-status").html(JSON.stringify(task_status, null, 2));
+    $("#examma-ray-task-status").html(`
+      <table>
+        ${Object.entries(task_status).map(([task, status]) => `
+          <tr>
+            <td><span class="badge badge-primary">${task}</span></td>
+            <td>${status}</td>
+          </tr>
+        `).join("")
+        }
+      </table>
+    `);
     
   }
 
