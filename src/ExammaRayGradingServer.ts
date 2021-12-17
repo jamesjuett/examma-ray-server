@@ -1,5 +1,5 @@
 import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
-import { readdirSync } from "fs";
+import { readdirSync, readFileSync } from "fs";
 import { copyFile, readFile } from "fs/promises";
 import { JwtUserInfo } from "./auth/jwt_auth";
 import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, reassignGradingGroups } from "./manual_grading";
@@ -94,14 +94,30 @@ export class ServerExam {
       }
     });
 
-    this.taskStatus.generate = `Preparing to generate ${roster.length} exams...`;
+    await this.workerTask(worker, "generate", `Preparing to generate ${roster.length} exams...`);
+  }
 
-    await this.workerTask(worker, "generate");
+  public async gradeExams(reports: boolean) {
+    
+    console.log(reports ? "Grading...".bgBlue : "Generating grading reports...".bgBlue);
+
+    const grader_spec = {
+      uuid_strategy: "uuidv5",
+      uuidv5_namespace: readFileSync(`data/${this.exam.exam_id}/secret`, "utf-8"),
+      frontend_js_path: "js/frontend-graded.js",
+    };
+
+    const worker = new Worker("./build/run/grade.js", {
+      workerData: {
+        exam_id: this.exam.exam_id,
+        grader_spec: grader_spec,
+        reports: reports
+      }
+    });
+    await this.workerTask(worker, "grade", "Preparing to grade submissions...");
   }
 
   public async addSubmissions(files: readonly Express.Multer.File[]) {
-
-    this.taskStatus.generate = `Adding submissions...`;
 
     // Files will have been uploaded to "/uploads" and information about
     // each is in the files object. We'll pass this off to a worker
@@ -113,7 +129,7 @@ export class ServerExam {
       }
     });
 
-    await this.workerTask(worker, "submissions");
+    await this.workerTask(worker, "submissions", "Preparing to add submissions...");
     await this.nextEpoch();
 
     // All question grading servers will need to reload new submission
@@ -121,7 +137,8 @@ export class ServerExam {
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
   }
 
-  private workerTask(worker: Worker, task: keyof ExamTaskStatus) {
+  private workerTask(worker: Worker, task: keyof ExamTaskStatus, initial_status: string) {
+    this.taskStatus[task] = initial_status;
     return new Promise<void>((resolve, reject) => {
       worker.on("message", (status: string) => this.taskStatus[task] = status)
       worker.on("error", () => {

@@ -58,6 +58,31 @@ export class DashboardExammaRayGraderApplication {
 
       $("#upload-roster-modal").modal("hide");
     });
+
+    
+    $(".examma-ray-run-grading-button").on("click", async () => {
+      let response = await axios({
+        url: `run/grade/${this.exam_id}`,
+        method: "POST",
+        data: {},
+        headers: {
+            'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      });
+      alert(JSON.stringify(response.data));
+    });
+
+    $(".examma-ray-run-reports-button").on("click", async () => {
+      let response = await axios({
+        url: `run/reports/${this.exam_id}`,
+        method: "POST",
+        data: {},
+        headers: {
+            'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      });
+      alert(JSON.stringify(response.data));
+    });
   }
 
   private async checkTaskStatus() {

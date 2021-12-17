@@ -97,27 +97,19 @@ export function createGradeRoute(reports: boolean) {
     validation: [
       validateParamExamId
     ],
-    handler: async (req: Request, res: Response) => {
+    handler: (req: Request, res: Response) => {
       const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
       if (!exam) {
         res.sendStatus(404);
         return;
       }
 
-      const grader_spec = {
-        uuid_strategy: "uuidv5",
-        uuidv5_namespace: readFileSync(`data/${exam?.exam.exam_id}/secret`, "utf-8"),
-        frontend_js_path: "js/frontend-graded.js",
-      };
+      if (exam.taskStatus["grade"]) {
+        res.status(200).json("A grading task is already running. Please wait for it to finish.");
+        return;
+      }
 
-      const worker = new Worker("./build/run/grade.js", {
-        workerData: {
-          exam_id: exam.exam.exam_id,
-          grader_spec: grader_spec,
-          reports: reports
-        }
-      });
-      
+      exam.gradeExams(reports);
       res.status(200).json(reports ? "Report generation started..." : "Grading run started...");
     }
   })

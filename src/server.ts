@@ -73,6 +73,7 @@ const STAFF = new Set<string>([
   "mkau@umich.edu",
   "fiahmed@umich.edu",
   "gsev@umich.edu",
+  "patis@umich.edu",
   "omidsh@umich.edu",
 ]);
 

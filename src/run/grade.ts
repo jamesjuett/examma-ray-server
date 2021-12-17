@@ -5,6 +5,7 @@ import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
 import { workerData } from "worker_threads";
+import { query } from "../db/db";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
 
 class WebExamGrader extends ExamGrader {
@@ -78,6 +79,8 @@ async function main() {
   if (reports) {
     EXAM_GRADER.writeReports();
   }
+  
+  await query.destroy();
   
 }
 

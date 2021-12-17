@@ -45,8 +45,6 @@ export class IndexExammaRayGraderApplication {
           $(".examma-ray-exams-list").append(`
             <li>
               <a href="dashboard.html?exam-id=${exam_id}">${exam_id}: ${exam_spec.title}</a>
-              <button class="btn btn-success examma-ray-run-grading-button" data-exam-id="${exam_id}">Run Grading</button>
-              <button class="btn btn-success examma-ray-run-reports-button" data-exam-id="${exam_id}">Generate Grading Reports</button>
             </li>
           `);
 
@@ -54,29 +52,6 @@ export class IndexExammaRayGraderApplication {
   
         });
 
-        $(".examma-ray-run-grading-button").on("click", async function() {
-          let response = await axios({
-            url: `run/grade/${$(this).data("exam-id")}`,
-            method: "POST",
-            data: {},
-            headers: {
-                'Authorization': 'bearer ' + app.client.getBearerToken()
-            }
-          });
-          alert(JSON.stringify(response.data));
-        });
-
-        $(".examma-ray-run-reports-button").on("click", async function() {
-          let response = await axios({
-            url: `run/reports/${$(this).data("exam-id")}`,
-            method: "POST",
-            data: {},
-            headers: {
-                'Authorization': 'bearer ' + app.client.getBearerToken()
-            }
-          });
-          alert(JSON.stringify(response.data));
-        });
       }
       catch (e: unknown) {
         // no courses listed
