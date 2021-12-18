@@ -26,7 +26,7 @@ class WebExamGrader extends ExamGrader {
   public static async create(exam: Exam, options: Partial<ExamGraderOptions> = {}, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[], onStatus?: (status: string) => void) {
     let grading_data : { [index: string]: CodeWritingGraderData } = {};
     for(let question of exam.allQuestions) {
-      if (question.kind === "code_editor") {
+      // if (question.kind === "code_editor") {
         let rubric = await db_getManualGradingRubric(question.question_id);
         let records = await db_getManualGradingRecords(question.question_id);
         let submission_results: CodeWritingGraderSubmissionResult[] = Object.values(records.groups).flatMap(
@@ -41,7 +41,7 @@ class WebExamGrader extends ExamGrader {
           rubric: rubric,
           submission_results: submission_results
         }
-      }
+      // }
     }
     return new WebExamGrader(exam, options, graders, exceptions, onStatus, grading_data);
   }
