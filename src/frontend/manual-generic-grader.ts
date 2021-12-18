@@ -1,9 +1,9 @@
 import queryString from "query-string";
 import { assert } from "../util/util";
 import { ExammaRayGraderClient } from "./Application";
-import { CodeSubmissionComponent } from "./CodeSubmissionComponent";
 import { ManualCodeGraderApp } from "./graders/ManualCodeGrader";
 import { ManualGraderApp } from "./ManualGrader";
+import { QuestionSubmissionComponent } from "./QuestionSubmissionComponent";
 
 async function main() {
 
@@ -13,7 +13,7 @@ async function main() {
   const QUESTION_ID = qs["question_id"];
   assert(typeof EXAM_ID === "string");
   assert(typeof QUESTION_ID === "string");
-  const app = await ManualGraderApp.create(CodeSubmissionComponent, EXAM_ID, QUESTION_ID);
+  const app = await ManualGraderApp.create(QuestionSubmissionComponent, EXAM_ID, QUESTION_ID);
 
 }
 

@@ -110,8 +110,8 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      const question_spec = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.exam.allQuestions.find(q => q.question_id === req.params["question_id"]);
-      return question_spec ? res.status(200).json(question_spec) : res.sendStatus(404);
+      const question = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.exam.allQuestions.find(q => q.question_id === req.params["question_id"]);
+      return question ? res.status(200).json(question.spec) : res.sendStatus(404);
     }
   }));
 
