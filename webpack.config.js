@@ -6,6 +6,7 @@ module.exports = {
     'index': './src/frontend/index',
     'dashboard': './src/frontend/dashboard',
     'manual-code-grader': './src/frontend/manual-code-grader',
+    'manual-generic-grader': './src/frontend/manual-generic-grader',
   },
   output: {
     path: path.join(__dirname, '/public/js/'),
