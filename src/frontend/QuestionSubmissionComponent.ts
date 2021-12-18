@@ -59,14 +59,18 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
   
 
   public renderSubmissionThumbnail(sub: ManualGradingSubmission) {
-    let thumbElem = $(`<div></div>`);
-    thumbElem.html(this.app.question.renderResponse(uuidv4(), this.app.skins[sub.skin_id]));
-    fill_response(
-      thumbElem,
-      this.app.question.response.kind,
-      parse_submission(this.app.question.response.kind, sub.submission)
-    );
-    return thumbElem.html();
+
+    return `Submission Encoding:<br /><pre><code>${sub.submission}</code></pre>`;
+
+    // rendering the question element each time is too slow
+    // let thumbElem = $(`<div></div>`);
+    // thumbElem.html(this.app.question.renderResponse(uuidv4(), this.app.skins[sub.skin_id]));
+    // fill_response(
+    //   thumbElem,
+    //   this.app.question.response.kind,
+    //   parse_submission(this.app.question.response.kind, sub.submission)
+    // );
+    // return thumbElem.html();
   }
 
 
