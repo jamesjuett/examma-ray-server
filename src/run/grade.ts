@@ -1,10 +1,12 @@
 // import minimist from "minimist";
 import { Exam, Question, QuestionGrader } from "examma-ray";
+import { IndividualizedNormalCurve } from "examma-ray/dist/core/ExamCurve";
 import { ExamGrader, ExamGraderOptions, ExceptionMap, GraderSpecificationMap } from "examma-ray/dist/ExamGrader";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
 import { parentPort, workerData } from "worker_threads";
+import { RunGradingRequest } from "../dashboard";
 import { query } from "../db/db";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
 
@@ -58,7 +60,7 @@ class WebExamGrader extends ExamGrader {
 async function main() {
   const exam_id : string = workerData.exam_id;
   const grader_spec : ExamGraderOptions = workerData.grader_spec;
-  const reports : boolean = workerData.reports;
+  const run_request : RunGradingRequest = workerData.run_request;
 
   const EXAM = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
   
@@ -80,13 +82,13 @@ async function main() {
   console.log("grading submissions...");
   EXAM_GRADER.gradeAll();
   
-  // if (CURVE) {
-  //   EXAM_GRADER.applyCurve(CURVE);
-  // }
+  if (run_request.curve) {
+    EXAM_GRADER.applyCurve(new IndividualizedNormalCurve(EXAM_GRADER.stats, run_request.target_mean, run_request.target_stddev, true));
+  }
 
   EXAM_GRADER.writeAll();
   
-  if (reports) {
+  if (run_request.reports) {
     EXAM_GRADER.writeReports();
   }
   

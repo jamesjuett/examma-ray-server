@@ -1,9 +1,10 @@
 import { Request, Response, Router } from "express";
 import { query } from "../db/db";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParam } from "./common";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam } from "./common";
 import { Worker } from "worker_threads";
 import { readFileSync } from "fs";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
+import { RunGradingRequest } from "../dashboard";
 const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, max: 100});
 // const validateParamTerm = validateParam("term").isIn(["fall", "winter", "spring", "summer"]);
 // const validateParamYear = validateParam("year").isInt();
@@ -90,37 +91,38 @@ const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, ma
 //   }
 // });
 
-export function createGradeRoute(reports: boolean) {
-  return createRoute({
-    authorization: NO_AUTHORIZATION, // requireSuperUser,
-    preprocessing: NO_PREPROCESSING,
-    validation: [
-      validateParamExamId
-    ],
-    handler: (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
-      if (!exam) {
-        res.sendStatus(404);
-        return;
-      }
-
-      if (exam.taskStatus["grade"]) {
-        res.status(200).json("A grading task is already running. Please wait for it to finish.");
-        return;
-      }
-
-      exam.gradeExams(reports);
-      res.status(200).json(reports ? "Report generation started..." : "Grading run started...");
-    }
-  })
-}
 
 export const run_router = Router();
 run_router
   .route("/grade/:exam_id")
-    .post(createGradeRoute(false));
-run_router
-  .route("/reports/:exam_id")
-    .post(createGradeRoute(true));
+    .post(createRoute({
+      authorization: NO_AUTHORIZATION,
+      preprocessing: jsonBodyParser,
+      validation: [
+        validateParamExamId,
+        validateBody("reports").isBoolean({strict: true}),
+        validateBody("curve").isBoolean({strict: true}),
+        validateBody("target_mean").isNumeric().optional(),
+        validateBody("target_stddev").isNumeric().optional(),
+      ],
+      handler: (req: Request, res: Response) => {
+
+        let run_request = <RunGradingRequest>req.body;
+
+        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+        if (!exam) {
+          res.sendStatus(404);
+          return;
+        }
+  
+        if (exam.taskStatus["grade"]) {
+          res.status(200).json("A grading task is already running. Please wait for it to finish.");
+          return;
+        }
+  
+        exam.gradeExams(run_request);
+        res.status(200).json(run_request.reports ? "Report generation started..." : "Grading run started...");
+      }
+    }));
 
 

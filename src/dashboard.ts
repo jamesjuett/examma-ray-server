@@ -31,3 +31,15 @@ export type ExamPingResponse = {
   epoch: number,
   active_graders: ActiveExamGraders
 };
+
+
+
+export type RunGradingRequest = {
+  reports: boolean,
+  curve: false,
+} | {
+  reports: boolean,
+  curve: true,
+  target_mean: number,
+  target_stddev: number
+};

@@ -11,6 +11,7 @@ import { db_getExamEpoch, db_nextExamEpoch } from "./db/db_exams";
 import { WorkerData_Generate } from "./run/types";
 import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
 import { db_createCodeGraderConfig, db_createGroup, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
+import { RunGradingRequest } from "./dashboard";
 
 const GRADER_IDLE_THRESHOLD = 4000; // ms
 
@@ -97,9 +98,9 @@ export class ServerExam {
     await this.workerTask(worker, "generate", `Preparing to generate ${roster.length} exams...`);
   }
 
-  public async gradeExams(reports: boolean) {
+  public async gradeExams(run_request: RunGradingRequest) {
     
-    console.log(reports ? "Grading...".bgBlue : "Generating grading reports...".bgBlue);
+    console.log(run_request.reports ? "Grading...".bgBlue : "Generating grading reports...".bgBlue);
 
     const grader_spec = {
       uuid_strategy: "uuidv5",
@@ -111,7 +112,7 @@ export class ServerExam {
       workerData: {
         exam_id: this.exam.exam_id,
         grader_spec: grader_spec,
-        reports: reports
+        run_request: run_request
       }
     });
     await this.workerTask(worker, "grade", "Preparing to grade submissions...");

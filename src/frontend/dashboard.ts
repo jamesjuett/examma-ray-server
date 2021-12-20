@@ -2,7 +2,7 @@ import avatar from "animal-avatar-generator";
 import axios from "axios";
 import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import queryString from "query-string";
-import { ExamPingResponse, ExamSubmissionRecord } from "../dashboard";
+import { ExamPingResponse, ExamSubmissionRecord, RunGradingRequest } from "../dashboard";
 import { ExamTaskStatus } from "../ExammaRayGradingServer";
 import { asMutable, assert } from "../util/util";
 import { ExammaRayGraderClient } from "./Application";
@@ -61,27 +61,26 @@ export class DashboardExammaRayGraderApplication {
     });
 
     
-    $(".examma-ray-run-grading-button").on("click", async () => {
+    $("#run-grading-submit-button").on("click", async () => {
+      const request: RunGradingRequest = {
+        reports: $("#run-grading-input-reports").is(":checked"),
+        curve: $("#run-grading-input-curve").is(":checked"),
+        target_mean: parseFloat(""+$("#run-grading-input-curve-target-mean").val()),
+        target_stddev: parseFloat(""+$("#run-grading-input-curve-target-stddev").val()),
+      };
+
       let response = await axios({
         url: `run/grade/${this.exam_id}`,
         method: "POST",
-        data: {},
+        data: request,
         headers: {
             'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
+
+      $("#run-grading-modal").modal("hide");
     });
 
-    $(".examma-ray-run-reports-button").on("click", async () => {
-      let response = await axios({
-        url: `run/reports/${this.exam_id}`,
-        method: "POST",
-        data: {},
-        headers: {
-            'Authorization': 'bearer ' + this.client.getBearerToken()
-        }
-      });
-    });
   }
 
   private async checkTaskStatus() {
