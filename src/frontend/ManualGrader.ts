@@ -1054,6 +1054,7 @@ class GroupThumbnailsPanel {
   
   private groupThumbnailOutlets: GroupThumbnailOutlet[] = [];
 
+  private submissionsUniqnameFilter? : string;
   private submissionsFilterCriterion : SubmissionsFilterCriterion = "all";
   private submissionsSortCriteria : SubmissionsSortCriterion = "name";
   private submissionsSortOrdering : SubmissionsSortOrdering = "asc";
@@ -1078,22 +1079,27 @@ class GroupThumbnailsPanel {
   private initComponents() {
     
     const self = this;
+
+    $("#examma-ray-submissions-uniqname-filter").on("input", function() {
+      self.setSubmissionsUniqnameFilter($(this).val()?.toString() ?? "")
+    });
+
     $(".examma-ray-submissions-filter-button").on("click", function() {
-        $(".examma-ray-submissions-filter-button").removeClass("btn-primary").addClass("btn-default");
-        $(this).removeClass("btn-default").addClass("btn-primary");
-        self.setSubmissionsFilterCriterion($(this).data("filter-criterion"))
+      $(".examma-ray-submissions-filter-button").removeClass("btn-primary").addClass("btn-default");
+      $(this).removeClass("btn-default").addClass("btn-primary");
+      self.setSubmissionsFilterCriterion($(this).data("filter-criterion"))
     });
   
     $(".examma-ray-submissions-sort-button").on("click", function() {
-        $(".examma-ray-submissions-sort-button").removeClass("btn-primary").addClass("btn-default");
-        $(this).removeClass("btn-default").addClass("btn-primary");
-        self.setSubmissionsSortCriterion($(this).data("sort-criterion"))
+      $(".examma-ray-submissions-sort-button").removeClass("btn-primary").addClass("btn-default");
+      $(this).removeClass("btn-default").addClass("btn-primary");
+      self.setSubmissionsSortCriterion($(this).data("sort-criterion"))
     });
   
     $(".examma-ray-submissions-sort-ordering-button").on("click", function() {
-        $(".examma-ray-submissions-sort-ordering-button").removeClass("btn-primary").addClass("btn-default");
-        $(this).removeClass("btn-default").addClass("btn-primary");
-        self.setSubmissionsSortOrdering($(this).data("sort-ordering"));
+      $(".examma-ray-submissions-sort-ordering-button").removeClass("btn-primary").addClass("btn-default");
+      $(this).removeClass("btn-default").addClass("btn-primary");
+      self.setSubmissionsSortOrdering($(this).data("sort-ordering"));
     });
   }
 
@@ -1106,13 +1112,17 @@ class GroupThumbnailsPanel {
     this.groupThumbnailOutlets = Object.values(this.app.grading_records.groups).map(group => {
       let outlet = new GroupThumbnailOutlet(this.app, $("<div></div>"), group!);
       this.groupThumbnailOutletsMap[group!.group_uuid] = outlet;
-      return outlet
+      return outlet;
     });
     this.updateDisplayedThumbnails();
 
     if (this.app.currentGroup) {
       this.onGroupOpened(this.app.currentGroup);
     }
+
+    $("#examma-ray-submissions-uniqname-list").html(
+      this.groupThumbnailOutlets.flatMap(gout => gout.group.submissions.map(sub => `<option value="${sub.uniqname}">`)).join("\n")
+    );
   }
 
   public getNextNGroups(n: number) {
@@ -1143,6 +1153,11 @@ class GroupThumbnailsPanel {
     this.groupThumbnailOutletsMap[group.group_uuid]?.onGroupClosed();
   }
 
+  public setSubmissionsUniqnameFilter(uniqname: string) {
+    this.submissionsUniqnameFilter = uniqname;
+    this.updateDisplayedThumbnails();
+  }
+
   public setSubmissionsFilterCriterion(criterion: SubmissionsFilterCriterion) {
     this.submissionsFilterCriterion = criterion;
     this.updateDisplayedThumbnails();
@@ -1165,6 +1180,7 @@ class GroupThumbnailsPanel {
 
     // Attached filtered, sorted, elements
     this.groupThumbnailOutlets = Object.values(this.groupThumbnailOutletsMap).map(to => to!.group)
+      .filter(group => !this.submissionsUniqnameFilter || group.submissions.find(sub => sub.uniqname === this.submissionsUniqnameFilter))
       .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
       .sort(this.SUBMISSION_SORTS[this.submissionsSortCriteria])
       .map(group => this.groupThumbnailOutletsMap[group.group_uuid]!);

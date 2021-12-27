@@ -1,8 +1,6 @@
 import queryString from "query-string";
 import { assert } from "../util/util";
-import { ExammaRayGraderClient } from "./Application";
 import { CodeSubmissionComponent } from "./CodeSubmissionComponent";
-import { ManualCodeGraderApp } from "./graders/ManualCodeGrader";
 import { ManualGraderApp } from "./ManualGrader";
 
 async function main() {

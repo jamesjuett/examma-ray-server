@@ -1,7 +1,5 @@
 import queryString from "query-string";
 import { assert } from "../util/util";
-import { ExammaRayGraderClient } from "./Application";
-import { ManualCodeGraderApp } from "./graders/ManualCodeGrader";
 import { ManualGraderApp } from "./ManualGrader";
 import { QuestionSubmissionComponent } from "./QuestionSubmissionComponent";
 
