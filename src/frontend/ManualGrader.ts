@@ -716,22 +716,32 @@ class GroupGraderOutlet {
   }
 
   private initHotkeys() {
-    hotkeys('1,2,3,4,5,6,7,8,9', (event, handler) => {
 
-      // do nothing if any modal is open
-      if ($(".modal.in").length > 0) {
-        return;
-      }
+    // Note that this needs to match against "*", rather than "1,2,3,4,5,6,7,8,9"
+    // because the latter will only match against key events where they numeric
+    // key is the ONLY thing currently pressed. This causes issues for graders that
+    // use a "rolling" style where they press hotkeys in quick succession with
+    // multiple fingers, where the next hotkey wouldn't be registered if the previous
+    // key hadn't yet been fully released.
+    hotkeys("*", (event, handler) => {
 
       // do nothing if modifier keys are held
       if (event.ctrlKey || event.shiftKey || event.altKey) {
         return;
       }
       
-      let num = parseInt(handler.key);
+      let key = parseInt(event.key);
+      if (Number.isNaN(key) || key < 0 || key > 9) {
+        return; // It wasn't a numeric hotkey (or was somehow not 0-9 idk if that's possible lol)
+      }
+
+      // do nothing if any modal is open
+      if ($(".modal.in").length > 0) {
+        return;
+      }
 
       Object.values(this.rubricItemOutlets).forEach(ri => {
-        if (ri!.display_index === num) {
+        if (ri!.display_index === key) {
           this.toggleRubricItem(ri!.rubricItem.rubric_item_uuid);
         }
       });
