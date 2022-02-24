@@ -31,6 +31,8 @@ import { Simulation } from "lobster-vis/dist/js/core/Simulation";
 
 import hotkeys from "hotkeys-js";
 import { ManualGradingSubmissionComponent, ManualGraderApp } from "./ManualGrader";
+import { parse_submission } from "examma-ray/dist/response/responses";
+import { BLANK_SUBMISSION } from "examma-ray/dist/response/common";
 
 
 
@@ -121,7 +123,22 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
 
   public applyHarness(sub: ManualGradingSubmission) {
 
-    let code = this.app.config.test_harness.replace("{{submission}}", indentString(sub.submission, 4));
+    let code = this.app.config.test_harness;
+    if (this.app.question.kind === "fill_in_the_blank") {
+      let parsed = parse_submission("fill_in_the_blank", sub.submission);
+      if (parsed === BLANK_SUBMISSION) {
+        parsed = [];
+      }
+      parsed.forEach((blankSub, i) => {
+        code = code.replace(`{{submission[${i}]}}`, blankSub);
+      });
+      // replace any remaining
+      code = code.replace(/\{\{submission\[.*\]\}\}/gi, "");
+
+    }
+    else {
+      code = code.replace("{{submission}}", indentString(sub.submission, 4));
+    }
 
     code = code.replace(/vector\s*\<\s*Topping\s*\>/gi, "VectorOfTopping");
     code = code.replace(/vector\s*\<\s*Sundae\s*\>/gi, "VectorOfSundae");
