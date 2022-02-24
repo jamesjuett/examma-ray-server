@@ -123,6 +123,10 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
 
     let code = this.app.config.test_harness.replace("{{submission}}", indentString(sub.submission, 4));
 
+    code = code.replace(/vector\s*\<\s*Topping\s*\>/gi, "VectorOfTopping");
+    code = code.replace(/vector\s*\<\s*Sundae\s*\>/gi, "VectorOfSundae");
+    code = code.replace(/vector\s*\<\s*Ingredient\s*\>/gi, "VectorOfIngredient");
+    code = code.replace(/vector\s*\<\s*Sandwich\s*\>/gi, "VectorOfSandwich");
     code = applySkin(code, this.app.skins[sub.skin_id]);
     return code;
   }
