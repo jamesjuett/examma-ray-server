@@ -96,7 +96,7 @@ async function main() {
   // // const EXAM_GENERATOR_INDIVIDUAL = new ExamGenerator(EXAM, {
   // //   uuid_strategy: "uuidv5",
   // //   uuidv5_namespace: readFileSync(`data/${exam_id}/secret`, "utf-8"),
-  // //   frontend_js_path: "js/frontend.js"
+  // //   frontend_js_path: "js"
   // // });
   
   // // EXAM_GENERATOR_INDIVIDUAL.assignExams(ExamUtils.loadCSVRoster(`data/${exam_id}/roster.csv`)),

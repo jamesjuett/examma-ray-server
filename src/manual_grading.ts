@@ -3,7 +3,8 @@ import { ExamComponentSkin } from "examma-ray";
 export type ManualCodeGraderConfiguration = {
   question_id: string,
   test_harness: string,
-  grouping_function: string
+  grouping_function: string,
+  // replacements: {[index: string]: string}
 };
 
 
