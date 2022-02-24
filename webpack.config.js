@@ -56,6 +56,9 @@ module.exports = {
     extensions: ['.tsx', '.ts', '.js'],
     alias: {
       handlebars: 'handlebars/dist/handlebars.min.js'
+    },
+    fallback: {
+      "path": require.resolve("path-browserify")
     }
   }
 };

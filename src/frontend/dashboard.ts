@@ -200,8 +200,14 @@ export class DashboardExammaRayGraderApplication {
       $("#examma-ray-question-grading-list").html(
         this.exam!.allQuestions
           .filter(q => q.response.kind === "code_editor")
-          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join(""));
-      
+          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("")
+        + 
+        this.exam!.allQuestions
+        .filter(q => q.response.kind !== "code_editor" && q.response.default_grader?.grader_kind === "manual_code_writing")
+        .map(q => `<li><a href="manual-generic-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("")
+
+      );
+        
     }
     catch(e: unknown) {
       alert("Error loading question :(");

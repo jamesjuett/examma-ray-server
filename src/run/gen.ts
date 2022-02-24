@@ -1,5 +1,5 @@
 // import minimist from "minimist";
-import { Exam } from "examma-ray";
+import { Exam, OriginalExamRenderer } from "examma-ray";
 import { ExamGenerator } from "examma-ray/dist/ExamGenerator";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { parentPort, workerData as workerDataUntyped } from "worker_threads";
@@ -29,7 +29,8 @@ function main() {
   );
   
   EXAM_GENERATOR_INDIVIDUAL.assignExams(workerData.roster),
-  EXAM_GENERATOR_INDIVIDUAL.writeAll("out", "data");
+  
+  EXAM_GENERATOR_INDIVIDUAL.writeAll(new OriginalExamRenderer(), "out", "data");
 }
 
 main();
