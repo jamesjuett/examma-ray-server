@@ -90,7 +90,7 @@ export class ServerExam {
         gen_spec: {
           uuid_strategy: "uuidv5",
           uuidv5_namespace: secret,
-          frontend_js_path: "js/frontend.js"
+          frontend_js_path: "js"
         }
       }
     });
