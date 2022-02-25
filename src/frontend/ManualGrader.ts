@@ -766,8 +766,11 @@ class GroupGraderOutlet {
     $(".examma-ray-grading-group-name").html(group.group_uuid);
     $(".examma-ray-grading-group-num-members").html(""+group.submissions.length);
 
+    let sub = group.submissions[0];
+    let skin = sub ? this.app.skins[sub.skin_id] : undefined;
     let gr = this.app.currentGroup?.grading_result;
     this.app.rubric?.forEach((ri, i) => this.rubricItemOutlets[ri.rubric_item_uuid]
+      ?.updateSkin(skin)
       ?.updateStatus(gr && gr[ri.rubric_item_uuid]?.status)
       .updateNotes(gr && gr[ri.rubric_item_uuid]?.notes)
       .clearHighlights());
@@ -966,7 +969,7 @@ class RubricItemOutlet {
     return this;
   }
 
-  public updateSkin(skin: ExamComponentSkin) {
+  public updateSkin(skin: ExamComponentSkin | undefined) {
     this.skin = skin;
     this.refreshContent();
     return this;
