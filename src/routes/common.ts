@@ -56,3 +56,7 @@ export const NO_AUTHORIZATION = [] as readonly never[];
 export function validateParamExammaRayId(param_name: string) {
   return validateParam(param_name).trim().isLength({min: 1, max: 100});
 }
+
+export function validateParamUuid(param_name: string) {
+  return validateParam(param_name).trim().isUUID();
+}

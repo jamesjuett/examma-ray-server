@@ -191,11 +191,27 @@ export class DashboardExammaRayGraderApplication {
         ${s.submission
           ? `
             <a class="btn btn-sm btn-primary" href="out/${this.exam?.exam_id}/exams/${s.uniqname}-${s.submission.uuid}.html">Exam</a>
+            <a class="btn btn-sm btn-danger examma-ray-delete-submission-button" data-submission-uuid="${s.submission.uuid}">Delete</a>
           `
           : "[no submission]"
-      
         }
       </li>`).join(""));
+
+      const self = this;
+      $(".examma-ray-students-list .examma-ray-delete-submission-button").on("click", async function() {
+
+        if (!self.exam) { return; }
+
+        await axios({
+          url: `api/exams/${self.exam.exam_id}/submissions/${$(this).data("submission-uuid")}`,
+          method: "DELETE",
+          headers: {
+            'Authorization': 'bearer ' + self.client.getBearerToken(),
+          },
+        });
+
+        self.sendPing();
+      });
 
       $("#examma-ray-question-grading-list").html(
         this.exam!.allQuestions

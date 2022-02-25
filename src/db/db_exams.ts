@@ -36,6 +36,10 @@ export async function db_getExamSubmissionByUuid(exam_uuid: string) {
   return await query("exam_submissions").where({uuid: exam_uuid}).select().first();
 }
 
+export async function db_deleteExamSubmissionByUuid(exam_uuid: string) {
+  return await query("exam_submissions").where({uuid: exam_uuid}).delete();
+}
+
 export async function db_addExamSubmission(submission: TrustedExamSubmission) {
   return await query("exam_submissions").insert({
     uuid: submission.uuid,

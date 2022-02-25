@@ -90,6 +90,12 @@ export async function db_setSubmissionGroup(submission_uuid: string, group_uuid:
   });
 }
 
+export async function db_deleteQuestionSubmissionByUniqname(uniqname: string) {
+  return await query("manual_grading_submissions").where({
+    uniqname: uniqname
+  }).delete();
+}
+
 // export async function getSubmissionGroups(question_id: string) {
 //   const submissions = await query("manual_grading_submissions").where({
 //     question_id: question_id

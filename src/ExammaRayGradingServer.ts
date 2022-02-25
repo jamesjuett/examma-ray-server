@@ -1,16 +1,16 @@
-import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
+import { AssignedExam, Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { readdirSync, readFileSync } from "fs";
-import { copyFile, readFile } from "fs/promises";
+import { copyFile, readFile, rm } from "fs/promises";
 import { JwtUserInfo } from "./auth/jwt_auth";
 import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, reassignGradingGroups } from "./manual_grading";
 import { asMutable, assert, assertExists, assertFalse, assertNever } from "./util/util";
 import { Worker } from "worker_threads";
 import { ExamGeneratorSpecification } from "examma-ray/dist/ExamGenerator";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
-import { db_getExamEpoch, db_nextExamEpoch } from "./db/db_exams";
+import { db_deleteExamSubmissionByUuid, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
 import { WorkerData_Generate } from "./run/types";
 import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
-import { db_createCodeGraderConfig, db_createGroup, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
+import { db_createCodeGraderConfig, db_createGroup, db_deleteQuestionSubmissionByUniqname, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
 import { RunGradingRequest } from "./dashboard";
 
 const GRADER_IDLE_THRESHOLD = 4000; // ms
@@ -135,6 +135,30 @@ export class ServerExam {
 
     // All question grading servers will need to reload new submission
     // data from the DB
+    await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
+  }
+  
+  public async deleteSubmissionByUuid(submission_uuid: string) {
+
+    let exam_submission = await db_getExamSubmissionByUuid(submission_uuid);
+
+    if (!exam_submission) {
+      // exam didn't exist, nothing to do
+      return;
+    }
+
+    // Remove exam submission from DB
+    await db_deleteExamSubmissionByUuid(exam_submission.uuid);
+
+    // Remove all associated question submission info and grading records from the DB
+    await db_deleteQuestionSubmissionByUniqname(exam_submission.uniqname);
+    
+    // Remove our stored copy of the submission file
+    await rm(`data/${exam_submission.exam_id}/submissions/${exam_submission.uniqname}-submission.json`, { force: true });
+
+    await this.nextEpoch();
+
+    // All question grading servers will need to reload new submission data from the DB
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
   }
 
@@ -401,7 +425,7 @@ export class QuestionGradingServer {
     asMutable(this).grading_record = await db_getManualGradingRecords(this.question_id);
 
     // Reload skins (may come with new submissions added to DB)
-    asMutable(this).skins = {};
+    asMutable(this).skins = await loadSkins(this.question_id);
 
     // New grading epoch to represent new data in the DB
     await db_setManualGradingQuestion(this.question_id, ++this.grading_record.grading_epoch);

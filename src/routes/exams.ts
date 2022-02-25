@@ -5,7 +5,7 @@ import multer from "multer";
 import { Worker } from "worker_threads";
 import { db_createExam, db_getExamEpoch, db_getSubmissionsList } from "../db/db_exams";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParamExammaRayId } from "./common";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParamExammaRayId, validateParamUuid } from "./common";
 
 // const upload = multer({
 //   storage: multer.diskStorage({
@@ -128,6 +128,49 @@ exams_router
     handler: async (req: Request, res: Response) => {
       const exam_id = req.params["exam_id"];
       res.status(200).json(await db_getSubmissionsList(exam_id));
+    }
+  }))
+  .post(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: [
+      upload.array("submissions"),
+      async (req: Request, res: Response) => {
+        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+        if (!exam) {
+          res.sendStatus(404);
+          return;
+        }
+
+        req.files && exam.addSubmissions(<Express.Multer.File[]>req.files);
+
+        res.sendStatus(200);
+      }
+    ]
+  }));
+
+exams_router
+  .route("/:exam_id/submissions/:submission_uuid")
+  .delete(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id"),
+      validateParamUuid("submission_uuid"),
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+      if (!exam) {
+        res.sendStatus(404);
+        return;
+      }
+
+      await exam.deleteSubmissionByUuid(req.params["submission_uuid"]);
+
+      res.sendStatus(204);
     }
   }))
   .post(createRoute({

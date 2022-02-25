@@ -88,7 +88,7 @@ async function main() {
         }
       });
 
-      rmSync(`uploads${file.filename}`, { force: true });
+      rmSync(`uploads/${file.filename}`, { force: true });
     }
     else {
       toProcess.push({filepath: `uploads/${file.filename}`, originalFilename: file.originalname});
