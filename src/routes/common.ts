@@ -2,7 +2,7 @@ import express, { NextFunction, Request, RequestHandler, Response } from 'expres
 import { param as validateParam, ValidationChain, validationResult } from 'express-validator';
 
 // Body parsers
-export const jsonBodyParser = express.json();
+export const jsonBodyParser = express.json({limit: "10MB"});
 export const urlencodedBodyParser = express.urlencoded({ extended: false });
 
 export { body as validateBody, param as validateParam } from 'express-validator';
