@@ -24,6 +24,7 @@ export interface ManualGradingSubmissionComponent {
   updateDisplayedSubmission() : void;
   renderSubmissionThumbnail(sub: ManualGradingSubmission) : string;
   groupOneSubmission(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program })[], sub: ManualGradingSubmission) : Promise<void>;
+  autogradeGroup(group: ManualGradingGroupRecord) : Promise<(RubricItemGradingResult | undefined)[] | undefined>
 }
 
 
@@ -130,6 +131,7 @@ export class ManualGraderApp {
 
     
     $(".examma-ray-auto-group-button").on("click", async () => this.autoGroup());
+    $(".examma-ray-autograde-button").on("click", async () => this.autograde());
 
     $("#examma-ray-next-ungraded-button").on("click", async() => this.claimNextUngraded());
   }
@@ -602,24 +604,47 @@ export class ManualGraderApp {
     $("#examma-ray-grouping-progress-modal").modal("hide");
   }
 
+  public async autograde() {
 
-  // private removeFromCurrentGroup(subToRemove: CodeWritingSubmission) {
-  //   if (!this.assn || !this.currentGroup || this.currentGroup.submissions.length <= 1) {
-  //     return;
-  //   }
+    $("#examma-ray-autograding-modal").modal("show");
 
-  //   let i = this.currentGroup.submissions.findIndex(sub => sub.question_uuid === subToRemove.question_uuid);
-  //   i !== -1 && this.currentGroup.submissions.splice(i, 1);
+    const attempted_groups = new Set<string>();
 
-  //   this.assn.groups.push({
-  //     name: "group_" + this.assn.groups.length,
-  //     representative_index: 0,
-  //     submissions: [subToRemove],
-  //     grading_result: copyGradingResult(this.currentGroup.grading_result)
-  //   });
+    await this.claimNextUngraded();
 
-  //   this.refreshGroups();
-  // }
+    while (this.currentGroup && !attempted_groups.has(this.currentGroup.group_uuid)) {
+      const group = this.currentGroup;
+      attempted_groups.add(group.group_uuid);
+
+      // Attempt to autograde the group. Autograder will return undefined if it
+      // declines to set any rubric items.
+      let ag_result = await this.submissionComponent.autogradeGroup(group);
+      if (ag_result) {
+        ag_result.forEach((result, i) => {
+          if (result?.status) {
+            this.performLocalOperation({
+              kind: "set_rubric_item_status",
+              group_uuid: group.group_uuid,
+              rubric_item_uuid: this.rubric[i].rubric_item_uuid,
+              status: result.status
+            });
+          }
+        });
+        
+        this.performLocalOperation({
+          kind: "set_group_finished",
+          group_uuid: group.group_uuid,
+          finished: true
+        });
+      }
+
+      // Get the next submission to attempt to autograde
+      await this.claimNextUngraded();
+    }
+
+    
+    $("#examma-ray-autograding-modal").modal("hide");
+  }
 
 };
 

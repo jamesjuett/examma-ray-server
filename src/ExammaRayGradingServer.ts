@@ -189,7 +189,7 @@ export class ServerExam {
   }
 
   private async nextEpoch() {
-    asMutable(this).epoch = await db_nextExamEpoch(this.exam.exam_id);
+    asMutable(this).epoch = (await db_nextExamEpoch(this.exam.exam_id))[0];
   }
 
   public getTaskStatus() {

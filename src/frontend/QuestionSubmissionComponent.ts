@@ -102,8 +102,8 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
    });
   }
 
-  private getGroupingFunctionName(sub: ManualGradingSubmission) {
-    return applySkin(this.app.config.grouping_function, this.app.skins[sub.skin_id]);
+  public async autogradeGroup(group: ManualGradingGroupRecord) {
+    return undefined;
   }
 
 }

@@ -65,3 +65,9 @@ Create a secret key for JWT:
 ```
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'));" > secrets/jwt_secret
 ```
+
+
+### Other stuff
+```
+psql --host=127.0.0.1 -p 5000 --user=exammaray
+```

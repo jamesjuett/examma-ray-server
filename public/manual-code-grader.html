@@ -66,6 +66,7 @@
       <button id="edit-code-grader-config-open-modal-button" type="button" class="btn btn-sm btn-primary"><i class="bi bi-gear"></i> Grader Config</button>
       <button type="button" class="btn btn-sm btn-primary examma-ray-auto-group-button"><i class="bi bi-lightning"></i> Auto-Group</button>
       <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#groups-modal"><span class="badge examma-ray-grading-group-num-members">N/A</span> Group Members</button>
+      <button type="button" style="display: none;" class="btn btn-sm btn-primary examma-ray-autograde-button"><i class="bi bi-lightning"></i> Autograde</button>
       <span style="display: inline-block; vertical-align: middle; margin-top: 0; margin-bottom: 0; margin-left: 0.25em; font-weight: bold">You are grading: <code class="examma-ray-grading-group-name">[No group selected]</code></span>
       <!-- <button class="btn btn-primary" id="examma-ray-grading-autograde-button">Autograde!</button> -->
       <div style="float: right;"><button id="examma-ray-next-ungraded-button" type="button" class="btn btn-primary"><code style="margin-right: 0.25em">z</code> Next Ungraded</button></div>
@@ -116,6 +117,24 @@
           <div class="progress">
             <div class="progress-bar" role="progressbar" style="width: 2%;">
               0%
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="modal fade" id="examma-ray-autograding-modal" tabindex="-1" role="dialog" data-backdrop="static">
+    <div class="modal-dialog modal-sm" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <!-- <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button> -->
+          <h4 class="modal-title"><b>Autograding...</b></h4>
+        </div>
+        <div class="modal-body">
+          Here I go! Nothing can stop me now!
+          <div class="progress progress-striped active">
+            <div class="progress-bar" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" style="width: 100%">
             </div>
           </div>
         </div>

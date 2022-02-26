@@ -28,6 +28,7 @@ import { ExammaRayGraderClient } from "./Application";
 import avatar from "animal-avatar-generator";
 import { EditRubricItemOperation, ManualGradingEpochTransition, ManualGradingOperation, SetRubricItemStatusOperation } from "../manual_grading";
 import { Simulation } from "lobster-vis/dist/js/core/Simulation";
+import { AsynchronousSimulationRunner } from "lobster-vis/dist/js/core/simulationRunners";
 
 import hotkeys from "hotkeys-js";
 import { ManualGradingSubmissionComponent, ManualGraderApp } from "./ManualGrader";
@@ -219,6 +220,37 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
 
   private getGroupingFunctionName(sub: ManualGradingSubmission) {
     return applySkin(this.app.config.grouping_function, this.app.skins[sub.skin_id]);
+  }
+  
+  public async autogradeGroup(group: ManualGradingGroupRecord) {
+    
+    // skip empty groups
+    if (group.submissions.length === 0) {
+      return undefined;
+    }
+
+    // A group with some grading already done. Skip it.
+    if (group.finished || Object.values(group.grading_result).filter(isMeaningfulRubricItemGradingResult).length > 0) {
+      return undefined;
+    }
+
+    let code = this.applyHarness(group.submissions[0]);
+
+    let program = new SimpleProgram(code);
+    if (!program.isRunnable()) {
+      return undefined;
+    }
+
+    let sim = new Simulation(program);
+    let runner = new AsynchronousSimulationRunner(sim);
+    await runner.stepToEnd();
+
+    if (!sim.hasAnyEventOccurred) {
+      return <RubricItemGradingResult[]>[{status: "on"}, {status: "off"}];
+    }
+    else {
+      return <RubricItemGradingResult[]>[{status: "off"}, {status: "on"}];
+    }
   }
 
 }

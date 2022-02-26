@@ -18,7 +18,7 @@ export async function db_nextExamEpoch(exam_id: string, new_epoch?: number) {
 
   return await query("exams").where({exam_id: exam_id}).update({
     epoch: new_epoch
-  });
+  }).returning("epoch");
 }
 
 export async function db_createExam(exam_spec: ExamSpecification) {
