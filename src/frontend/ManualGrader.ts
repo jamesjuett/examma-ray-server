@@ -619,7 +619,7 @@ export class ManualGraderApp {
       // Attempt to autograde the group. Autograder will return undefined if it
       // declines to set any rubric items.
       let ag_result = await this.submissionComponent.autogradeGroup(group);
-      if (ag_result) {
+      if (ag_result && ag_result.some(res => res?.status)) {
         ag_result.forEach((result, i) => {
           if (result?.status) {
             this.performLocalOperation({

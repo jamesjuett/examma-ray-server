@@ -3,7 +3,7 @@ import { Program, SimpleProgram, SourceFile } from "lobster-vis/dist/js/core/Pro
 import { SimpleExerciseLobsterOutlet } from "lobster-vis/dist/js/view/SimpleExerciseLobsterOutlet"
 import { createRunestoneExerciseOutlet } from "lobster-vis/dist/js/view/embeddedExerciseOutlet"
 
-import { applySkin, highlightCode, mk2html, mk2html_unwrapped } from "examma-ray/dist/core/render";
+import { applySkin, highlightCode } from "examma-ray/dist/core/render";
 import "highlight.js/styles/github.css";
 
 import "./code-grader.css";
@@ -13,20 +13,14 @@ import "lobster-vis/dist/css/main.css"
 import "lobster-vis/dist/css/code.css"
 import "lobster-vis/dist/css/exercises.css"
 import "lobster-vis/dist/css/frontend.css"
-import { Checkpoint, EndOfMainStateCheckpoint } from "lobster-vis/dist/js/analysis/checkpoints";
+import { EndOfMainStateCheckpoint } from "lobster-vis/dist/js/analysis/checkpoints";
 import "lobster-vis/dist/js/lib/standard";
-import { renderScoreBadge, renderShortPointsWorthBadge, renderUngradedBadge } from "examma-ray/dist/core/ui_components";
-import { QuestionSpecification, ExamComponentSkin, Question } from "examma-ray";
-import deepEqual from "deep-equal";
 import { v4 as uuidv4 } from "uuid";
 
 import queryString from "query-string";
-import { ActiveExamGraders, ActiveQuestionGraders, GradingGroupReassignment, isMeaningfulManualGradingResult, isMeaningfulRubricItemGradingResult, ManualCodeGraderConfiguration, ManualGradingGroupRecord, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, NextUngradedRequest, NextUngradedResponse, reassignGradingGroups, RubricItemGradingResult } from "../manual_grading";
+import { isMeaningfulRubricItemGradingResult, ManualGradingGroupRecord, ManualGradingSubmission, RubricItemGradingResult } from "../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../util/util";
 import axios from "axios";
-import { ExammaRayGraderClient } from "./Application";
-import avatar from "animal-avatar-generator";
-import { EditRubricItemOperation, ManualGradingEpochTransition, ManualGradingOperation, SetRubricItemStatusOperation } from "../manual_grading";
 import { Simulation } from "lobster-vis/dist/js/core/Simulation";
 import { AsynchronousSimulationRunner } from "lobster-vis/dist/js/core/simulationRunners";
 
@@ -34,6 +28,10 @@ import hotkeys from "hotkeys-js";
 import { ManualGradingSubmissionComponent, ManualGraderApp } from "./ManualGrader";
 import { parse_submission } from "examma-ray/dist/response/responses";
 import { BLANK_SUBMISSION } from "examma-ray/dist/response/common";
+
+
+
+
 
 
 
@@ -237,20 +235,45 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
     let code = this.applyHarness(group.submissions[0]);
 
     let program = new SimpleProgram(code);
-    if (!program.isRunnable()) {
-      return undefined;
-    }
+    let regexes: RegExp[] = [];
 
-    let sim = new Simulation(program);
-    let runner = new AsynchronousSimulationRunner(sim);
-    await runner.stepToEnd();
+    if (program.isRunnable()) {
+      regexes.push(/AG-ON-COMPILE-SUCCESS\(([a-zA-Z]+)\)/i);
+      let sim = new Simulation(program);
+      let runner = new AsynchronousSimulationRunner(sim);
+      await runner.stepToEnd();
 
-    if (!sim.hasAnyEventOccurred) {
-      return <RubricItemGradingResult[]>[{status: "on"}, {status: "off"}];
+      if (!sim.hasAnyEventOccurred) {
+        regexes.push(/AG-ON-TESTS-PASS\(([a-zA-Z]+)\)/i);
+      }
+      else {
+        regexes.push(/AG-ON-TESTS-FAIL\(([a-zA-Z]+)\)/i);
+      }
     }
     else {
-      return <RubricItemGradingResult[]>[{status: "off"}, {status: "on"}];
+      // program not runnable
+      regexes.push(/AG-ON-COMPILE-FAIL\(([a-zA-Z]+)\)/i);
     }
+
+
+    let results : (RubricItemGradingResult | undefined)[] = this.app.rubric.map(ri => {
+      let m: RegExpMatchArray | null = null;
+      for(let i = 0; i < regexes.length; ++i) {
+        if (m = ri.description.match(regexes[i])) {
+          const s = m[1];
+          if (s === "off" || s === "on" || s === "unknown") {
+            return {status: s};
+          }
+          else {
+            return undefined; // malformed status
+          }
+        }
+      }
+      return undefined; // no regexes matched, do nothing for this rubric item
+    });
+
+    return results;
+    
   }
 
 }
