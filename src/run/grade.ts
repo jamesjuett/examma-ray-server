@@ -5,6 +5,7 @@ import { ExamGrader, ExamGraderOptions, ExceptionMap, GraderSpecificationMap } f
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
+import { ManualGenericGrader } from "examma-ray/dist/graders/ManualGenericGrader";
 import { parentPort, workerData } from "worker_threads";
 import { RunGradingRequest } from "../dashboard";
 import { query } from "../db/db";
@@ -49,7 +50,7 @@ class WebExamGrader extends ExamGrader {
   }
 
   protected override prepareGradingData(question: Question, grader: QuestionGrader) {
-    if (grader instanceof CodeWritingGrader) {
+    if (grader instanceof CodeWritingGrader || grader instanceof ManualGenericGrader) {
       return this.grading_data[question.question_id];
     }
   }
