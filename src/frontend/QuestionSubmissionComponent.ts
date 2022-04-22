@@ -55,6 +55,8 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
       this.app.question.response.kind,
       parse_submission(this.app.question.response.kind, sub.submission)
     );
+
+    this.responseElem.append(this.app.question.renderDescription(this.app.skins[sub.skin_id]));
   }
   
 
