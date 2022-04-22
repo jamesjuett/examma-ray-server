@@ -220,7 +220,7 @@ export class DashboardExammaRayGraderApplication {
 
       $("#examma-ray-question-grading-list").html(
         this.exam!.allQuestions
-          .filter(q => q.response.kind === "code_editor" || forced_code_grader.indexOf(q.question_id) !== -1)
+          .filter(q => q.response.default_grader?.grader_kind === "manual_code_writing" || forced_code_grader.indexOf(q.question_id) !== -1)
           .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("")
         + 
         this.exam!.allQuestions
