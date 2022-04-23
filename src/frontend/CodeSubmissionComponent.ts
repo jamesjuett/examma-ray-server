@@ -241,7 +241,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
       regexes.push(/AG-ON-COMPILE-SUCCESS\(([a-zA-Z]+)\)/i);
       let sim = new Simulation(program);
       let runner = new AsynchronousSimulationRunner(sim);
-      await runner.stepToEnd();
+      await runner.stepToEnd(0, 5000);
 
       if (!sim.hasAnyEventOccurred) {
         regexes.push(/AG-ON-TESTS-PASS\(([a-zA-Z]+)\)/i);
