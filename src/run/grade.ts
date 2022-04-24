@@ -105,7 +105,7 @@ async function main() {
     name: "Sample Solutions",
     uniqname: "solutions"
   });
-  EXAM_GENERATOR_PREVIEW.writeAll(new SampleSolutionExamRenderer());
+  EXAM_GENERATOR_PREVIEW.writeAll(new SampleSolutionExamRenderer(), "solutions");
     
   await query.destroy();
   
