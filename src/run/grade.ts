@@ -1,6 +1,7 @@
 // import minimist from "minimist";
-import { Exam, Question, QuestionGrader } from "examma-ray";
+import { Exam, Question, QuestionGrader, SampleSolutionExamRenderer } from "examma-ray";
 import { IndividualizedNormalCurve } from "examma-ray/dist/core/ExamCurve";
+import { ExamGenerator } from "examma-ray/dist/ExamGenerator";
 import { ExamGrader, ExamGraderOptions, ExceptionMap, GraderSpecificationMap } from "examma-ray/dist/ExamGrader";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
@@ -93,7 +94,19 @@ async function main() {
   if (run_request.reports) {
     EXAM_GRADER.writeReports();
   }
-  
+
+  const EXAM_GENERATOR_PREVIEW = new ExamGenerator(EXAM, {
+    uuid_strategy: "plain",
+    allow_duplicates: true,
+    choose_all: true,
+    skins: "all"
+  });
+  EXAM_GENERATOR_PREVIEW.assignExam({
+    name: "Sample Solutions",
+    uniqname: "solutions"
+  });
+  EXAM_GENERATOR_PREVIEW.writeAll(new SampleSolutionExamRenderer());
+    
   await query.destroy();
   
 }
