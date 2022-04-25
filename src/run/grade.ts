@@ -3,7 +3,7 @@ import { Exam, Question, QuestionGrader, SampleSolutionExamRenderer } from "exam
 import { IndividualizedNormalCurve } from "examma-ray/dist/core/ExamCurve";
 import { ExamGenerator } from "examma-ray/dist/ExamGenerator";
 import { ExamGrader, ExamGraderOptions, ExceptionMap, GraderSpecificationMap } from "examma-ray/dist/ExamGrader";
-import { ExamUtils } from "examma-ray/dist/ExamUtils";
+import { ExamUtils, writeFrontendJS } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
 import { ManualGenericGrader } from "examma-ray/dist/graders/ManualGenericGrader";
@@ -108,8 +108,10 @@ async function main() {
   });
 
   let sol_html = EXAM_GENERATOR_PREVIEW.renderExams(new SampleSolutionExamRenderer())[0];
-  mkdirSync(`out/${EXAM.exam_id}/solution`, { recursive: true });
-  writeFileSync(`out/${EXAM.exam_id}/solution/solution.html`, sol_html);
+  let sol_dir = `out/${EXAM.exam_id}/solution`;
+  mkdirSync(`${sol_dir}`, { recursive: true });
+  writeFrontendJS(`${sol_dir}/js`, "frontend-solution.js");
+  writeFileSync(`${sol_dir}/solution.html`, sol_html);
   await query.destroy();
   
 }
