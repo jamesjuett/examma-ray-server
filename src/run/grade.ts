@@ -7,7 +7,7 @@ import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
 import { ManualGenericGrader } from "examma-ray/dist/graders/ManualGenericGrader";
-import { writeFileSync } from "fs";
+import { mkdirSync, writeFileSync } from "fs";
 import { parentPort, workerData } from "worker_threads";
 import { RunGradingRequest } from "../dashboard";
 import { query } from "../db/db";
@@ -108,6 +108,7 @@ async function main() {
   });
 
   let sol_html = EXAM_GENERATOR_PREVIEW.renderExams(new SampleSolutionExamRenderer())[0];
+  mkdirSync(`out/${EXAM.exam_id}/solution`, { recursive: true });
   writeFileSync(`out/${EXAM.exam_id}/solution/solution.html`, sol_html);
   await query.destroy();
   
