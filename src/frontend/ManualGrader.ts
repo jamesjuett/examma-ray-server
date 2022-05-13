@@ -646,6 +646,47 @@ export class ManualGraderApp {
     $("#examma-ray-autograding-modal").modal("hide");
   }
 
+
+  public uniqnameRubricFilter(group: ManualGradingGroupRecord, filter: string) {
+    if (group.submissions.find(sub => sub.uniqname === filter)) {
+      return true;
+    }
+  
+    try {
+      let rubricFilter : {[index: string]: boolean | undefined} = JSON.parse(filter);
+  
+      if (rubricFilter && typeof rubricFilter === "object") {
+        return true;
+      }
+    
+      this.groupGrader.getRubricItemOutlets().every(ri => {
+        let rf = rubricFilter[""+ri?.display_index];
+        if (rf === undefined) {
+          // no specification in the filter, ok
+          return true;
+        }
+
+        const status = group.grading_result[ri?.rubricItem.rubric_item_uuid]?.status;
+
+        if (rf === true) {
+          return status === "on";
+        }
+
+        if (rf === false) {
+          return !status || status === "off" || status === "unknown";
+        }
+
+        assertNever(rf);
+      });
+    
+    }
+    catch(e) {
+      return true;
+    }
+
+   return false;
+  }
+
 };
 
 
@@ -927,6 +968,10 @@ class GroupGraderOutlet {
       return;
     }
     this.onGroupOpen(this.app.currentGroup);
+  }
+
+  public getRubricItemOutlets() {
+    return <RubricItemOutlet[]>Object.values(this.rubricItemOutlets);
   }
 }
 
@@ -1218,7 +1263,7 @@ class GroupThumbnailsPanel {
 
     // Attached filtered, sorted, elements
     this.groupThumbnailOutlets = Object.values(this.groupThumbnailOutletsMap).map(to => to!.group)
-      .filter(group => !this.submissionsUniqnameFilter || group.submissions.find(sub => sub.uniqname === this.submissionsUniqnameFilter))
+      .filter(group => !this.submissionsUniqnameFilter || this.app.uniqnameRubricFilter(group, this.submissionsUniqnameFilter))
       .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
       .sort(this.SUBMISSION_SORTS[this.submissionsSortCriteria])
       .map(group => this.groupThumbnailOutletsMap[group.group_uuid]!);
