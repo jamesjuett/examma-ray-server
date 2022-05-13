@@ -649,7 +649,7 @@ export class ManualGraderApp {
 
   public rubricFilter(group: ManualGradingGroupRecord, rubricFilter : {[index: string]: boolean | undefined}) {
   
-    this.groupGrader.getRubricItemOutlets().every(ri => {
+    return this.groupGrader.getRubricItemOutlets().every(ri => {
       let rf = rubricFilter[""+ri?.display_index];
       if (rf === undefined) {
         // no specification in the filter, ok
@@ -668,8 +668,6 @@ export class ManualGraderApp {
 
       return false;
     });
-  
-   return false;
   }
 
 };
