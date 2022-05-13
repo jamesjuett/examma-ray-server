@@ -647,43 +647,28 @@ export class ManualGraderApp {
   }
 
 
-  public uniqnameRubricFilter(group: ManualGradingGroupRecord, filter: string) {
-    if (group.submissions.find(sub => sub.uniqname === filter)) {
-      return true;
-    }
+  public rubricFilter(group: ManualGradingGroupRecord, rubricFilter : {[index: string]: boolean | undefined}) {
   
-    try {
-      let rubricFilter : {[index: string]: boolean | undefined} = JSON.parse(filter);
-  
-      if (rubricFilter && typeof rubricFilter === "object") {
+    this.groupGrader.getRubricItemOutlets().every(ri => {
+      let rf = rubricFilter[""+ri?.display_index];
+      if (rf === undefined) {
+        // no specification in the filter, ok
         return true;
       }
-    
-      this.groupGrader.getRubricItemOutlets().every(ri => {
-        let rf = rubricFilter[""+ri?.display_index];
-        if (rf === undefined) {
-          // no specification in the filter, ok
-          return true;
-        }
 
-        const status = group.grading_result[ri?.rubricItem.rubric_item_uuid]?.status;
+      const status = group.grading_result[ri?.rubricItem.rubric_item_uuid]?.status;
 
-        if (rf === true) {
-          return status === "on";
-        }
+      if (rf === true) {
+        return status === "on";
+      }
 
-        if (rf === false) {
-          return !status || status === "off" || status === "unknown";
-        }
+      if (rf === false) {
+        return !status || status === "off" || status === "unknown";
+      }
 
-        assertNever(rf);
-      });
-    
-    }
-    catch(e) {
-      return true;
-    }
-
+      return false;
+    });
+  
    return false;
   }
 
@@ -1261,9 +1246,27 @@ class GroupThumbnailsPanel {
     // detach all thumbnail elements
     Object.values(this.groupThumbnailOutletsMap).forEach(to => to!.elem.detach());
 
+    let uniqnameFilter : string | undefined;
+    let rubricFilter : {[index: string]: boolean | undefined} | undefined;
+
+    try {
+      // Attempt to parse as a rubric filter
+      let rfParsed : {[index: string]: boolean | undefined} = JSON.parse(this.submissionsUniqnameFilter ?? "{");
+  
+      if (rfParsed && typeof rfParsed === "object") {
+        rubricFilter = rfParsed;
+      }
+    }
+    catch(e) { }
+
+    if (!rubricFilter) {
+      uniqnameFilter = this.submissionsUniqnameFilter;
+    }
+
     // Attached filtered, sorted, elements
     this.groupThumbnailOutlets = Object.values(this.groupThumbnailOutletsMap).map(to => to!.group)
-      .filter(group => !this.submissionsUniqnameFilter || this.app.uniqnameRubricFilter(group, this.submissionsUniqnameFilter))
+      .filter(group => !uniqnameFilter || group.submissions.find(sub => sub.uniqname === uniqnameFilter))
+      .filter(group => !rubricFilter || this.app.rubricFilter(group, rubricFilter))
       .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
       .sort(this.SUBMISSION_SORTS[this.submissionsSortCriteria])
       .map(group => this.groupThumbnailOutletsMap[group.group_uuid]!);
