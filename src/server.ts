@@ -85,6 +85,7 @@ const STAFF = new Set<string>([
   "zccarey@umich.edu",
   "zwgold@umich.edu",
   "zalsaedy@umich.edu",
+  "schatzju@umich.edu"
 ]);
 
 function requireStaff(req: Request, res: Response, next: NextFunction) {
