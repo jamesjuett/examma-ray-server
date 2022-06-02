@@ -80,7 +80,6 @@ export type ManualGradingPingRequest = {
 
 export type ManualGradingPingResponse = {
 
-  exam_id: string,
   question_id: string,
 
   /**
