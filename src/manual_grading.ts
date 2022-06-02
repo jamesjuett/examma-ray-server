@@ -10,9 +10,12 @@ export type ManualCodeGraderConfiguration = {
 
 export type ManualGradingSubmission = {
   submission_uuid: string,
+  question_id: string,
+  exam_id: string,
   uniqname: string,
   submission: string,
-  skin_id: string
+  skin_id: string,
+  group_uuid: string,
 }
 
 export type ManualGradingRubricItemStatus = "on" | "off" | "unknown";

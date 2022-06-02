@@ -180,7 +180,10 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
       submission_uuid: sub.submission_uuid,
       uniqname: sub.uniqname,
       submission: sub.submission,
-      skin_id: sub.skin_id
+      skin_id: sub.skin_id,
+      exam_id: sub.exam_id,
+      group_uuid: sub.group_uuid,
+      question_id: sub.question_id
     });
   });
   records.forEach(r => {
