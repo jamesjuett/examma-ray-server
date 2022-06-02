@@ -43,7 +43,7 @@ export class ServerExam {
     return new ServerExam(
       exam,
       0,
-      await Promise.all(exam.allQuestions.map(q => QuestionGradingServer.create(exam.exam_id, q.question_id)))
+      await Promise.all(exam.allQuestions.map(q => QuestionGradingServer.create(q.question_id)))
     );
   }
   
@@ -213,7 +213,6 @@ const DEFAULT_GROUPING_FUNCTION = "main";
 
 export class QuestionGradingServer {
   
-  public readonly exam_id: string;
   public readonly question_id: string;
   public readonly config: ManualCodeGraderConfiguration;
   public readonly rubric: ManualGradingRubricItem[];
@@ -234,8 +233,20 @@ export class QuestionGradingServer {
 
   private reload_lock?: Promise<void>;
 
-  public static async create(exam_id: string, question_id: string) {
-    console.log("creating question grading server for " + exam_id + " " + question_id);
+  private static INSTANCES : {
+    [index: string] : QuestionGradingServer | undefined
+  } = { };
+
+  public static async create(question_id: string) {
+
+    const existing = this.INSTANCES[question_id];
+    if (existing) {
+      console.log("reusing existing question grading server for " + question_id);
+      return existing;
+    }
+
+    console.log("creating question grading server for " + question_id);
+
     let question = await db_getManualGradingQuestion(question_id);
     if (!question) {
       await db_setManualGradingQuestion(question_id, 0);
@@ -249,7 +260,6 @@ export class QuestionGradingServer {
     assert(grader_config);
 
     return new QuestionGradingServer(
-      exam_id,
       question_id,
       await db_getManualGradingRubric(question_id),
       grader_config,
@@ -258,8 +268,7 @@ export class QuestionGradingServer {
     );
   }
 
-  private constructor(exam_id: string, question_id: string, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, skins: ManualGradingSkins, grading_record: ManualGradingQuestionRecords) {
-    this.exam_id = exam_id;
+  private constructor(question_id: string, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, skins: ManualGradingSkins, grading_record: ManualGradingQuestionRecords) {
     this.question_id = question_id;
     this.history_starting_epoch = grading_record.grading_epoch;
     this.rubric = rubric;
@@ -492,7 +501,6 @@ export class QuestionGradingServer {
     }
 
     return {
-      exam_id: this.exam_id,
       question_id: this.question_id,
       active_graders: this.active_graders,
       grading_epoch: this.grading_record.grading_epoch,
