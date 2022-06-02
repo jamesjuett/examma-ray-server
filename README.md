@@ -19,11 +19,11 @@ Database migrations are `.ts` files in `db/migrations/`. The files contain Knex 
 
 #### Creating new Migrations
 
-To begin creating a new migration, first auto-generate a migration `.ts` file using `knex migrate:make <name>` where `<name>` is replaced by a name for your migration. The name should generally be something related to the feature you are implementing. This creates a new `.ts` file in `db/migrations/`, named with a timestamp and the name you provided.
+To begin creating a new migration, `cd` into the `src/` directory and auto-generate a migration `.ts` file using `knex --knexfile knexfile-dev.ts migrate:make <name>` where `<name>` is replaced by a name for your migration. The name should generally be something related to the feature you are implementing. This creates a new `.ts` file in `db/migrations/`, named with a timestamp and the name you provided.
 
 Then, edit the `.ts` file to implement the migration. You might want to use a previous migration as a template.
 
-You'll also want to check out `db/db_types.ts` and make changes there to reflect your migration.
+You'll also want to edit `db/db_types.ts` to reflect your migration.
 
 ### Seeds
 
