@@ -1126,6 +1126,8 @@ class GroupThumbnailsPanel {
   private submissionsSortCriteria : SubmissionsSortCriterion = "name";
   private submissionsSortOrdering : SubmissionsSortOrdering = "asc";
 
+  private submissionsExamFilter : {[index:string]: boolean | undefined} = { };
+
   private SUBMISSION_SORTS : {
     [k in SubmissionsSortCriterion]: (a: ManualGradingGroupRecord, b: ManualGradingGroupRecord) => number
   } = {
@@ -1140,7 +1142,7 @@ class GroupThumbnailsPanel {
   
     this.initComponents();
 
-    this.createGroupThumbnails();
+    this.onGroupsChanged();
   }
 
   private initComponents() {
@@ -1168,6 +1170,37 @@ class GroupThumbnailsPanel {
       $(this).removeClass("btn-default").addClass("btn-primary");
       self.setSubmissionsSortOrdering($(this).data("sort-ordering"));
     });
+  }
+
+  private updateExamFilters() {
+    const elem = $(".examma-ray-exam-filter-checkboxes");
+    elem.empty();
+    this.submissionsExamFilter = { };
+    Object.values(this.app.grading_records.groups).map(group => {
+      group?.submissions.forEach(sub => {
+        if (this.submissionsExamFilter[sub.exam_id] === undefined) {
+          this.submissionsExamFilter[sub.exam_id] = true;
+        }
+      });
+    });
+    Object.entries(this.submissionsExamFilter).forEach(([exam_id, is_included]) => {
+      const exam_option_checkbox = $(`<div class="checkbox">
+        <label>
+          <input type="checkbox" ${is_included ? "checked" : ""}>
+          <span class="label label-primary" style="background-color: ${randomColor({seed: exam_id, luminosity: "bright"})};">${exam_id}</span>
+        </label>
+      </div>`);
+      exam_option_checkbox.find("input").on("change", () => {
+        this.submissionsExamFilter[exam_id] = !this.submissionsExamFilter[exam_id];
+        this.updateDisplayedThumbnails();
+      });
+      elem.append(exam_option_checkbox);
+    });
+
+  }
+
+  private filterByExam(group: ManualGradingGroupRecord) {
+    return group.submissions.some(sub => this.submissionsExamFilter[sub.exam_id]);
   }
 
   private createGroupThumbnails() {
@@ -1264,6 +1297,7 @@ class GroupThumbnailsPanel {
 
     // Attached filtered, sorted, elements
     this.groupThumbnailOutlets = Object.values(this.groupThumbnailOutletsMap).map(to => to!.group)
+      .filter(group => this.filterByExam(group))
       .filter(group => !uniqnameFilter || group.submissions.find(sub => sub.uniqname === uniqnameFilter))
       .filter(group => !rubricFilter || this.app.rubricFilter(group, rubricFilter))
       .filter(SUBMISSION_FILTERS[this.submissionsFilterCriterion])
@@ -1294,7 +1328,9 @@ class GroupThumbnailsPanel {
   }
 
   public onGroupsChanged(remote_grader_email?: string) {
+    this.updateExamFilters();
     this.createGroupThumbnails();
+
   }
 }
 
