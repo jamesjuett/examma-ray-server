@@ -15,7 +15,7 @@ import { ActiveQuestionGraders, GradingGroupReassignment, isMeaningfulManualGrad
 import { asMutable, assert, assertFalse, assertNever } from "../util/util";
 import { ExammaRayGraderClient } from "./Application";
 import "./code-grader.css";
-
+import randomColor from "randomcolor";
 
 
 
@@ -481,8 +481,9 @@ export class ManualGraderApp {
     let jq = $(`
       <div class="panel panel-default examma-ray-group-member-thumbnail">
         <div class="panel-heading">
-          <button type="button" class="btn btn-sm btn-danger examma-ray-group-member-remove-button" aria-label="Remove"><span aria-hidden="true">Remove</span></button>
+          <span class="label label-primary" style="background-color: ${randomColor({seed: sub.exam_id, luminosity: "bright"})};">${sub.exam_id}</span>
           ${sub.uniqname}
+          <button type="button" class="btn btn-sm btn-danger examma-ray-group-member-remove-button" aria-label="Remove"><span aria-hidden="true">Remove</span></button>
         </div>
         <div class="panel-body">
           ${this.submissionComponent.renderSubmissionThumbnail(sub)}
