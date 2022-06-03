@@ -27,7 +27,6 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
   
   public constructor(app: ManualGraderApp) {
     this.app = app;
-    
     this.responseElem = $("#examma-ray-current-submission");
   }
 
@@ -47,14 +46,27 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
       return;
     }
 
-    let sub = this.app.currentGroup.submissions[0];
+    const sub = this.app.currentGroup.submissions[0];
+    const sampleSolution = this.app.question.sampleSolution;
+    const skin = this.app.skins[sub.skin_id];
 
-    this.responseElem.html(this.app.question.renderResponse(uuidv4(), this.app.skins[sub.skin_id]));
+    this.responseElem.html(`<table>
+      <tr><th>Student Submission</th><th>${sampleSolution ? "Sample Solution" : "Sample Solution (None Provided)"}</th></tr>
+      <tr><td></td><td></td></tr>
+    </table>`);
+    const studentSubmissionElem = this.responseElem.find("td").first();
+    const sampleSolutionElem = this.responseElem.find("td").last();
+
+    studentSubmissionElem.html(this.app.question.renderResponse(uuidv4(), skin));
     fill_response(
-      this.responseElem,
+      studentSubmissionElem,
       this.app.question.response.kind,
       parse_submission(this.app.question.response.kind, sub.submission)
     );
+
+    if (sampleSolution) {
+      sampleSolutionElem.html(this.app.question.renderResponseSolution("NONE", sampleSolution, skin));
+    }
 
     this.responseElem.append(this.app.question.renderDescription(this.app.skins[sub.skin_id]));
   }
