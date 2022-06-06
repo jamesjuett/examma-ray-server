@@ -227,8 +227,8 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
       return undefined;
     }
 
-    // A group with some grading already done. Skip it.
-    if (group.finished || Object.values(group.grading_result).filter(isMeaningfulRubricItemGradingResult).length > 0) {
+    // A group that is finished, skip it
+    if (group.finished) {
       return undefined;
     }
 
