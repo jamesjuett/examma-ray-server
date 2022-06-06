@@ -28,6 +28,8 @@ import hotkeys from "hotkeys-js";
 import { ManualGradingSubmissionComponent, ManualGraderApp } from "./ManualGrader";
 import { parse_submission } from "examma-ray/dist/response/responses";
 import { BLANK_SUBMISSION } from "examma-ray/dist/response/common";
+import { AutoObject } from "lobster-vis/dist/js/core/objects";
+import { CompleteObjectType } from "lobster-vis/dist/js/core/types";
 
 
 
@@ -235,13 +237,15 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
     let code = this.applyHarness(group.submissions[0]);
 
     let program = new SimpleProgram(code);
+    let sim: Simulation;
     let regexes: RegExp[] = [];
-
+    
     if (program.isRunnable()) {
       regexes.push(/AG-ON-COMPILE-SUCCESS\(([a-zA-Z]+)\)/i);
-      let sim = new Simulation(program);
+
+      sim = new Simulation(program);
       let runner = new AsynchronousSimulationRunner(sim);
-      await runner.stepToEnd(0, 5000);
+      await runner.stepToEndOfMain(0, 5000);
 
       if (!sim.hasAnyEventOccurred) {
         regexes.push(/AG-ON-TESTS-PASS\(([a-zA-Z]+)\)/i);
@@ -254,7 +258,6 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
       // program not runnable
       regexes.push(/AG-ON-COMPILE-FAIL\(([a-zA-Z]+)\)/i);
     }
-
 
     let results : (RubricItemGradingResult | undefined)[] = this.app.rubric.map(ri => {
       let m: RegExpMatchArray | null = null;
@@ -269,6 +272,21 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
           }
         }
       }
+
+      const localValRegex = /AG-MAIN-LOCAL\(([a-zA-Z_]+[a-zA-Z1-9_]*), *([a-zA-Z]+)\)/i;
+      let localValMatch = ri.description.match(localValRegex);
+      if(localValMatch) {
+        const localName = localValMatch[1];
+        const status = localValMatch[2];
+        let val = sim.memory.stack.topFrame()?.localObjectsByName[localName]?.rawValue();
+        if (val && status === "off" || status === "on" || status === "unknown") {
+          return {status: status};
+        }
+        else {
+          return undefined; // variable was false or malformed status
+        }
+      }
+
       return undefined; // no regexes matched, do nothing for this rubric item
     });
 
