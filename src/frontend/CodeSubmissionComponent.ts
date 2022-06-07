@@ -63,7 +63,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
       checkpoints: [
         new EndOfMainStateCheckpoint("Passes Test Cases", (sim: Simulation) => {
           return !sim.hasAnyEventOccurred
-        }, "", 5000)
+        }, "", 10000)
       ],
       completionCriteria: COMPLETION_ALL_CHECKPOINTS,
       starterCode: "",
@@ -237,7 +237,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
     let code = this.applyHarness(group.submissions[0]);
 
     let program = new SimpleProgram(code);
-    let sim: Simulation;
+    let sim: Simulation | undefined;
     let regexes: RegExp[] = [];
     
     if (program.isRunnable()) {
@@ -278,7 +278,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
       if(localValMatch) {
         const localName = localValMatch[1];
         const status = localValMatch[2];
-        let val = sim.memory.stack.topFrame()?.localObjectsByName[localName]?.rawValue();
+        let val = sim?.memory.stack.topFrame()?.localObjectsByName[localName]?.rawValue();
         if (val) {
           if (status === "off" || status === "on" || status === "unknown") {
             return {status: status};
