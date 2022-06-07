@@ -279,12 +279,13 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
         const localName = localValMatch[1];
         const status = localValMatch[2];
         let val = sim.memory.stack.topFrame()?.localObjectsByName[localName]?.rawValue();
-        if (val && status === "off" || status === "on" || status === "unknown") {
-          return {status: status};
+        if (val) {
+          if (status === "off" || status === "on" || status === "unknown") {
+            return {status: status};
+          }
         }
-        else {
-          return undefined; // variable was false or malformed status
-        }
+        
+        return undefined; // variable was false or malformed status
       }
 
       return undefined; // no regexes matched, do nothing for this rubric item
