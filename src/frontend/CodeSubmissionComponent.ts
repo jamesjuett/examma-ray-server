@@ -63,7 +63,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
       checkpoints: [
         new EndOfMainStateCheckpoint("Passes Test Cases", (sim: Simulation) => {
           return !sim.hasAnyEventOccurred
-        }, "", 10000)
+        }, "", 30000)
       ],
       completionCriteria: COMPLETION_ALL_CHECKPOINTS,
       starterCode: "",
