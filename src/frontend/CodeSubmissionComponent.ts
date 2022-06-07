@@ -273,7 +273,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
         }
       }
 
-      const localValRegex = /AG-MAIN-LOCAL\(([a-zA-Z_]+[a-zA-Z1-9_]*), *([a-zA-Z]+)\)/i;
+      const localValRegex = /AG-MAIN-LOCAL\(([a-zA-Z_]+[a-zA-Z0-9_]*), *([a-zA-Z]+)\)/i;
       let localValMatch = ri.description.match(localValRegex);
       if(localValMatch) {
         const localName = localValMatch[1];
