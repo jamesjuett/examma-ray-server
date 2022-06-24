@@ -93,7 +93,13 @@ async function main() {
   EXAM_GRADER.writeAll();
   
   if (run_request.reports) {
-    EXAM_GRADER.writeReports();
+    try {
+      EXAM_GRADER.writeReports();
+    }
+    catch(e) {
+      console.log(e);
+      throw e;
+    }
   }
 
   const EXAM_GENERATOR_PREVIEW = new ExamGenerator(EXAM, {
