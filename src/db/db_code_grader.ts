@@ -90,8 +90,9 @@ export async function db_setSubmissionGroup(submission_uuid: string, group_uuid:
   });
 }
 
-export async function db_deleteQuestionSubmissionByUniqname(uniqname: string) {
+export async function db_deleteQuestionSubmissionsByExam(exam_id: string, uniqname: string) {
   return await query("manual_grading_submissions").where({
+    exam_id: exam_id,
     uniqname: uniqname
   }).delete();
 }
