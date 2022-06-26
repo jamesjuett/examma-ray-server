@@ -10,7 +10,7 @@ import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { db_deleteExamSubmissionByUuid, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
 import { WorkerData_Generate } from "./run/types";
 import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
-import { db_createCodeGraderConfig, db_createGroup, db_deleteQuestionSubmissionByUniqname, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
+import { db_createCodeGraderConfig, db_createGroup, db_deleteQuestionSubmissionsByExam, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
 import { RunGradingRequest } from "./dashboard";
 
 const GRADER_IDLE_THRESHOLD = 4000; // ms
@@ -151,7 +151,7 @@ export class ServerExam {
     await db_deleteExamSubmissionByUuid(exam_submission.uuid);
 
     // Remove all associated question submission info and grading records from the DB
-    await db_deleteQuestionSubmissionByUniqname(exam_submission.uniqname);
+    await db_deleteQuestionSubmissionsByExam(exam_submission.exam_id, exam_submission.uniqname);
     
     // Remove our stored copy of the submission file
     await rm(`data/${exam_submission.exam_id}/submissions/${exam_submission.uniqname}-submission.json`, { force: true });
