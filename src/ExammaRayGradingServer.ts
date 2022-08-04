@@ -21,7 +21,7 @@ export type ExamTaskStatus = {
   grade?: string
 }
 
-export class ServerExam {
+export class ExamServer {
 
   public readonly exam: Exam;
   public readonly epoch: number;
@@ -40,7 +40,7 @@ export class ServerExam {
 
   public static async create(exam_spec: ExamSpecification) {
     const exam = Exam.create(exam_spec);
-    return new ServerExam(
+    return new ExamServer(
       exam,
       0,
       await Promise.all(exam.allQuestions.map(q => QuestionGradingServer.create(q.question_id)))
@@ -513,24 +513,24 @@ export class QuestionGradingServer {
 
 export class ExammaRayGradingServer {
 
-  public readonly exams: readonly ServerExam[];
+  public readonly exams: readonly ExamServer[];
   public readonly exams_by_id: {
-    [index: string]: ServerExam | undefined
+    [index: string]: ExamServer | undefined
   } = {};
 
-  private constructor(exams: readonly ServerExam[]) {
+  private constructor(exams: readonly ExamServer[]) {
     this.exams = exams;
     this.exams.forEach(exam => this.exams_by_id[exam.exam.exam_id] = exam);
   }
 
   public static async create(exam_specs: readonly ExamSpecification[]) {
     return new ExammaRayGradingServer(
-      await Promise.all(exam_specs.map(spec => ServerExam.create(spec)))
+      await Promise.all(exam_specs.map(spec => ExamServer.create(spec)))
     )
   }
 
   public async loadExam(exam_spec: ExamSpecification) {
-    const newExam = await ServerExam.create(exam_spec);
+    const newExam = await ExamServer.create(exam_spec);
 
     let existingIndex = this.exams.findIndex(ex => ex.exam.exam_id === newExam.exam.exam_id);
     if (existingIndex !== -1) {
