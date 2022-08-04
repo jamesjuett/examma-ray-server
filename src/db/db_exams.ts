@@ -28,17 +28,22 @@ export async function db_createExam(exam_spec: ExamSpecification) {
   }).returning("*");
 }
 
-export async function db_getSubmissionsList(exam_id: string) {
+export async function db_deleteExam(exam_id: string) {
+  return await query("exams").where({
+    exam_id: exam_id,
+  }).delete();
+}
+
+
+export async function db_getExamSubmissions(exam_id: string) {
   return await query("exam_submissions").where({exam_id: exam_id}).select();
 }
 
-export async function db_getExamSubmissionByUuid(exam_uuid: string) {
-  return await query("exam_submissions").where({uuid: exam_uuid}).select().first();
+export async function db_deleteExamSubmissions(exam_id: string) {
+  return await query("exam_submissions").where({exam_id: exam_id}).delete();
 }
 
-export async function db_deleteExamSubmissionByUuid(exam_uuid: string) {
-  return await query("exam_submissions").where({uuid: exam_uuid}).delete();
-}
+
 
 export async function db_addExamSubmission(submission: TrustedExamSubmission) {
   return await query("exam_submissions").insert({
@@ -47,4 +52,12 @@ export async function db_addExamSubmission(submission: TrustedExamSubmission) {
     uniqname: submission.student.uniqname,
     name: submission.student.name
   }).returning("*");
+}
+
+export async function db_getExamSubmissionByUuid(exam_uuid: string) {
+  return await query("exam_submissions").where({uuid: exam_uuid}).select().first();
+}
+
+export async function db_deleteExamSubmissionByUuid(exam_uuid: string) {
+  return await query("exam_submissions").where({uuid: exam_uuid}).delete();
 }

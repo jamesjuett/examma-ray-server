@@ -93,7 +93,7 @@ questions_router
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
       res.status(200);
-      res.json(EXAMMA_RAY_GRADING_SERVER.exams
+      res.json(EXAMMA_RAY_GRADING_SERVER.getAllExams()
           .flatMap(exam => exam.exam.allQuestions)
           .find(q => q.question_id === req.params["question_id"])?.spec);
     }

@@ -81,6 +81,23 @@ export class DashboardExammaRayGraderApplication {
       $("#run-grading-modal").modal("hide");
     });
 
+    $("#delete-exam-id-confirmation").on("input", () => {
+      $("#delete-exam-button").prop("disabled", $("#delete-exam-id-confirmation").val() !== this.exam_id);
+    });
+
+    $("#delete-exam-button").on("click", async () => {
+      
+      let response = await axios({
+        url: `api/exams/${this.exam_id}`,
+        method: "DELETE",
+        headers: {
+            'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      });
+
+      $("#delete-exam-modal").modal("hide");
+    });
+
   }
 
   private async checkTaskStatus() {

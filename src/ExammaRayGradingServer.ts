@@ -10,7 +10,7 @@ import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { db_deleteExamSubmissionByUuid, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
 import { WorkerData_Generate } from "./run/types";
 import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
-import { db_createCodeGraderConfig, db_createGroup, db_deleteQuestionSubmissionsByExam, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
+import { db_createCodeGraderConfig, db_createGroup, db_deleteManualGradingBySubmission, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
 import { RunGradingRequest } from "./dashboard";
 
 const GRADER_IDLE_THRESHOLD = 4000; // ms
@@ -133,8 +133,7 @@ export class ExamServer {
     await this.workerTask(worker, "submissions", "Preparing to add submissions...");
     await this.nextEpoch();
 
-    // All question grading servers will need to reload new submission
-    // data from the DB
+    // All question grading servers will need to reload new submission data from the DB
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
   }
   
@@ -151,7 +150,7 @@ export class ExamServer {
     await db_deleteExamSubmissionByUuid(exam_submission.uuid);
 
     // Remove all associated question submission info and grading records from the DB
-    await db_deleteQuestionSubmissionsByExam(exam_submission.exam_id, exam_submission.uniqname);
+    await db_deleteManualGradingBySubmission(exam_submission.exam_id, exam_submission.uniqname);
     
     // Remove our stored copy of the submission file
     await rm(`data/${exam_submission.exam_id}/submissions/${exam_submission.uniqname}-submission.json`, { force: true });
@@ -227,7 +226,6 @@ export class QuestionGradingServer {
   private transitionRecorderQueue: ManualGradingEpochTransition[] = [];
   private transitionRecorderQueueLock?: Promise<void>;
 
-  // TODO: these unnecessarily index based on question_id which is always the same for a single question server
   public readonly active_graders: ActiveQuestionGraders = {graders: {}};
   private next_active_graders: ActiveQuestionGraders = {graders: {}};
 
@@ -513,14 +511,12 @@ export class QuestionGradingServer {
 
 export class ExammaRayGradingServer {
 
-  public readonly exams: readonly ExamServer[];
-  public readonly exams_by_id: {
+  private readonly exams_by_id: {
     [index: string]: ExamServer | undefined
   } = {};
 
   private constructor(exams: readonly ExamServer[]) {
-    this.exams = exams;
-    this.exams.forEach(exam => this.exams_by_id[exam.exam.exam_id] = exam);
+    exams.forEach(exam => this.exams_by_id[exam.exam.exam_id] = exam);
   }
 
   public static async create(exam_specs: readonly ExamSpecification[]) {
@@ -529,18 +525,20 @@ export class ExammaRayGradingServer {
     )
   }
 
+  public getExamServer(exam_id: string) {
+    return this.exams_by_id[exam_id];
+  }
+
   public async loadExam(exam_spec: ExamSpecification) {
-    const newExam = await ExamServer.create(exam_spec);
+    this.exams_by_id[exam_spec.exam_id] = await ExamServer.create(exam_spec);
+  }
 
-    let existingIndex = this.exams.findIndex(ex => ex.exam.exam_id === newExam.exam.exam_id);
-    if (existingIndex !== -1) {
-      asMutable(this.exams)[existingIndex] = newExam;
-    }
-    else {
-      asMutable(this.exams).push(newExam);
-    }
+  public async unloadExamServer(exam_id: string) {
+    delete this.exams_by_id[exam_id];
+  }
 
-    this.exams_by_id[newExam.exam.exam_id] = newExam;
+  public getAllExams() {
+    return Object.values(this.exams_by_id) as ExamServer[];
   }
 
 }

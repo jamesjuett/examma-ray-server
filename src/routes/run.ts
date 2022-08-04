@@ -109,7 +109,7 @@ run_router
 
         let run_request = <RunGradingRequest>req.body;
 
-        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+        const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
         if (!exam) {
           res.sendStatus(404);
           return;

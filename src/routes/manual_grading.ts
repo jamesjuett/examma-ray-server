@@ -110,7 +110,7 @@ manual_grading_router
         validateParamQuestionId
       ],
       handler: async (req: Request, res: Response) => {
-        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
         if (qs) {
           return res.status(200).json(qs.rubric);
         }
@@ -154,7 +154,7 @@ manual_grading_router
       handler: async (req: Request, res: Response) => {
         let userInfo = getJwtUserInfo(req);
         let pr = <ManualGradingPingRequest>req.body;
-        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
         if (qs) {
           return res.status(200).json(await qs.processManualGradingPing(userInfo.email, pr));
         }
@@ -177,7 +177,7 @@ manual_grading_router
       handler: async (req: Request, res: Response) => {
         let userInfo = getJwtUserInfo(req);
         let next_ungraded_request = <NextUngradedRequest>req.body;
-        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
         if (qs) {
           return res.status(200).json(<NextUngradedResponse>{
             group_uuid: qs.claimNextUngradedGroup(userInfo.email, next_ungraded_request.client_uuid, next_ungraded_request.desired)
@@ -199,7 +199,7 @@ manual_grading_router
         validateParamExammaRayId("question_id"),
       ],
       handler: async (req: Request, res: Response) => {
-        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
         if (qs) {
           return res.status(200).json(qs.grading_record);
         }
@@ -220,7 +220,7 @@ manual_grading_router
         validateParamExammaRayId("question_id"),
       ],
       handler: async (req: Request, res: Response) => {
-        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
         if (qs) {
           return res.status(200).json(qs.skins);
         }
@@ -241,7 +241,7 @@ manual_grading_router
         validateParamExammaRayId("question_id"),
       ],
       handler: async (req: Request, res: Response) => {
-        let qs = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
         if (qs) {
           return res.status(200).json(qs.config);
         }
