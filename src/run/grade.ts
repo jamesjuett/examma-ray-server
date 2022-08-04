@@ -102,24 +102,7 @@ async function main() {
     }
   }
 
-  const EXAM_GENERATOR_PREVIEW = new ExamGenerator(EXAM, {
-    uuid_strategy: "plain",
-    allow_duplicates: true,
-    choose_all: true,
-    skins: "all"
-  });
-  EXAM_GENERATOR_PREVIEW.assignExam({
-    name: "Sample Solutions",
-    uniqname: "solutions"
-  });
-
-  let sol_html = EXAM_GENERATOR_PREVIEW.renderExams(new SampleSolutionExamRenderer())[0];
-  let sol_dir = `out/${EXAM.exam_id}/solution`;
-  mkdirSync(`${sol_dir}`, { recursive: true });
-  writeFrontendJS(`${sol_dir}/js`, "frontend-solution.js");
-  writeFileSync(`${sol_dir}/solution.html`, sol_html);
   await query.destroy();
-  
 }
 
 main();
