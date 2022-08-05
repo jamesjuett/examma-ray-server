@@ -1,17 +1,15 @@
-import { AssignedExam, Exam, ExamSpecification, StudentInfo } from "examma-ray";
-import { readdirSync, readFileSync } from "fs";
-import { copyFile, readFile, rm } from "fs/promises";
-import { JwtUserInfo } from "./auth/jwt_auth";
-import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, reassignGradingGroups } from "./manual_grading";
-import { asMutable, assert, assertExists, assertFalse, assertNever } from "./util/util";
-import { Worker } from "worker_threads";
-import { ExamGeneratorSpecification } from "examma-ray/dist/ExamGenerator";
+import { Exam, ExamSpecification } from "examma-ray";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
-import { db_deleteExamSubmissionByUuid, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
-import { WorkerData_Generate } from "./run/types";
-import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
-import { db_createCodeGraderConfig, db_createGroup, db_deleteManualGradingBySubmission, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
+import { readFileSync } from "fs";
+import { copyFile, readFile, rm } from "fs/promises";
+import { Worker } from "worker_threads";
 import { RunGradingRequest } from "./dashboard";
+import { db_createCodeGraderConfig, db_createGroup, db_deleteManualGradingByExam, db_deleteManualGradingBySubmission, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
+import { db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
+import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
+import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingSkins, reassignGradingGroups } from "./manual_grading";
+import { WorkerData_Generate } from "./run/types";
+import { asMutable, assert, assertFalse, assertNever } from "./util/util";
 
 const GRADER_IDLE_THRESHOLD = 4000; // ms
 
@@ -156,6 +154,18 @@ export class ExamServer {
     await rm(`data/${exam_submission.exam_id}/submissions/${exam_submission.uniqname}-submission.json`, { force: true });
 
     await this.nextEpoch();
+
+    // All question grading servers will need to reload new submission data from the DB
+    await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
+  }
+
+  public async deleteEverything() {
+    await db_deleteManualGradingByExam(this.exam.exam_id);
+    await db_deleteExamSubmissions(this.exam.exam_id);
+    await db_deleteExam(this.exam.exam_id);
+
+    // Remove the exam data directory
+    await rm(`data/${this.exam.exam_id}/`, { force: true, recursive: true });
 
     // All question grading servers will need to reload new submission data from the DB
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
@@ -529,12 +539,14 @@ export class ExammaRayGradingServer {
     return this.exams_by_id[exam_id];
   }
 
-  public async loadExam(exam_spec: ExamSpecification) {
+  public async loadExamServer(exam_spec: ExamSpecification) {
     this.exams_by_id[exam_spec.exam_id] = await ExamServer.create(exam_spec);
   }
 
-  public async unloadExamServer(exam_id: string) {
+  public unloadExamServer(exam_id: string) {
+    const exam_server = this.exams_by_id[exam_id];
     delete this.exams_by_id[exam_id];
+    return exam_server;
   }
 
   public getAllExams() {

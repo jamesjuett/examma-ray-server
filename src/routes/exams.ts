@@ -74,7 +74,7 @@ exams_router
   
         await db_createExam(new_exam_spec);
 
-        EXAMMA_RAY_GRADING_SERVER.loadExam(new_exam_spec);
+        EXAMMA_RAY_GRADING_SERVER.loadExamServer(new_exam_spec);
   
         return res.sendStatus(201);
       }
@@ -108,23 +108,18 @@ exams_router
       async (req: Request, res: Response) => {
 
         const exam_id = req.params["exam_id"];
-        const exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(exam_id);
+
+        // Unload the exam server, which means we immediately cease to process
+        // any exam-level requests (that would go to the to-be-deleted exam)
+        const exam_server = EXAMMA_RAY_GRADING_SERVER.unloadExamServer(exam_id);
         
+        // There wasn't any server for that exam
         if (!exam_server) {
           return res.sendStatus(404);
         }
 
-        // Stop the exam server, which means we immediately cease to process
-        // any exam-level requests (that would go to the to-be-deleted exam)
-        EXAMMA_RAY_GRADING_SERVER.unloadExamServer(exam_id);
-
         // Remove all manual grading, exam submissions, and exam info from the DB
-        await db_deleteManualGradingByExam(exam_id);
-        await db_deleteExamSubmissions(exam_id);
-        await db_deleteExam(exam_id);
-
-        // Remove the exam data directory
-        await rm(`data/${exam_id}/`, { force: true, recursive: true });
+        await exam_server.deleteEverything();
         
         return res.sendStatus(204); // 204 No Content (delete was successful)
       }
