@@ -45,7 +45,7 @@ export class IndexExammaRayGraderApplication {
           const exam_id = exam_info.exam_id;
           $(".examma-ray-exams-list").append(`
             <li>
-              <a href="dashboard.html?exam-id=${exam_id}">${exam_id}: ${exam_info.uuidv5_namespace}</a>
+              <a href="dashboard.html?exam-id=${exam_id}">${exam_id}</a>
             </li>
           `);
 

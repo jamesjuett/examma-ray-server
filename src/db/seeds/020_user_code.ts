@@ -23,7 +23,7 @@
 
 //   const EXAM_ID = "eecs280f21midterm";
 
-//   const EXAM = Exam.create(ExamUtils.loadExamSpecification(`data/${EXAM_ID}/exam-spec.json`));
+//   const EXAM = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${EXAM_ID}/exam-spec.json`));
 
 //   for (let i = 0; i < EXAM.allQuestions.length; ++i) {
 //     await createQuestionSubmissions(EXAM_ID, EXAM.allQuestions[i]);

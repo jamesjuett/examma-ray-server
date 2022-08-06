@@ -14,7 +14,7 @@ function main() {
   console.log("GENERATE WORKER STARTED".bgBlue);
   const exam_id : string = workerData.exam_id;
 
-  const EXAM = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
+  const EXAM = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${exam_id}/exam-spec.json`));
 
   let lastMessage = Date.now();
 

@@ -103,7 +103,7 @@ async function main() {
 
   EXAMMA_RAY_GRADING_SERVER = await ExammaRayGradingServer.create(
     readdirSync("data", "utf8").map(
-      exam_id => ExamUtils.loadExamSpecification(
+      exam_id => ExamUtils.readExamSpecificationFromFileSync(
         path.join("data", exam_id, "exam-spec.json")
       )
     )

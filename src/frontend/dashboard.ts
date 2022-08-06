@@ -1,6 +1,7 @@
 import avatar from "animal-avatar-generator";
 import axios from "axios";
-import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
+import { Exam, ExamSpecification, parseExamSpecification, StudentInfo } from "examma-ray";
+import { DB_Exams } from "knex/types/tables";
 import queryString from "query-string";
 import { ExamPingResponse, ExamSubmissionRecord, RunGradingRequest } from "../dashboard";
 import { ExamTaskStatus } from "../ExammaRayGradingServer";
@@ -14,6 +15,7 @@ export class DashboardExammaRayGraderApplication {
   public readonly client: ExammaRayGraderClient;
 
   public readonly exam_id: string;
+  public readonly exam_info?: DB_Exams;
   public readonly exam?: Exam;
   
   private exam_epoch?: number;
@@ -98,10 +100,56 @@ export class DashboardExammaRayGraderApplication {
       $("#delete-exam-modal").modal("hide");
     });
 
-    $("#configure-exam-modal").on("show.bs.modal", () => {
+    $("#configure-exam-spec-file-input").on("change", () => {
       
+      let files = (<HTMLInputElement>$("#configure-exam-spec-file-input")[0]).files;
+      if (files && files.length > 0) {
+        this.considerSpecFile(files[0]);
+      }
+      else {
+        $("#configure-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
+      }
     });
 
+    $("#configure-exam-spec-button").on("click", async () => {
+      const formData = new FormData();
+      let files = (<HTMLInputElement>$("#configure-exam-spec-file-input")[0]).files;
+      if (!files || !files[0]) {
+        return;
+      }
+      formData.append("exam_spec", files[0]);
+      await axios({
+        url: `api/exams`,
+        method: "POST",
+        data: formData,
+        headers: {
+          'Authorization': 'bearer ' + this.client.getBearerToken(),
+        },
+      });
+      
+      $("#configure-exam-spec-file-input").val("");
+      $("#configure-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
+    });
+
+    $("#configure-exam-modal").on("show.bs.modal", () => {
+      $("#configure-exam-uuidv5_namespace-input").val(this.exam_info?.uuidv5_namespace ?? "");
+    });
+
+  }
+
+  private considerSpecFile(file: File) {
+    const reader = new FileReader();
+    reader.readAsText(file);
+    reader.onload = () => {
+      
+      const new_spec = parseExamSpecification(<string>reader.result);
+      console.log(new_spec.title);
+
+      $("#configure-exam-spec-button").prop("disabled", false).removeClass("btn-success").addClass("btn-warning").html('<i class="bi bi-file-arrow-up"></i> Upload');
+    };
+    reader.onerror = () => {
+      alert(reader.error);
+    }
   }
 
   private async checkTaskStatus() {
@@ -160,6 +208,18 @@ export class DashboardExammaRayGraderApplication {
   public async reloadExam() {
 
     try {
+      
+      const exam_info : DB_Exams = (await axios({
+        url: `api/exams/${this.exam_id}`,
+        method: "GET",
+        data: {},
+        headers: {
+            'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      })).data;
+
+      console.log(exam_info);
+      asMutable(this).exam_info = exam_info;
 
       const exam_spec_response = await axios({
         url: `api/exams/${this.exam_id}/spec`,
@@ -234,18 +294,13 @@ export class DashboardExammaRayGraderApplication {
         self.sendPing();
       });
 
-      const forced_code_grader = [
-        "secret_message",
-        "cstring_interleave",
-      ];
-
       $("#examma-ray-question-grading-list").html(
         this.exam!.allQuestions
-          .filter(q => q.response.default_grader?.grader_kind === "manual_code_writing" || forced_code_grader.indexOf(q.question_id) !== -1)
+          .filter(q => q.response.default_grader?.grader_kind === "manual_code_writing")
           .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("")
         + 
         this.exam!.allQuestions
-        .filter(q => q.response.default_grader?.grader_kind === "manual_generic" && !(forced_code_grader.indexOf(q.question_id) !== -1))
+        .filter(q => q.response.default_grader?.grader_kind === "manual_generic")
         .map(q => `<li><a href="manual-generic-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("")
 
       );

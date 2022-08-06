@@ -177,22 +177,29 @@
           </button>
         </div>
         <div class="modal-body">
-          <div class="form-group-horizontal">
-            <label for="configure-exam-input-secret">
-              <i class="bi bi-check-square" style="font-size: large; color: green;"></i> Exam Specification
-            </label>
-            <input class="form-control-file" id="upload-roster-file-input" type="file" name="roster" />
-              <button type="button" class="btn btn-sm btn-primary" id="configure-exam-secret-submit-button">Update</button>
+          <p>
+            <b>Exam Specification</b><br />
+            You may upload a new exam specification file to modify the structure or content of the exam.
+            If the exam has already been given, changes may still be made to question descriptions, sample solutions,
+            grader specifications, etc. but should NOT be made to the structure of the exam.
+          </p>
+          <div class="form-group-horizontal row">
+            <div class="col-auto">
+              <button type="button" class="btn btn-sm btn-success" id="configure-exam-spec-button" disabled><i class="bi bi-file-check"></i> Uploaded</button>
+            </div>
+            <div class="col-auto">
+              <input class="form-control-file" id="configure-exam-spec-file-input" type="file" name="spec" />
+            </div>
           </div>
           <hr />
           <div class="form-group row">
-            <label class="col-form-label col-3" for="configure-exam-input-secret">
+            <label class="col-form-label col-3" for="configure-exam-uuidv5_namespace-input">
               <i class="bi bi-check-square" style="font-size: large; color: green;"></i> UUID Secret
             </label>
             <div class="col-9">
               <button type="button" class="btn btn-sm btn-primary" id="configure-exam-secret-edit-button">Edit</button>
               <button type="button" class="btn btn-sm btn-primary" id="configure-exam-secret-submit-button">Update</button>
-              <input type="text" class="form-control" id="configure-exam-secret-input">
+              <input type="text" class="form-control" id="configure-exam-uuidv5_namespace-input">
               <button type="button" class="btn btn-sm btn-secondary" id="configure-exam-secret-submit-button">Cancel</button>
             </div>
           </div>

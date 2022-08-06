@@ -1,4 +1,5 @@
-import { ExamSpecification } from "examma-ray";
+import { ExamSpecification, parseExamSpecification } from "examma-ray";
+import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { Request, Response, Router } from "express";
 import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import multer from "multer";
@@ -47,7 +48,7 @@ exams_router
         }
 
         const uploaded_filepath = `uploads/${req.file?.filename}`;
-        const new_exam_spec = <ExamSpecification>JSON.parse(await readFile(uploaded_filepath, "utf8"));
+        const new_exam_spec = parseExamSpecification(await readFile(uploaded_filepath, "utf8"));
         await rm(uploaded_filepath, { force: true });
 
         if (EXAMMA_RAY_GRADING_SERVER.getExamServer(new_exam_spec.exam_id)) {
