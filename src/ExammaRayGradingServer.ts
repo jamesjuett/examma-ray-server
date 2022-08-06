@@ -2,10 +2,11 @@ import { Exam, ExamSpecification } from "examma-ray";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { readFileSync } from "fs";
 import { copyFile, readFile, rm } from "fs/promises";
+import { DB_Exams } from "knex/types/tables";
 import { Worker } from "worker_threads";
 import { RunGradingRequest } from "./dashboard";
 import { db_createCodeGraderConfig, db_createGroup, db_deleteManualGradingByExam, db_deleteManualGradingBySubmission, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
-import { db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
+import { db_createExam, db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExam, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
 import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
 import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingSkins, reassignGradingGroups } from "./manual_grading";
 import { WorkerData_Generate } from "./run/types";
@@ -24,22 +25,28 @@ export class ExamServer {
   public readonly exam: Exam;
   public readonly epoch: number;
 
+  
   public readonly taskStatus: ExamTaskStatus = { };
+  
+  private readonly uuidv5_namespace;
 
   private readonly questionGradingServers: {
     [index: string]: QuestionGradingServer | undefined
   } = {};
 
-  private constructor(exam: Exam, epoch: number, question_servers: readonly QuestionGradingServer[]) {
+  private constructor(exam: Exam, db_exam: DB_Exams, epoch: number, question_servers: readonly QuestionGradingServer[]) {
     this.exam = exam;
     this.epoch = epoch;
+    this.uuidv5_namespace = db_exam.uuidv5_namespace;
     question_servers.forEach(qs => this.questionGradingServers[qs.question_id] = qs);
   }
 
   public static async create(exam_spec: ExamSpecification) {
+    const db_exam = await db_createExam(exam_spec);
     const exam = Exam.create(exam_spec);
     return new ExamServer(
       exam,
+      db_exam,
       0,
       await Promise.all(exam.allQuestions.map(q => QuestionGradingServer.create(q.question_id)))
     );
@@ -50,16 +57,11 @@ export class ExamServer {
   }
 
   public async update(updates: {
-    new_roster_csv_filepath?: string,
-    new_secret_filepath?: string
+    new_roster_csv_filepath?: string
   }) {
 
     if (updates.new_roster_csv_filepath) {
       this.setRoster(updates.new_roster_csv_filepath);
-    }
-
-    if (updates.new_secret_filepath) {
-      this.setSecret(updates.new_secret_filepath);
     }
 
     await this.generateExams();
@@ -69,17 +71,13 @@ export class ExamServer {
   private async setRoster(new_roster_csv_filepath: string) {
     await copyFile(new_roster_csv_filepath, `data/${this.exam.exam_id}/roster.csv`);
   }
-  
-  private async setSecret(new_secret_filepath: string) {
-    await copyFile(new_secret_filepath, `data/${this.exam.exam_id}/secret`);
-  }
 
   private async generateExams() {
     
     console.log("GENERATING EXAMS".bgBlue);
 
-    let secret = await readFile(`data/${this.exam.exam_id}/secret`, "utf-8");
-    let roster = await ExamUtils.loadCSVRoster(`data/${this.exam.exam_id}/roster.csv`);
+    // TODO: can we make this async? (probably not a huge deal, but still)
+    let roster = ExamUtils.loadCSVRoster(`data/${this.exam.exam_id}/roster.csv`);
 
     const worker = new Worker("./build/run/gen.js", {
       workerData: <WorkerData_Generate>{
@@ -87,7 +85,7 @@ export class ExamServer {
         roster: roster,
         gen_spec: {
           uuid_strategy: "uuidv5",
-          uuidv5_namespace: secret,
+          uuidv5_namespace: this.uuidv5_namespace,
           frontend_js_path: "js"
         }
       }
@@ -102,7 +100,7 @@ export class ExamServer {
 
     const grader_spec = {
       uuid_strategy: "uuidv5",
-      uuidv5_namespace: readFileSync(`data/${this.exam.exam_id}/secret`, "utf-8"),
+      uuidv5_namespace: this.uuidv5_namespace,
       frontend_js_path: "js",
     };
 

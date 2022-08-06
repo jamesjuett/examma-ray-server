@@ -98,6 +98,10 @@ export class DashboardExammaRayGraderApplication {
       $("#delete-exam-modal").modal("hide");
     });
 
+    $("#configure-exam-modal").on("show.bs.modal", () => {
+      
+    });
+
   }
 
   private async checkTaskStatus() {
@@ -158,7 +162,7 @@ export class DashboardExammaRayGraderApplication {
     try {
 
       const exam_spec_response = await axios({
-        url: `api/exams/${this.exam_id}`,
+        url: `api/exams/${this.exam_id}/spec`,
         method: "GET",
         data: {},
         headers: {

@@ -12,6 +12,7 @@ declare module "knex/types/tables" {
 
   interface DB_Exams {
     exam_id: string;
+    uuidv5_namespace: string;
     epoch: number;
   }
 
@@ -96,8 +97,8 @@ declare module "knex/types/tables" {
       //   All required
       DB_Exams,
       // Update Type
-      //   Only allowed to update epoch
-      Partial<Pick<DB_Exams, "epoch">>
+      //   Only allowed to update epoch or uuidv5_namespace
+      Partial<Pick<DB_Exams, "epoch" | "uuidv5_namespace">>
     >;
     
     exam_submissions: Knex.CompositeTableType<

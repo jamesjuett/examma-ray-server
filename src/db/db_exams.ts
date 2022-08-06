@@ -3,8 +3,16 @@ import { query } from "./db";
 import { v4 as uuidv4 } from "uuid";
 import { assert } from "../util/util";
 
+export async function db_getExam(exam_id: string) {
+  return query("exams").where({exam_id: exam_id}).select("*").first();
+}
+
+export async function db_getExams() {
+  return query("exams").select("*");
+}
+
 export async function db_getExamEpoch(exam_id: string) {
-  return await query("exams").where({exam_id: exam_id}).select("epoch").first();
+  return query("exams").where({exam_id: exam_id}).select("epoch").first();
 }
 
 export async function db_nextExamEpoch(exam_id: string, new_epoch?: number) {
@@ -22,10 +30,12 @@ export async function db_nextExamEpoch(exam_id: string, new_epoch?: number) {
 }
 
 export async function db_createExam(exam_spec: ExamSpecification) {
-  return await query("exams").insert({
+  return await query("exams").where({exam_id: exam_spec.exam_id}).first()
+   ?? (await query("exams").insert({
     exam_id: exam_spec.exam_id,
+    uuidv5_namespace: uuidv4(),
     epoch: 0
-  }).returning("*");
+  }).returning("*"))[0];
 }
 
 export async function db_deleteExam(exam_id: string) {
