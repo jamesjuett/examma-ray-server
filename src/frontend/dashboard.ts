@@ -1,8 +1,10 @@
 import avatar from "animal-avatar-generator";
 import axios from "axios";
 import { Exam, ExamSpecification, parseExamSpecification, StudentInfo } from "examma-ray";
+import { ExamDiff } from "examma-ray/dist/ExamDiff";
 import { DB_Exams } from "knex/types/tables";
 import queryString from "query-string";
+import { v4 } from "uuid";
 import { ExamPingResponse, ExamSubmissionRecord, RunGradingRequest } from "../dashboard";
 import { ExamTaskStatus } from "../ExammaRayGradingServer";
 import { asMutable, assert } from "../util/util";
@@ -142,8 +144,22 @@ export class DashboardExammaRayGraderApplication {
     reader.readAsText(file);
     reader.onload = () => {
       
-      const new_spec = parseExamSpecification(<string>reader.result);
-      console.log(new_spec.title);
+      const original_exam = this.exam;
+      const new_exam = Exam.create(parseExamSpecification(<string>reader.result));
+      if (original_exam) {
+        const exam_diff = ExamDiff.shallowDiff(original_exam.spec, new_exam.spec);
+        console.log("Exam diff:");
+        console.log(exam_diff);
+
+        console.log("Section Diffs:");
+        new_exam.allSections.forEach(new_section => {
+          const original_section = original_exam.getSectionById(new_section.section_id);
+          if (!original_section) { return; }
+          const section_diff = ExamDiff.shallowDiff(original_section.spec, new_section.spec);
+          console.log(new_section.section_id);
+          console.log(section_diff);
+        })
+      }
 
       $("#configure-exam-spec-button").prop("disabled", false).removeClass("btn-success").addClass("btn-warning").html('<i class="bi bi-file-arrow-up"></i> Upload');
     };
