@@ -68,7 +68,7 @@ async function assignGrading(exam: Exam, submission: TrustedExamSubmission) {
 async function main() {
   const exam_id = <string>workerData.exam_id;
 
-  const exam = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
+  const exam = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${exam_id}/exam-spec.json`));
 
   const uploaded_files : Express.Multer.File[] = workerData.files ?? [];
 

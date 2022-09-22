@@ -91,7 +91,7 @@ async function main() {
   // const grader_spec : ExamGraderOptions = workerData.grader_spec;
   // const reports : boolean = workerData.reports;
 
-  // const EXAM = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
+  // const EXAM = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${exam_id}/exam-spec.json`));
 
   // // const EXAM_GENERATOR_INDIVIDUAL = new ExamGenerator(EXAM, {
   // //   uuid_strategy: "uuidv5",

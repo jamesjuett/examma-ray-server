@@ -65,7 +65,7 @@ async function main() {
   const grader_spec : ExamGraderOptions = workerData.grader_spec;
   const run_request : RunGradingRequest = workerData.run_request;
 
-  const EXAM = Exam.create(ExamUtils.loadExamSpecification(`data/${exam_id}/exam-spec.json`));
+  const EXAM = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${exam_id}/exam-spec.json`));
   
   let lastMessage = Date.now();
   

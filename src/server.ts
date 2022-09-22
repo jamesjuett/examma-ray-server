@@ -23,69 +23,19 @@ import { getJwtUserInfo } from './auth/jwt_auth';
 export let EXAMMA_RAY_GRADING_SERVER: ExammaRayGradingServer;
 
 const STAFF = new Set<string>([
-  "abifox@umich.edu",
   "aravikum@umich.edu",
-  "aelhamah@umich.edu",
-  "adaines@umich.edu",
-  "stoneann@umich.edu",
-  "sarangia@umich.edu",
-  "ajamalud@umich.edu",
-  "ashpatel@umich.edu",
-  "ashleyac@umich.edu",
   "ashvink@umich.edu",
-  "bkayes@umich.edu",
-  "brightxu@umich.edu",
-  "ciheanyi@umich.edu",
-  "chrzhang@umich.edu",
-  "clsun@umich.edu",
-  "babila@umich.edu",
-  "danlliu@umich.edu",
-  "divyaram@umich.edu",
-  "eylu@umich.edu",
-  "fiahmed@umich.edu",
-  "gsev@umich.edu",
-  "gurish@umich.edu",
-  "hniswand@umich.edu",
+  "egriffis@umich.edu",
   "iabouara@umich.edu",
   "imanmal@umich.edu",
   "jjuett@umich.edu",
-  "wengj@umich.edu",
-  "houghj@umich.edu",
   "jbbeau@umich.edu",
-  "macekj@umich.edu",
-  "joshsieg@umich.edu",
-  "jcaoun@umich.edu",
   "jsliu@umich.edu",
-  "metzkm@umich.edu",
   "kamiz@umich.edu",
-  "leheng@umich.edu",
   "fimaria@umich.edu",
-  "mariamhm@umich.edu",
-  "mipeng@umich.edu",
-  "mmliu@umich.edu",
-  "saputran@umich.edu",
-  "nehark@umich.edu",
-  "nishuk@umich.edu",
-  "omidsh@umich.edu",
-  "ptaneja@umich.edu",
-  "congq@umich.edu",
-  "qinjuanx@umich.edu",
-  "rnag@umich.edu",
-  "rosendon@umich.edu",
-  "rushilk@umich.edu",
-  "sjaehnig@umich.edu",
-  "schabseb@umich.edu",
-  "patis@umich.edu",
+  "pmathena@umich.edu",
   "sofias@umich.edu",
-  "yiranshi@umich.edu",
-  "unserh@umich.edu",
-  "vrnayak@umich.edu",
   "qwzhao@umich.edu",
-  "wsoltas@umich.edu",
-  "zccarey@umich.edu",
-  "zwgold@umich.edu",
-  "zalsaedy@umich.edu",
-  "schatzju@umich.edu"
 ]);
 
 function requireStaff(req: Request, res: Response, next: NextFunction) {
@@ -103,7 +53,7 @@ async function main() {
 
   EXAMMA_RAY_GRADING_SERVER = await ExammaRayGradingServer.create(
     readdirSync("data", "utf8").map(
-      exam_id => ExamUtils.loadExamSpecification(
+      exam_id => ExamUtils.readExamSpecificationFromFileSync(
         path.join("data", exam_id, "exam-spec.json")
       )
     )
