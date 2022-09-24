@@ -123,12 +123,12 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
-      if (!exam) {
+      const exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
+      if (!exam_server) {
         res.sendStatus(404);
         return;
       }
-      res.status(200).json(exam.exam.spec);
+      res.status(200).json(exam_server.exam.spec);
     }
   }));
 

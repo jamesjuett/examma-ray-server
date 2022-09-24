@@ -11,7 +11,6 @@ import { asMutable, assert } from "../util/util";
 import { ExammaRayGraderClient } from "./Application";
 
 
-
 export class DashboardExammaRayGraderApplication {
 
   public readonly client: ExammaRayGraderClient;
@@ -135,6 +134,17 @@ export class DashboardExammaRayGraderApplication {
 
     $("#configure-exam-modal").on("show.bs.modal", () => {
       $("#configure-exam-uuidv5_namespace-input").val(this.exam_info?.uuidv5_namespace ?? "");
+    });
+
+    if (window.location.hash) {
+      $('ul.nav a[href="' + window.location.hash + '"]').tab('show');
+    }
+    else {
+      $('ul.nav a').first().tab('show');
+    }
+  
+    $('#dashboard-navigation a').on("click", function() {
+      window.location.hash = (<HTMLAnchorElement>this).hash.substring(1);
     });
 
   }

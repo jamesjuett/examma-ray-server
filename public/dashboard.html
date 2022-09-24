@@ -30,9 +30,9 @@
 
 <body>
 
-  <div style="width: 100vw; height: 100vh; overflow-y: hidden">
+  <div style="width: 100vw;">
 
-    <div style="margin: 0.25em; height: 60px;">
+    <div style="margin: 5px 20px; height: 45px; position: sticky; top: 5px;">
       <div style="float: right; vertical-align: middle;">
         <a class="btn btn-primary examma-ray-log-in-button" href="auth/google">Sign In</a>
         <button style="display:none;" class="btn btn-warning examma-ray-log-out-button"><i class="bi bi-person-x-fill"></i> Sign Out</button>
@@ -40,65 +40,232 @@
       <h4 style="display:inline-block; vertical-align: middle;">
         <span class="examma-ray-exam-id"></span>
       </h4>
-      <button class="btn btn-primary" data-toggle="modal" data-target="#configure-exam-modal"><i class="bi bi-gear"></i> Configure</button>
+      <div style="display: inline-block;">
+
+        <nav>
+          <ul class="nav nav-pills mb-3" id="dashboard-navigation" role="tablist">
+            <li class="nav-item">
+              <a class="nav-link" id="grading-tab" data-toggle="pill" href="#grading" role="tab" aria-controls="grading" aria-selected="true">
+                <i class="bi bi-journal-check"></i> Grading
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="configure-tab" data-toggle="pill" href="#configure" role="tab" aria-controls="configure" aria-selected="false">
+                <i class="bi bi-gear"></i> Configure Exam
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="roster-tab" data-toggle="pill" href="#roster" role="tab" aria-controls="roster" aria-selected="false">
+                <i class="bi bi-people"></i> Roster
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+      
     </div>
 
-
-    <h3>Tasks</h3>
-    <div id="examma-ray-task-status">
-    </div>
-
-    <button class="btn btn-success examma-ray-run-grading-button" data-toggle="modal" data-target="#run-grading-modal">Run Grading</button>
-
-    <table>
-      <tr>
-        <td>
-          <div>
-
-            <h3>Students</h3>
-            <ul class="examma-ray-students-list" style="overflow-y: auto; max-height: 70vh;">
-      
-            </ul>
-          </div>
-          
-        </td>
-        <td>
-          <div>
-            <h3>Grading Overview</h3>
-            <p>
-              Linked <a id="examma-ray-grading-overview-link" class="btn btn-sm btn-outline-primary">here</a>
-              <br />
-              (Run grading/reports to update)
-            </p>
-            <h3>Question Grading</h3>
-            <ul id="examma-ray-question-grading-list" style="overflow-y: auto; max-height: 70vh;">
-      
-            </ul>
-          </div>
-          
-        </td>
-      </tr>
-    </table>
+    <div class="tab-content" id="pills-tabContent">
+      <div class="tab-pane" id="grading" role="tabpanel" aria-labelledby="grading-tab">
 
 
-
-    <div class="alert alert-danger" style="position: absolute; bottom: 0; right: 0" role="alert">
-      <h2>DANGER DO NOT CLICK THESE</h2>
+        <h3>Tasks</h3>
+        <div id="examma-ray-task-status">
+        </div>
     
-      <div>
-        <i class="bi bi-check2-square"></i> Exam Specification
+        <button class="btn btn-success examma-ray-run-grading-button" data-toggle="modal" data-target="#run-grading-modal">Run Grading</button>
+    
+        <table>
+          <tr>
+            <td>
+              <div>
+                <h3>Grading Overview</h3>
+                <p>
+                  Linked <a id="examma-ray-grading-overview-link" class="btn btn-sm btn-outline-primary">here</a>
+                  <br />
+                  (Run grading/reports to update)
+                </p>
+                <h3>Question Grading</h3>
+                <ul id="examma-ray-question-grading-list" style="overflow-y: auto; max-height: 70vh;">
+          
+                </ul>
+              </div>
+              
+            </td>
+          </tr>
+        </table>
+    
+    
+    
+        <div class="alert alert-danger" style="position: absolute; bottom: 0; right: 0" role="alert">
+          <h2>DANGER DO NOT CLICK THESE</h2>
+        
+          <div>
+            <i class="bi bi-check2-square"></i> Exam Specification
+          </div>
+          
+          <div>
+            <button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#upload-roster-modal">Upload</button> Exam Roster 
+          </div>
+          <form id="submissions-file-input-form" enctype="multipart/form-data">
+            <input id="submissions-file-input" type="file" name="submissions" multiple/>
+            <button type="submit">Submit</button>
+          </form>
+        </div>
+
       </div>
-      
-      <div>
-        <button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#upload-roster-modal">Upload</button> Exam Roster 
+      <div class="tab-pane" id="configure" role="tabpanel" aria-labelledby="configure-tab">
+        
+        <h5 class="modal-title"><b>Configure Exam</b></h5> 
+
+        <p>
+          <b>Exam Specification</b><br />
+          You may upload a new exam specification file to modify the structure or content of the exam.
+          If the exam has already been given, changes may still be made to question descriptions, sample solutions,
+          grader specifications, etc. but should NOT be made to the structure of the exam.
+        </p>
+        <div class="form-group-horizontal row">
+          <div class="col-auto">
+            <button type="button" class="btn btn-sm btn-success" id="configure-exam-spec-button" disabled><i class="bi bi-file-check"></i> Uploaded</button>
+          </div>
+          <div class="col-auto">
+            <input class="form-control-file" id="configure-exam-spec-file-input" type="file" name="spec" />
+          </div>
+        </div>
+        <hr />
+        <div class="form-group row">
+          <label class="col-form-label col-3" for="configure-exam-uuidv5_namespace-input">
+            <i class="bi bi-check-square" style="font-size: large; color: green;"></i> UUID Secret
+          </label>
+          <div class="col-9">
+            <button type="button" class="btn btn-sm btn-primary" id="configure-exam-secret-edit-button">Edit</button>
+            <button type="button" class="btn btn-sm btn-primary" id="configure-exam-secret-submit-button">Update</button>
+            <input type="text" class="form-control" id="configure-exam-uuidv5_namespace-input">
+            <button type="button" class="btn btn-sm btn-secondary" id="configure-exam-secret-submit-button">Cancel</button>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group col-4">
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="configure-exam-input-curve">
+              <label class="form-check-label" for="configure-exam-input-curve">Apply Curve?</label>
+            </div>
+          </div>
+          <div class="form-group col-4">
+            <label for="configure-exam-input-curve-target-mean">Target Mean</label>
+            <input type="number" class="form-control" id="configure-exam-input-curve-target-mean">
+          </div>
+          <div class="form-group col-4">
+            <label for="configure-exam-input-curve-target-stddev">Target Stddev</label>
+            <input type="number" class="form-control" id="configure-exam-input-curve-target-stddev">
+          </div>
+        </div>
+
+        <div>
+          <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" data-target="#delete-exam-modal">DELETE EXAM</button>
+        </div>
+
       </div>
-      <div>
-        <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" data-target="#delete-exam-modal">DELETE EXAM</button>
+      <div class="tab-pane" id="roster" role="tabpanel" aria-labelledby="roster-tab">
+        
+        <div style="position: sticky; top: 55px;">
+          <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" data-target="#delete-exam-modal">DELETE EXAM</button>
+        </div>
+
+        <h3>Students</h3>
+        <ul class="examma-ray-students-list">
+        </ul>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+        <li>test</li>
+
       </div>
-      <form id="submissions-file-input-form" enctype="multipart/form-data">
-        <input id="submissions-file-input" type="file" name="submissions" multiple/>
-        <button type="submit">Submit</button>
-      </form>
     </div>
 
     
@@ -162,76 +329,6 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
           <button type="button" id="run-grading-submit-button" class="btn btn-primary">Run</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal fade" id="configure-exam-modal" tabindex="-1" role="dialog" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title"><b>Configure Exam</b></h5> 
-          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-            <span aria-hidden="true">&times;</span>
-          </button>
-        </div>
-        <div class="modal-body">
-          <p>
-            <b>Exam Specification</b><br />
-            You may upload a new exam specification file to modify the structure or content of the exam.
-            If the exam has already been given, changes may still be made to question descriptions, sample solutions,
-            grader specifications, etc. but should NOT be made to the structure of the exam.
-          </p>
-          <div class="form-group-horizontal row">
-            <div class="col-auto">
-              <button type="button" class="btn btn-sm btn-success" id="configure-exam-spec-button" disabled><i class="bi bi-file-check"></i> Uploaded</button>
-            </div>
-            <div class="col-auto">
-              <input class="form-control-file" id="configure-exam-spec-file-input" type="file" name="spec" />
-            </div>
-          </div>
-          <hr />
-          <div class="form-group row">
-            <label class="col-form-label col-3" for="configure-exam-uuidv5_namespace-input">
-              <i class="bi bi-check-square" style="font-size: large; color: green;"></i> UUID Secret
-            </label>
-            <div class="col-9">
-              <button type="button" class="btn btn-sm btn-primary" id="configure-exam-secret-edit-button">Edit</button>
-              <button type="button" class="btn btn-sm btn-primary" id="configure-exam-secret-submit-button">Update</button>
-              <input type="text" class="form-control" id="configure-exam-uuidv5_namespace-input">
-              <button type="button" class="btn btn-sm btn-secondary" id="configure-exam-secret-submit-button">Cancel</button>
-            </div>
-          </div>
-          <div class="form-group row">
-            <label class="col-form-label col-3" for="configure-exam-input-roster-file">
-              <i class="bi bi-check-square" style="font-size: large; color: green;"></i> Roster
-            </label>
-            <div class="col-9">
-              <input class="form-control-file" id="upload-roster-file-input" type="file" name="roster" />
-            </div>
-          </div>
-          
-          <div class="form-row">
-            <div class="form-group col-4">
-              <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="configure-exam-input-curve">
-                <label class="form-check-label" for="configure-exam-input-curve">Apply Curve?</label>
-              </div>
-            </div>
-            <div class="form-group col-4">
-              <label for="configure-exam-input-curve-target-mean">Target Mean</label>
-              <input type="number" class="form-control" id="configure-exam-input-curve-target-mean">
-            </div>
-            <div class="form-group col-4">
-              <label for="configure-exam-input-curve-target-stddev">Target Stddev</label>
-              <input type="number" class="form-control" id="configure-exam-input-curve-target-stddev">
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-          <button type="button" id="configure-exam-submit-button" class="btn btn-primary">Run</button>
         </div>
       </div>
     </div>
