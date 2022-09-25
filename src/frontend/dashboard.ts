@@ -63,6 +63,21 @@ export class DashboardExammaRayGraderApplication {
       $("#upload-roster-modal").modal("hide");
     });
 
+    $("#run-generate-submit-button").on("click", async () => {
+      let response = await axios({
+        url: `run/generate/${this.exam_id}`,
+        method: "POST",
+        headers: {
+          'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      });
+
+      if (response.status !== 200) {
+        alert(response.data);
+      }
+      
+      $("#run-generate-modal").modal("hide");
+    });
     
     $("#run-grading-submit-button").on("click", async () => {
       const request: RunGradingRequest = {

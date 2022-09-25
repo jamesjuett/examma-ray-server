@@ -268,7 +268,7 @@ exams_router
 
         const uploaded_filepath = `uploads/${req.file?.filename}`;
 
-        await exam.update({ new_roster_csv_filepath: uploaded_filepath });
+        await exam.setRoster(uploaded_filepath);
 
         await rm(uploaded_filepath, { force: true });
         return res.sendStatus(201);

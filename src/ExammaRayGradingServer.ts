@@ -56,23 +56,11 @@ export class ExamServer {
     return ExamUtils.loadCSVRoster(`data/${this.exam.exam_id}/roster.csv`);
   }
 
-  public async update(updates: {
-    new_roster_csv_filepath?: string
-  }) {
-
-    if (updates.new_roster_csv_filepath) {
-      this.setRoster(updates.new_roster_csv_filepath);
-    }
-
-    await this.generateExams();
-    await this.nextEpoch();
-  }
-
-  private async setRoster(new_roster_csv_filepath: string) {
+  public async setRoster(new_roster_csv_filepath: string) {
     await copyFile(new_roster_csv_filepath, `data/${this.exam.exam_id}/roster.csv`);
   }
 
-  private async generateExams() {
+  public async generateExams() {
     
     console.log("GENERATING EXAMS".bgBlue);
 
@@ -92,6 +80,7 @@ export class ExamServer {
     });
 
     await this.workerTask(worker, "generate", `Preparing to generate ${roster.length} exams...`);
+    await this.nextEpoch();
   }
 
   public async gradeExams(run_request: RunGradingRequest) {
