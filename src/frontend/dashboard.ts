@@ -43,6 +43,35 @@ export class DashboardExammaRayGraderApplication {
     $(".examma-ray-exam-id").html(this.exam_id);
     $("#examma-ray-grading-overview-link").attr("href", `out/${this.exam_id}/graded/overview.html`);
 
+    
+    $("#change_uuidv5_namespace-modal").on("show.bs.modal", () => {
+      $("#change_uuidv5_namespace-input").val(this.exam_info?.uuidv5_namespace ?? "");
+      $("#change_uuidv5_namespace-submit-button").prop("disabled", true);
+    });
+  
+    $("#change_uuidv5_namespace-input").on("input", () => {
+      $("#change_uuidv5_namespace-submit-button").prop(
+        "disabled",
+        $("#change_uuidv5_namespace-input").val() === this.exam_info?.uuidv5_namespace
+        || !($("#change_uuidv5_namespace-input")[0] as HTMLInputElement).checkValidity()
+      );
+    });
+
+    $("#change_uuidv5_namespace-submit-button").on("click", async () => {
+      await axios({
+        url: `api/exams/${this.exam_id}/uuidv5_namespace`,
+        method: "PUT",
+        data: {
+          uuidv5_namespace: $("#change_uuidv5_namespace-input").val()
+        },
+        headers: {
+          'Authorization': 'bearer ' + this.client.getBearerToken(),
+        },
+      });
+      
+      $("#change_uuidv5_namespace-modal").modal("hide");
+    });
+
     $("#upload-roster-modal-button").on("click", async () => {
       
       let files = (<HTMLInputElement>$("#upload-roster-file-input")[0]).files;
@@ -147,9 +176,6 @@ export class DashboardExammaRayGraderApplication {
       $("#configure-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
     });
 
-    $("#configure-exam-modal").on("show.bs.modal", () => {
-      $("#configure-exam-uuidv5_namespace-input").val(this.exam_info?.uuidv5_namespace ?? "");
-    });
 
     if (window.location.hash) {
       $('ul.nav a[href="' + window.location.hash + '"]').tab('show');
@@ -261,6 +287,8 @@ export class DashboardExammaRayGraderApplication {
 
       console.log(exam_info);
       asMutable(this).exam_info = exam_info;
+      
+      $("#exam-uuidv5_namespace").val(this.exam_info?.uuidv5_namespace ?? "");
 
       const exam_spec_response = await axios({
         url: `api/exams/${this.exam_id}/spec`,

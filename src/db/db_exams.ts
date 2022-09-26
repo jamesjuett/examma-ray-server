@@ -29,13 +29,19 @@ export async function db_nextExamEpoch(exam_id: string, new_epoch?: number) {
   }).returning("epoch");
 }
 
-export async function db_createExam(exam_spec: ExamSpecification) {
-  return await query("exams").where({exam_id: exam_spec.exam_id}).first()
+export async function db_getOrCreateExam(exam_id: string) {
+  return await query("exams").where({exam_id: exam_id}).first()
    ?? (await query("exams").insert({
-    exam_id: exam_spec.exam_id,
+    exam_id: exam_id,
     uuidv5_namespace: uuidv4(),
     epoch: 0
   }).returning("*"))[0];
+}
+
+export async function db_updateExamUuidV5Namespace(exam_id: string, namespace: string) {
+  return await query("exams").where({exam_id: exam_id}).update({
+    uuidv5_namespace: namespace,
+  });
 }
 
 export async function db_deleteExam(exam_id: string) {

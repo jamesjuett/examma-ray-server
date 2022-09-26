@@ -6,7 +6,7 @@ import { DB_Exams } from "knex/types/tables";
 import { Worker } from "worker_threads";
 import { RunGradingRequest } from "./dashboard";
 import { db_createCodeGraderConfig, db_createGroup, db_deleteManualGradingByExam, db_deleteManualGradingBySubmission, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
-import { db_createExam, db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExam, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
+import { db_getOrCreateExam, db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExam, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch, db_updateExamUuidV5Namespace } from "./db/db_exams";
 import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
 import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingSkins, reassignGradingGroups } from "./manual_grading";
 import { WorkerData_Generate } from "./run/types";
@@ -25,10 +25,9 @@ export class ExamServer {
   public readonly exam: Exam;
   public readonly epoch: number;
 
-  
   public readonly taskStatus: ExamTaskStatus = { };
   
-  private readonly uuidv5_namespace;
+  private uuidv5_namespace;
 
   private readonly questionGradingServers: {
     [index: string]: QuestionGradingServer | undefined
@@ -42,7 +41,7 @@ export class ExamServer {
   }
 
   public static async create(exam_spec: ExamSpecification) {
-    const db_exam = await db_createExam(exam_spec);
+    const db_exam = await db_getOrCreateExam(exam_spec.exam_id);
     const exam = Exam.create(exam_spec);
     return new ExamServer(
       exam,
@@ -51,6 +50,14 @@ export class ExamServer {
       await Promise.all(exam.allQuestions.map(q => QuestionGradingServer.create(q.question_id)))
     );
   }
+
+  public getExamInfo() {
+    return {
+      exam_id: this.exam.exam_id,
+      uuidv5_namespace: this.uuidv5_namespace,
+      epoch: this.epoch,
+    };
+  }
   
   public async getRoster() {
     return ExamUtils.loadCSVRoster(`data/${this.exam.exam_id}/roster.csv`);
@@ -58,6 +65,11 @@ export class ExamServer {
 
   public async setRoster(new_roster_csv_filepath: string) {
     await copyFile(new_roster_csv_filepath, `data/${this.exam.exam_id}/roster.csv`);
+  }
+
+  public async setUuidV5Namespace(namespace: string) {
+    this.uuidv5_namespace = namespace;
+    await db_updateExamUuidV5Namespace(this.exam.exam_id, namespace);
   }
 
   public async generateExams() {

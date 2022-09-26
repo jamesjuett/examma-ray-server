@@ -1,4 +1,4 @@
-import { ExamSpecification, parseExamSpecification } from "examma-ray";
+import { ExamSpecification, parseExamSpecification, stringifyExamComponentSpecification } from "examma-ray";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { Request, Response, Router } from "express";
 import { mkdir, readFile, rm, writeFile } from "fs/promises";
@@ -53,7 +53,7 @@ exams_router
 
         if (EXAMMA_RAY_GRADING_SERVER.getExamServer(new_exam_spec.exam_id)) {
           // just update file
-          await writeFile(`data/${new_exam_spec.exam_id}/exam-spec.json`, JSON.stringify(new_exam_spec, null, 2), "utf8");
+          await writeFile(`data/${new_exam_spec.exam_id}/exam-spec.json`, stringifyExamComponentSpecification(new_exam_spec), "utf8");
           return res.sendStatus(201);
         }
         
@@ -64,7 +64,7 @@ exams_router
         await mkdir(`data/${exam_id}/submissions`);
         await mkdir(`data/${exam_id}/error-submissions`);
   
-        await writeFile(`data/${exam_id}/exam-spec.json`, JSON.stringify(new_exam_spec, null, 2), "utf8");
+        await writeFile(`data/${exam_id}/exam-spec.json`, stringifyExamComponentSpecification(new_exam_spec), "utf8");
         await writeFile(`data/${exam_id}/roster.csv`, "uniqname,name", "utf8");
 
         EXAMMA_RAY_GRADING_SERVER.loadExamServer(new_exam_spec);
@@ -83,7 +83,14 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      return res.status(200).json(await db_getExam(req.params["exam_id"]));
+      
+      const exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
+
+      if (!exam_server) {
+        return res.sendStatus(404);
+      }
+
+      return res.status(200).json(exam_server.getExamInfo());
     }
   }))
   .delete(createRoute({
@@ -278,40 +285,32 @@ exams_router
 
   
 
-// exams_router
-//   .route("/:exam_id/uuidv5_namespace")
-//   .put(createRoute({
-//     preprocessing: jsonBodyParser,
-//     validation: [
-//       validateParamExammaRayId("exam_id"),
-//       validateBody("uuidv5_namespace").isUUID().optional(),
-//     ],
-//     authorization: NO_AUTHORIZATION,
-//     handler: [
-//       async (req: Request, res: Response) => {
-//         const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
+exams_router
+  .route("/:exam_id/uuidv5_namespace")
+  .put(createRoute({
+    preprocessing: jsonBodyParser,
+    validation: [
+      validateParamExammaRayId("exam_id"),
+      validateBody("uuidv5_namespace").isUUID(),
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: [
+      async (req: Request, res: Response) => {
+        const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
 
-//         const secret = req.body.uuidv5_namespace;
+        if (!exam) {
+          return res.sendStatus(404);
+        }
 
-//         // const eg : ExamGeneratorSpecification;
+        await exam.setUuidV5Namespace(req.body.uuidv5_namespace);
 
-//         if (!exam) {
-//           return res.sendStatus(404);
-//         }
+        // We don't await this, let it run async
+        exam.generateExams();
 
-//         if (!req.file) {
-//           return res.sendStatus(400);
-//         }
-
-//         const uploaded_filepath = `uploads/${req.file?.filename}`;
-
-//         await exam.update({ new_secret_filepath: uploaded_filepath});
-
-//         await rm(uploaded_filepath, { force: true });
-//         return res.sendStatus(201);
-//       }
-//     ]
-//   }));
+        return res.sendStatus(204);
+      }
+    ]
+  }));
 
 exams_router
   .route("/:exam_id/epoch")
