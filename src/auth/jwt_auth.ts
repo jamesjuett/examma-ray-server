@@ -1,9 +1,9 @@
+import { assert } from "console";
+import { NextFunction, Request, Response } from "express";
+import jsonwebtoken from "jsonwebtoken";
 import passport from "passport";
 import passportJwt from "passport-jwt";
 import { auth_config } from "../auth/config";
-import jsonwebtoken from "jsonwebtoken";
-import { Request } from "express";
-import { assert } from "console";
 
 
 export interface JwtUserInfo {
@@ -43,3 +43,42 @@ export function generateJwt(email: string) {
     }
   );
 }
+
+
+
+
+const ADMIN = new Set<string>([
+  "jjuett@umich.edu",
+]);
+
+const STAFF = new Set<string>([
+  "aravikum@umich.edu",
+  "ashvink@umich.edu",
+  "egriffis@umich.edu",
+  "iabouara@umich.edu",
+  "imanmal@umich.edu",
+  "jjuett@umich.edu",
+  "jbbeau@umich.edu",
+  "jsliu@umich.edu",
+  "kamiz@umich.edu",
+  "fimaria@umich.edu",
+  "pmathena@umich.edu",
+  "sofias@umich.edu",
+  "qwzhao@umich.edu",
+]);
+
+function requireAuthorization(group: Set<string>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    let userInfo = getJwtUserInfo(req);
+    if (group.has(userInfo.email)) {
+      next();
+    }
+    else {
+      res.sendStatus(403);
+      console.log(`Blocked access by: ${userInfo.email}`);
+    }
+  }
+}
+
+export const requireStaff = requireAuthorization(STAFF);
+export const requireAdmin = requireAuthorization(ADMIN);

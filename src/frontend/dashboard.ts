@@ -143,22 +143,23 @@ export class DashboardExammaRayGraderApplication {
       });
 
       $("#delete-exam-modal").modal("hide");
+      $("#exam-deleted-modal").modal({show: true, backdrop: "static"});
     });
 
-    $("#configure-exam-spec-file-input").on("change", () => {
+    $("#specification-exam-spec-file-input").on("change", () => {
       
-      let files = (<HTMLInputElement>$("#configure-exam-spec-file-input")[0]).files;
+      let files = (<HTMLInputElement>$("#specification-exam-spec-file-input")[0]).files;
       if (files && files.length > 0) {
         this.considerSpecFile(files[0]);
       }
       else {
-        $("#configure-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
+        $("#specification-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
       }
     });
 
-    $("#configure-exam-spec-button").on("click", async () => {
+    $("#specification-exam-spec-button").on("click", async () => {
       const formData = new FormData();
-      let files = (<HTMLInputElement>$("#configure-exam-spec-file-input")[0]).files;
+      let files = (<HTMLInputElement>$("#specification-exam-spec-file-input")[0]).files;
       if (!files || !files[0]) {
         return;
       }
@@ -172,8 +173,8 @@ export class DashboardExammaRayGraderApplication {
         },
       });
       
-      $("#configure-exam-spec-file-input").val("");
-      $("#configure-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
+      $("#specification-exam-spec-file-input").val("");
+      $("#specification-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
     });
 
 
@@ -207,12 +208,26 @@ export class DashboardExammaRayGraderApplication {
           const original_section = original_exam.getSectionById(new_section.section_id);
           if (!original_section) { return; }
           const section_diff = ExamDiff.shallowDiff(original_section.spec, new_section.spec);
-          console.log(new_section.section_id);
-          console.log(section_diff);
+          if(section_diff) {
+            console.log("Section Diff: " + new_section.section_id);
+            console.log(section_diff);
+          }
+        });
+
+        new_exam.allQuestions.forEach(new_question => {
+          const original_question = original_exam.getQuestionById(new_question.question_id);
+          if (!original_question) { return; }
+          const question_diff = ExamDiff.shallowDiff(original_question.spec, new_question.spec);
+          if (question_diff) {
+            console.log("Question Diff: " + new_question.question_id);
+            console.log(question_diff);
+            console.log(original_question.response);
+            console.log(new_question.response);
+          }
         })
       }
 
-      $("#configure-exam-spec-button").prop("disabled", false).removeClass("btn-success").addClass("btn-warning").html('<i class="bi bi-file-arrow-up"></i> Upload');
+      $("#specification-exam-spec-button").prop("disabled", false).removeClass("btn-success").addClass("btn-warning").html('<i class="bi bi-file-arrow-up"></i> Upload');
     };
     reader.onerror = () => {
       alert(reader.error);
@@ -296,9 +311,11 @@ export class DashboardExammaRayGraderApplication {
         data: {},
         headers: {
             'Authorization': 'bearer ' + this.client.getBearerToken()
-        }
+        },
+        responseType: "text",
+        transformResponse: [v => v]
       });
-      const exam_spec = <ExamSpecification>exam_spec_response.data;
+      const exam_spec = parseExamSpecification(exam_spec_response.data);
 
       asMutable(this).exam = Exam.create(exam_spec);
       assert(this.exam);

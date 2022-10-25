@@ -3,6 +3,7 @@ import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { Request, Response, Router } from "express";
 import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import multer from "multer";
+import { requireAdmin } from "../auth/jwt_auth";
 import { db_getExam, db_getExamEpoch, db_getExams, db_getExamSubmissions } from "../db/db_exams";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
@@ -98,7 +99,7 @@ exams_router
     validation: [
       validateParamExammaRayId("exam_id")
     ],
-    authorization: NO_AUTHORIZATION,
+    authorization: requireAdmin,
     handler: [
       async (req: Request, res: Response) => {
 
@@ -135,7 +136,7 @@ exams_router
         res.sendStatus(404);
         return;
       }
-      res.status(200).json(exam_server.exam.spec);
+      res.status(200).send(stringifyExamComponentSpecification(exam_server.exam.spec));
     }
   }));
 
@@ -293,7 +294,7 @@ exams_router
       validateParamExammaRayId("exam_id"),
       validateBody("uuidv5_namespace").isUUID(),
     ],
-    authorization: NO_AUTHORIZATION,
+    authorization: requireAdmin,
     handler: [
       async (req: Request, res: Response) => {
         const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
