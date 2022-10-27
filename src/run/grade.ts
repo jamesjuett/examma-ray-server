@@ -12,8 +12,7 @@ import { parentPort, workerData } from "worker_threads";
 import { RunGradingRequest } from "../dashboard";
 import { query } from "../db/db";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
-
-const MESSAGE_RATE_LIMIT = 1000; // ms
+import { RATE_LIMITED_POST_MESSAGE } from "./common";
 
 class WebExamGrader extends ExamGrader {
   
@@ -67,15 +66,7 @@ async function main() {
 
   const EXAM = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${exam_id}/exam-spec.json`));
   
-  let lastMessage = Date.now();
-  
-  const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, {},
-    (status: string) => {
-      if (Date.now() > lastMessage + MESSAGE_RATE_LIMIT) {
-        lastMessage = Date.now();
-        parentPort?.postMessage(status);
-      }
-    });
+  const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, {}, RATE_LIMITED_POST_MESSAGE());
 
   // Load and verify answers
   console.log("loading submissions...");

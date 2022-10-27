@@ -52,9 +52,10 @@ exams_router
         const new_exam_spec = parseExamSpecification(await readFile(uploaded_filepath, "utf8"));
         await rm(uploaded_filepath, { force: true });
 
-        if (EXAMMA_RAY_GRADING_SERVER.getExamServer(new_exam_spec.exam_id)) {
-          // just update file
+        const existing_exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(new_exam_spec.exam_id);
+        if (existing_exam_server) {
           await writeFile(`data/${new_exam_spec.exam_id}/exam-spec.json`, stringifyExamComponentSpecification(new_exam_spec), "utf8");
+          await existing_exam_server.updateSpec(new_exam_spec)
           return res.sendStatus(201);
         }
         

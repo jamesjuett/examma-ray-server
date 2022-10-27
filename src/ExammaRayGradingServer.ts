@@ -9,7 +9,7 @@ import { db_createCodeGraderConfig, db_createGroup, db_deleteManualGradingByExam
 import { db_getOrCreateExam, db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExam, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch, db_updateExamUuidV5Namespace } from "./db/db_exams";
 import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
 import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingSkins, reassignGradingGroups } from "./manual_grading";
-import { WorkerData_Generate } from "./run/types";
+import { WorkerData_Generate, WorkerData_ProcessSubmissions } from "./run/types";
 import { asMutable, assert, assertFalse, assertNever } from "./util/util";
 
 const GRADER_IDLE_THRESHOLD = 4000; // ms
@@ -57,6 +57,15 @@ export class ExamServer {
       uuidv5_namespace: this.uuidv5_namespace,
       epoch: this.epoch,
     };
+  }
+
+  public async updateSpec(new_exam_spec: ExamSpecification) {
+    asMutable(this).exam = Exam.create(new_exam_spec);
+    await Promise.all(
+      this.exam.allQuestions.map(
+        async (question) => this.questionGradingServers[question.question_id] ??= await QuestionGradingServer.create(question.question_id)
+      )
+    );
   }
   
   public async getRoster() {
@@ -121,7 +130,7 @@ export class ExamServer {
     // each is in the files object. We'll pass this off to a worker
     // script to process each
     const worker = new Worker("./build/run/process_submissions.js", {
-      workerData: {
+      workerData: <WorkerData_ProcessSubmissions>{
         exam_id: this.exam.exam_id,
         files: files
       }
