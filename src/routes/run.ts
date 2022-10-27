@@ -12,8 +12,8 @@ run_router.route("/grade/:exam_id").post(createRoute({
     validateParamExamId,
     validateBody("reports").isBoolean({strict: true}),
     validateBody("curve").isBoolean({strict: true}),
-    validateBody("target_mean").isNumeric().optional(),
-    validateBody("target_stddev").isNumeric().optional(),
+    validateBody("target_mean").optional({nullable: true}).isNumeric(),
+    validateBody("target_stddev").optional({nullable: true}).isNumeric(),
   ],
   handler: (req: Request, res: Response) => {
 

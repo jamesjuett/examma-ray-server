@@ -74,6 +74,9 @@ export class ExamServer {
 
   public async setRoster(new_roster_csv_filepath: string) {
     await copyFile(new_roster_csv_filepath, `data/${this.exam.exam_id}/roster.csv`);
+
+    // We don't await this, let it run async
+    this.generateExams();
   }
 
   public async setUuidV5Namespace(namespace: string) {

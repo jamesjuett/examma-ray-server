@@ -74,31 +74,32 @@
       <div class="tab-pane" id="grading" role="tabpanel" aria-labelledby="grading-tab">
 
 
-        <h3>Tasks</h3>
-        <div id="examma-ray-task-status">
-        </div>
-    
-        <button class="btn btn-success examma-ray-run-grading-button" data-toggle="modal" data-target="#run-grading-modal">Run Grading</button>
     
         <table>
           <tr>
+            <td style="vertical-align: top;">
+              <h3>Tasks</h3>
+              <div id="examma-ray-task-status"></div>
+              <button class="btn btn-success examma-ray-run-grading-button" data-toggle="modal" data-target="#run-grading-modal">Run Grading</button>
+
+            </td style="vertical-align: top;">
             <td>
-              <div>
+              <div style="margin-left: 1em;">
                 <h3>Grading Overview</h3>
                 <p>
                   Linked <a id="examma-ray-grading-overview-link" class="btn btn-sm btn-outline-primary">here</a>
                   <br />
                   (Run grading/reports to update)
                 </p>
-                <h3>Question Grading</h3>
-                <ul id="examma-ray-question-grading-list" style="overflow-y: auto; max-height: 70vh;">
-          
-                </ul>
               </div>
-              
             </td>
           </tr>
         </table>
+        
+        <h3>Question Grading</h3>
+        <ul id="examma-ray-question-grading-list" style="overflow-y: auto; max-height: 70vh;">
+  
+        </ul>
     
     
     

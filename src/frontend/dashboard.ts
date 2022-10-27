@@ -383,12 +383,15 @@ export class DashboardExammaRayGraderApplication {
       $("#examma-ray-question-grading-list").html(
         this.exam!.allQuestions
           .filter(q => q.response.default_grader?.grader_kind === "manual_code_writing")
-          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("")
+          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("\n")
         + 
         this.exam!.allQuestions
         .filter(q => q.response.default_grader?.grader_kind === "manual_generic")
-        .map(q => `<li><a href="manual-generic-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("")
-
+        .map(q => `<li><a href="manual-generic-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("\n")
+        + 
+        this.exam!.allQuestions
+        .filter(q => q.response.default_grader === undefined)
+        .map(q => `<li><span style="color: red;">No grader defined for: ${q.question_id}</span></li>`).join("\n")
       );
         
     }
