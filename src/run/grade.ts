@@ -80,7 +80,6 @@ async function main() {
     EXAM_GRADER.applyCurve(new IndividualizedNormalCurve(EXAM_GRADER.stats, run_request.target_mean, run_request.target_stddev, true));
   }
 
-  EXAM_GRADER.writeSubmissions();
   EXAM_GRADER.writeAll();
   
   if (run_request.reports) {
