@@ -30,7 +30,7 @@
 
 <body>
 
-  <div style="width: 100vw;">
+  <div>
 
     <div style="margin: 5px 20px; height: 45px; position: sticky; top: 5px;">
       <div style="float: right; vertical-align: middle;">
@@ -97,19 +97,15 @@
         </table>
         
         <h3>Question Grading</h3>
-        <ul id="examma-ray-question-grading-list" style="overflow-y: auto; max-height: 70vh;">
+        <ul id="examma-ray-question-grading-list" style="overflow-y: auto; max-height: 60vh; max-width: 50vw;">
   
         </ul>
     
     
     
-        <div class="alert alert-danger" style="position: absolute; bottom: 0; right: 0" role="alert">
-          <h2>DANGER DO NOT CLICK THESE</h2>
-        
-          <div>
-            <i class="bi bi-check2-square"></i> Exam Specification
-          </div>
-          
+        <div class="alert alert-success" style="position: absolute; bottom: 0.5em; right: 0.5em;" role="alert">
+          <h2>Upload Submissions</h2>
+          Upload individual .json files or a .zip file containing .json files.
           <div>
           </div>
           <form id="submissions-file-input-form" enctype="multipart/form-data">
