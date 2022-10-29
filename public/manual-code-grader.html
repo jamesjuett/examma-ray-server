@@ -67,7 +67,10 @@
       <button id="edit-code-grader-config-open-modal-button" type="button" class="btn btn-sm btn-primary"><i class="bi bi-gear"></i> Grader Config</button>
       <button type="button" class="btn btn-sm btn-primary examma-ray-auto-group-button"><i class="bi bi-lightning"></i> Auto-Group</button>
       <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#groups-modal"><span class="badge examma-ray-grading-group-num-members">N/A</span> Group Members</button>
-      <button type="button" style="display: none;" class="btn btn-sm btn-primary examma-ray-autograde-button"><i class="bi bi-lightning"></i> Autograde</button>
+      <div style="display: none;">
+        <button type="button" class="btn btn-sm btn-primary examma-ray-autograde-button"><i class="bi bi-lightning"></i> Autograde</button>
+        <input id="examma-ray-autograde-step-limit" type="text" validation="number" placeholder="5000" maxlength="7">
+      </div>
       <span style="display: inline-block; vertical-align: middle; margin-top: 0; margin-bottom: 0; margin-left: 0.25em; font-weight: bold">You are grading: <code class="examma-ray-grading-group-name">[No group selected]</code></span>
       <!-- <button class="btn btn-primary" id="examma-ray-grading-autograde-button">Autograde!</button> -->
       <div style="float: right;"><button id="examma-ray-next-ungraded-button" type="button" class="btn btn-primary"><code style="margin-right: 0.25em">z</code> Next Ungraded</button></div>
