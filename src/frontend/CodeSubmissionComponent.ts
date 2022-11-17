@@ -1,5 +1,5 @@
 import indentString from "indent-string";
-import { Program, SimpleProgram, SourceFile } from "lobster-vis/dist/js/core/Program"
+import { Program, SimpleProgram, SourceFile } from "lobster-vis/dist/js/core/compilation/Program"
 import { SimpleExerciseLobsterOutlet } from "lobster-vis/dist/js/view/SimpleExerciseLobsterOutlet"
 import { createRunestoneExerciseOutlet } from "lobster-vis/dist/js/view/embeddedExerciseOutlet"
 
@@ -21,15 +21,15 @@ import queryString from "query-string";
 import { isMeaningfulRubricItemGradingResult, ManualGradingGroupRecord, ManualGradingSubmission, RubricItemGradingResult } from "../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../util/util";
 import axios from "axios";
-import { Simulation } from "lobster-vis/dist/js/core/Simulation";
-import { AsynchronousSimulationRunner } from "lobster-vis/dist/js/core/simulationRunners";
+import { Simulation } from "lobster-vis/dist/js/core/runtime/Simulation";
+import { AsynchronousSimulationRunner } from "lobster-vis/dist/js/core/runtime/simulationRunners";
 
 import hotkeys from "hotkeys-js";
 import { ManualGradingSubmissionComponent, ManualGraderApp } from "./ManualGrader";
 import { parse_submission } from "examma-ray/dist/response/responses";
 import { BLANK_SUBMISSION } from "examma-ray/dist/response/common";
-import { AutoObject } from "lobster-vis/dist/js/core/objects";
-import { CompleteObjectType } from "lobster-vis/dist/js/core/types";
+import { AutoObject } from "lobster-vis/dist/js/core/runtime/objects";
+import { CompleteObjectType } from "lobster-vis/dist/js/core/compilation/types";
 
 
 

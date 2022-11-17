@@ -4,18 +4,13 @@ import { ExamComponentSkin, Question, QuestionSpecification } from "examma-ray";
 import { applySkin, mk2html, mk2html_unwrapped } from "examma-ray/dist/core/render";
 import { renderScoreBadge, renderShortPointsWorthBadge, renderUngradedBadge } from "examma-ray/dist/core/ui_components";
 import hotkeys from "hotkeys-js";
-import { EndOfMainStateCheckpoint } from "lobster-vis/dist/js/analysis/checkpoints";
-import { Program } from "lobster-vis/dist/js/core/Program";
-import { COMPLETION_ALL_CHECKPOINTS, Exercise, Project } from "lobster-vis/dist/js/core/Project";
-import { Simulation } from "lobster-vis/dist/js/core/Simulation";
-import { createRunestoneExerciseOutlet } from "lobster-vis/dist/js/view/embeddedExerciseOutlet";
-import { SimpleExerciseLobsterOutlet } from "lobster-vis/dist/js/view/SimpleExerciseLobsterOutlet";
+import { Program } from "lobster-vis/dist/js/core/compilation/Program";
+import randomColor from "randomcolor";
 import { v4 as uuidv4 } from "uuid";
 import { ActiveQuestionGraders, GradingGroupReassignment, isMeaningfulManualGradingResult, isMeaningfulRubricItemGradingResult, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingGroupRecord, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, NextUngradedRequest, NextUngradedResponse, reassignGradingGroups, RubricItemGradingResult } from "../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../util/util";
 import { ExammaRayGraderClient } from "./Application";
 import "./code-grader.css";
-import randomColor from "randomcolor";
 
 
 
