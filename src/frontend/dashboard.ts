@@ -357,7 +357,7 @@ export class DashboardExammaRayGraderApplication {
         ${s.uniqname}
         ${s.submission
           ? `
-            <a class="btn btn-sm btn-primary" href="out/${this.exam?.exam_id}/submitted/${s.uniqname}-${this.exam?.exam_id}.html">Exam</a>
+            <a class="btn btn-sm btn-primary" href="out/${this.exam?.exam_id}/submitted/${s.uniqname}-${this.exam?.exam_id}.html">Submission</a>
             <a class="btn btn-sm btn-danger examma-ray-delete-submission-button" data-submission-uuid="${s.submission.uuid}">Delete</a>
           `
           : "[no submission]"
