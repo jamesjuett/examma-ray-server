@@ -152,71 +152,78 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
   
   
   
-  public groupOneSubmission(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program })[], sub: ManualGradingSubmission) {
+  public groupOneSubmission(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program, repString?: string })[], sub: ManualGradingSubmission) {
 
     return new Promise<void>((resolve, reject) => {
 
       window.setTimeout(() => {
-        let code = this.applyHarness(sub);
 
-        try {
-    
-          let p = new SimpleProgram(code);
-    
-          let fn = getFunc(p, this.getGroupingFunctionName(sub));
-          if (!fn) {
-            // Didn't parse or can't find function, make a new group
-            equivalenceGroups.push({
-              group_uuid: uuidv4(),
-              finished: false,
-              repProgram: p,
-              submissions: [sub],
-              grading_result: {}
-            });
-            resolve();
-            return;
-          }
-    
-          let matchingGroup = equivalenceGroups.find(group => {
-
-            // Only group blank submissions with other blank submissions
-            if ( (group.submissions[0].submission === "") !== (sub.submission === "")) {
-              return false;
-            }
-            
-            let rep = group.repProgram;
-            if (!rep) { return false; }
-            let repFunc = getFunc(rep, this.getGroupingFunctionName(group.submissions[0]));
-            return repFunc && getFunc(p, this.getGroupingFunctionName(sub))!.isSemanticallyEquivalent(repFunc, {});
-          });
-    
-          if (matchingGroup) {
-            matchingGroup.submissions.push(sub);
-          }
-          else {
-            equivalenceGroups.push({
-              group_uuid: uuidv4(),
-              finished: false,
-              repProgram: p,
-              submissions: [sub],
-              grading_result: {}
-            });
-          }
+        let matchingGroup = this.findMatchingGroup(equivalenceGroups, sub);
+        if (matchingGroup) {
+          matchingGroup.submissions.push(sub);
         }
-        catch(e) {
-          // Lobster might randomly crash on an obscure case. Just add to
-          // a new group with no representative program.
+        else {
+          let code = this.applyHarness(sub);
+          let p = new SimpleProgram(code);
           equivalenceGroups.push({
             group_uuid: uuidv4(),
             finished: false,
+            repString: sub.submission.replaceAll("\\s",""),
+            repProgram: p,
             submissions: [sub],
-            grading_result: {}
+            grading_result: {},
           });
         }
         
         resolve();
       }, 0);
    });
+  }
+
+  private findMatchingGroup(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program, repString?: string })[], sub: ManualGradingSubmission) {
+
+    let repString = sub.submission.replaceAll("\\s","");
+    let exactMatch = equivalenceGroups.find(group => repString === group.repString);
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    let code = this.applyHarness(sub);
+    try {
+    
+      let p = new SimpleProgram(code);
+
+      let fn = getFunc(p, this.getGroupingFunctionName(sub));
+      
+      if (!fn) {
+        return;
+      }
+
+      let matchingGroup = equivalenceGroups.find(group => {
+
+        // Only group blank submissions with other blank submissions
+        if ( (group.submissions[0].submission === "") !== (sub.submission === "")) {
+          return false;
+        }
+        
+        let rep = group.repProgram;
+        if (!rep) { return false; }
+        let repFunc = getFunc(rep, this.getGroupingFunctionName(group.submissions[0]));
+        return repFunc && getFunc(p, this.getGroupingFunctionName(sub))!.isSemanticallyEquivalent(repFunc, {});
+      });
+      return matchingGroup;
+      
+    }
+    catch(e) {
+      // Lobster might randomly crash on an obscure case. Just add to
+      // a new group with no representative program.
+      equivalenceGroups.push({
+        group_uuid: uuidv4(),
+        finished: false,
+        submissions: [sub],
+        grading_result: {}
+      });
+    }
   }
 
   private getGroupingFunctionName(sub: ManualGradingSubmission) {
