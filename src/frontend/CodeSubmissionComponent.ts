@@ -303,7 +303,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
 function getFunc(program: Program, name: string) {
   if (name[0].indexOf("::[[constructor]]") !== -1) {
     let className = name[0].slice(0, name[0].indexOf("::[[constructor]]"));
-    let entity = program.translationUnits[0].qualifiedLookup(parseQualifiedName(className));
+    let entity = program.translationUnits["main.cpp"].qualifiedLookup(parseQualifiedName(className));
     if (entity?.declarationKind === "class") {
       let ctor = entity.definition?.constructors[0].definition;
       if (ctor) {
@@ -313,7 +313,7 @@ function getFunc(program: Program, name: string) {
     return undefined;
   }
   else {
-    let entity = program.translationUnits[0].qualifiedLookup(parseQualifiedName(name));
+    let entity = program.translationUnits["main.cpp"].qualifiedLookup(parseQualifiedName(name));
     if (entity?.declarationKind === "function") {
       let def = entity.overloads[0].definition;
       if (def) {
