@@ -164,7 +164,13 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
         }
         else {
           let code = this.applyHarness(sub);
-          let p = new SimpleProgram(code);
+          let p: SimpleProgram | undefined = undefined;
+          try {
+            p = new SimpleProgram(code);
+          }
+          catch(e) {
+
+          } 
           equivalenceGroups.push({
             group_uuid: uuidv4(),
             finished: false,
