@@ -30,6 +30,7 @@ import { parse_submission } from "examma-ray/dist/response/responses";
 import { BLANK_SUBMISSION } from "examma-ray/dist/response/common";
 import { AutoObject } from "lobster-vis/dist/js/core/runtime/objects";
 import { CompleteObjectType } from "lobster-vis/dist/js/core/compilation/types";
+import { parseQualifiedName } from "lobster-vis/dist/js/core/compilation/lexical";
 
 
 
@@ -299,24 +300,27 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
 
 
 
-function getFunc(program: Program, name: string | string[]) {
-  if (typeof name === "string") {
-    name = [name];
-  }
-  for(let i = 0; i < name.length; ++i) {
-    if (name[0].indexOf("::[[constructor]]") !== -1) {
-      let className = name[0].slice(0, name[0].indexOf("::[[constructor]]"));
-      let ctor = program.linkedClassDefinitions[className]?.constructors[0].definition;
+function getFunc(program: Program, name: string) {
+  if (name[0].indexOf("::[[constructor]]") !== -1) {
+    let className = name[0].slice(0, name[0].indexOf("::[[constructor]]"));
+    let entity = program.translationUnits[0].qualifiedLookup(parseQualifiedName(className));
+    if (entity?.declarationKind === "class") {
+      let ctor = entity.definition?.constructors[0].definition;
       if (ctor) {
         return ctor;
       }
-      continue;
     }
-
-    let def = program.linkedFunctionDefinitions[name[i]]?.definitions[0];
-    if (def) {
-      return def;
-    }
+    return undefined;
   }
-  return undefined;
+  else {
+    let entity = program.translationUnits[0].qualifiedLookup(parseQualifiedName(name));
+    if (entity?.declarationKind === "function") {
+      let def = entity.overloads[0].definition;
+      if (def) {
+        return def;
+      }
+    }
+    return undefined;
+  }
+
 }
