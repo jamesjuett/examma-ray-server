@@ -168,7 +168,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
           equivalenceGroups.push({
             group_uuid: uuidv4(),
             finished: false,
-            repString: sub.submission.replaceAll("\\s",""),
+            repString: sub.submission.replace(/\s+|\n+/g,""),
             repProgram: p,
             submissions: [sub],
             grading_result: {},
@@ -182,7 +182,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
 
   private findMatchingGroup(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program, repString?: string })[], sub: ManualGradingSubmission) {
 
-    let repString = sub.submission.replaceAll("\\s","");
+    let repString = sub.submission.replace(/\s+|\n+/g,"");
     let exactMatch = equivalenceGroups.find(group => repString === group.repString);
     if (exactMatch) {
       return exactMatch;
@@ -217,12 +217,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
     catch(e) {
       // Lobster might randomly crash on an obscure case. Just add to
       // a new group with no representative program.
-      equivalenceGroups.push({
-        group_uuid: uuidv4(),
-        finished: false,
-        submissions: [sub],
-        grading_result: {}
-      });
+      return undefined;
     }
   }
 
