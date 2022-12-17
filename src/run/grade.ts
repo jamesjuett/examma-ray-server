@@ -7,7 +7,7 @@ import { ExamUtils, writeFrontendJS } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
 import { ManualGenericGrader } from "examma-ray/dist/graders/ManualGenericGrader";
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { parentPort, workerData } from "worker_threads";
 import { RunGradingRequest } from "../dashboard";
 import { query } from "../db/db";
@@ -68,7 +68,7 @@ async function main() {
   
   let EXCEPTIONS: ExceptionMap | undefined = undefined;
   try {
-    EXCEPTIONS = JSON.parse(`data/${exam_id}/exceptions/exceptions.json`);
+    EXCEPTIONS = JSON.parse(readFileSync(`data/${exam_id}/exceptions/exceptions.json`, "utf-8"));
   }
   catch(e) { }
 
