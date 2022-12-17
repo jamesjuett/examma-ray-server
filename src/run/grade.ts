@@ -69,8 +69,11 @@ async function main() {
   let EXCEPTIONS: ExceptionMap | undefined = undefined;
   try {
     EXCEPTIONS = JSON.parse(readFileSync(`data/${exam_id}/exceptions/exceptions.json`, "utf-8"));
+    console.log("loaded exceptions file");
   }
-  catch(e) { }
+  catch(e) {
+    console.log(e);
+  }
 
   const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, EXCEPTIONS, RATE_LIMITED_POST_MESSAGE());
 
