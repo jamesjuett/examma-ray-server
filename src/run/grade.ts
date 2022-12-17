@@ -66,7 +66,13 @@ async function main() {
 
   const EXAM = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${exam_id}/exam-spec.json`));
   
-  const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, {}, RATE_LIMITED_POST_MESSAGE());
+  let EXCEPTIONS: ExceptionMap | undefined = undefined;
+  try {
+    EXCEPTIONS = JSON.parse(`data/${exam_id}/exceptions/exceptions.json`);
+  }
+  catch(e) { }
+
+  const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, EXCEPTIONS, RATE_LIMITED_POST_MESSAGE());
 
   // Load and verify answers
   console.log("loading submissions...");
