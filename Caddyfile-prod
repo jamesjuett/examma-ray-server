@@ -19,6 +19,10 @@ route {
     route /out/* {
         reverse_proxy examma-ray-server:3000
     }
+
+    route /public_api/* {
+        reverse_proxy examma-ray-server:3000
+    }
     
     file_server {
         root /public
