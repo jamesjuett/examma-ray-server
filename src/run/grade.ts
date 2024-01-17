@@ -7,13 +7,12 @@ import { ExamUtils, writeFrontendJS } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
 import { ManualGenericGrader } from "examma-ray/dist/graders/ManualGenericGrader";
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { parentPort, workerData } from "worker_threads";
 import { RunGradingRequest } from "../dashboard";
 import { query } from "../db/db";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
-
-const MESSAGE_RATE_LIMIT = 1000; // ms
+import { RATE_LIMITED_POST_MESSAGE } from "./common";
 
 class WebExamGrader extends ExamGrader {
   
@@ -67,15 +66,16 @@ async function main() {
 
   const EXAM = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${exam_id}/exam-spec.json`));
   
-  let lastMessage = Date.now();
-  
-  const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, {},
-    (status: string) => {
-      if (Date.now() > lastMessage + MESSAGE_RATE_LIMIT) {
-        lastMessage = Date.now();
-        parentPort?.postMessage(status);
-      }
-    });
+  let EXCEPTIONS: ExceptionMap | undefined = undefined;
+  try {
+    EXCEPTIONS = JSON.parse(readFileSync(`data/${exam_id}/exceptions/exceptions.json`, "utf-8"));
+    console.log("loaded exceptions file");
+  }
+  catch(e) {
+    console.log(e);
+  }
+
+  const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, EXCEPTIONS, RATE_LIMITED_POST_MESSAGE());
 
   // Load and verify answers
   console.log("loading submissions...");
@@ -89,7 +89,6 @@ async function main() {
     EXAM_GRADER.applyCurve(new IndividualizedNormalCurve(EXAM_GRADER.stats, run_request.target_mean, run_request.target_stddev, true));
   }
 
-  EXAM_GRADER.writeSubmissions();
   EXAM_GRADER.writeAll();
   
   if (run_request.reports) {
@@ -102,24 +101,7 @@ async function main() {
     }
   }
 
-  const EXAM_GENERATOR_PREVIEW = new ExamGenerator(EXAM, {
-    uuid_strategy: "plain",
-    allow_duplicates: true,
-    choose_all: true,
-    skins: "all"
-  });
-  EXAM_GENERATOR_PREVIEW.assignExam({
-    name: "Sample Solutions",
-    uniqname: "solutions"
-  });
-
-  let sol_html = EXAM_GENERATOR_PREVIEW.renderExams(new SampleSolutionExamRenderer())[0];
-  let sol_dir = `out/${EXAM.exam_id}/solution`;
-  mkdirSync(`${sol_dir}`, { recursive: true });
-  writeFrontendJS(`${sol_dir}/js`, "frontend-solution.js");
-  writeFileSync(`${sol_dir}/solution.html`, sol_html);
   await query.destroy();
-  
 }
 
 main();

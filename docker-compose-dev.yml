@@ -6,7 +6,7 @@ services:
   examma-ray-server:
     build:
       context: .
-    command: "wait-for-it db:5432 -- bash -c \"npm install && npm run build && npm run migrate && node ./build/server.js\""
+    command: "wait-for-it db:5432 -- bash -c \"npm install && npm install examma-ray@latest && npm run build && npm run migrate && node ./build/server.js\""
     restart: always
     environment:
       DB_NAME: exammaray

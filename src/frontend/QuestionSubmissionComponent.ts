@@ -1,17 +1,10 @@
-import { applySkin, highlightCode } from "examma-ray/dist/core/render";
 import { fill_response, parse_submission } from "examma-ray/dist/response/responses";
-import indentString from "indent-string";
-import { EndOfMainStateCheckpoint } from "lobster-vis/dist/js/analysis/checkpoints";
-import { Program, SimpleProgram, SourceFile } from "lobster-vis/dist/js/core/Program";
-import { COMPLETION_ALL_CHECKPOINTS, Exercise, Project } from "lobster-vis/dist/js/core/Project";
-import { Simulation } from "lobster-vis/dist/js/core/Simulation";
-import { createRunestoneExerciseOutlet } from "lobster-vis/dist/js/view/embeddedExerciseOutlet";
-import { SimpleExerciseLobsterOutlet } from "lobster-vis/dist/js/view/SimpleExerciseLobsterOutlet";
+import { Program } from "lobster-vis/dist/js/core/compilation/Program";
 import { v4 as uuidv4 } from "uuid";
 import { ManualGradingGroupRecord, ManualGradingSubmission } from "../manual_grading";
 import { ManualGraderApp, ManualGradingSubmissionComponent } from "./ManualGrader";
 
-import "examma-ray/dist/frontend/frontend.css"
+import "examma-ray/dist/frontend/frontend.css";
 
 // Because this grader is based on Lobster, it only works for C++ code
 // Perhaps in the future it will be generalized to other languages and
@@ -123,25 +116,3 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
 }
 
 
-
-function getFunc(program: Program, name: string | string[]) {
-  if (typeof name === "string") {
-    name = [name];
-  }
-  for(let i = 0; i < name.length; ++i) {
-    if (name[0].indexOf("::[[constructor]]") !== -1) {
-      let className = name[0].slice(0, name[0].indexOf("::[[constructor]]"));
-      let ctor = program.linkedClassDefinitions[className]?.constructors[0].definition;
-      if (ctor) {
-        return ctor;
-      }
-      continue;
-    }
-
-    let def = program.linkedFunctionDefinitions[name[i]]?.definitions[0];
-    if (def) {
-      return def;
-    }
-  }
-  return undefined;
-}

@@ -1,53 +1,20 @@
-import express, { NextFunction, Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
+import express, { NextFunction, Request, Response } from 'express';
 
-// import { projects_router } from './routes/projects';
-// import { courses_router } from './routes/courses';
-import passport from 'passport';
-import { auth_router } from './routes/auth';
-// import { public_router } from './routes/public';
-import { users_router } from './routes/users';
-import { assert } from 'console';
-// import { exercises_router } from './routes/exercises';
-import path from 'path';
-import { run_router } from './routes/run';
-import { ExammaRayGradingServer } from './ExammaRayGradingServer';
-import { readdirSync } from 'fs';
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
-import { Exam } from "examma-ray";
+import { readdirSync } from 'fs';
+import passport from 'passport';
+import path from 'path';
+import { requireStaff } from './auth/jwt_auth';
+import { ExammaRayGradingServer } from './ExammaRayGradingServer';
+import { auth_router } from './routes/auth';
 import { exams_router } from './routes/exams';
 import { manual_grading_router } from './routes/manual_grading';
 import { questions_router } from './routes/questions';
-import { getJwtUserInfo } from './auth/jwt_auth';
+import { run_router } from './routes/run';
+import { users_router } from './routes/users';
 
 export let EXAMMA_RAY_GRADING_SERVER: ExammaRayGradingServer;
-
-const STAFF = new Set<string>([
-  "aravikum@umich.edu",
-  "ashvink@umich.edu",
-  "egriffis@umich.edu",
-  "iabouara@umich.edu",
-  "imanmal@umich.edu",
-  "jjuett@umich.edu",
-  "jbbeau@umich.edu",
-  "jsliu@umich.edu",
-  "kamiz@umich.edu",
-  "fimaria@umich.edu",
-  "pmathena@umich.edu",
-  "sofias@umich.edu",
-  "qwzhao@umich.edu",
-]);
-
-function requireStaff(req: Request, res: Response, next: NextFunction) {
-  let userInfo = getJwtUserInfo(req);
-  if (STAFF.has(userInfo.email)) {
-    next();
-  }
-  else {
-    res.sendStatus(403);
-    console.log(`Blocked access by: ${userInfo.email}`);
-  }
-}
 
 async function main() {
 

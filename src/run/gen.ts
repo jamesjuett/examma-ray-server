@@ -1,8 +1,11 @@
 // import minimist from "minimist";
-import { Exam, OriginalExamRenderer } from "examma-ray";
+import { Exam, OriginalExamRenderer, SampleSolutionExamRenderer } from "examma-ray";
 import { ExamGenerator } from "examma-ray/dist/ExamGenerator";
-import { ExamUtils } from "examma-ray/dist/ExamUtils";
+import { ExamPreview } from "examma-ray/dist/ExamPreview";
+import { ExamUtils, writeFrontendJS } from "examma-ray/dist/ExamUtils";
+import { mkdirSync, writeFileSync } from "fs";
 import { parentPort, workerData as workerDataUntyped } from "worker_threads";
+import { RATE_LIMITED_POST_MESSAGE } from "./common";
 import { WorkerData_Generate } from "./types";
 
 const workerData: WorkerData_Generate = workerDataUntyped;
@@ -20,17 +23,15 @@ function main() {
   const EXAM_GENERATOR_INDIVIDUAL = new ExamGenerator(
     EXAM,
     workerData.gen_spec,
-    (status: string) => {
-      if (Date.now() > lastMessage + MESSAGE_RATE_LIMIT) {
-        lastMessage = Date.now();
-        parentPort?.postMessage(status);
-      }
-    }
+    RATE_LIMITED_POST_MESSAGE()
   );
   
   EXAM_GENERATOR_INDIVIDUAL.assignExams(workerData.roster),
   
   EXAM_GENERATOR_INDIVIDUAL.writeAll(new OriginalExamRenderer(), "out", "data");
+
+  const EXAM_PREVIEW = new ExamPreview(EXAM);
+  EXAM_PREVIEW.writeAll("out/preview")
 }
 
 main();

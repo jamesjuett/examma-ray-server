@@ -1,19 +1,19 @@
 // import minimist from "minimist";
-import { ExamUtils } from "examma-ray/dist/ExamUtils";
+import { ExamUtils, writeFrontendJS } from "examma-ray/dist/ExamUtils";
 import { copyFileSync, rmSync, writeFileSync } from "fs";
-import { workerData } from "worker_threads";
+import { workerData as workerDataUntyped } from "worker_threads";
 import extract from "extract-zip";
 import { db_addExamSubmission, db_getExamSubmissionByUuid } from "../db/db_exams";
 import { query } from "../db/db";
 import { v4 as uuidv4 } from "uuid";
 import { AssignedExam, Exam, TrustedExamSubmission } from "examma-ray";
 import { db_createGroup, db_createSubmission } from "../db/db_code_grader";
-import { stringify_response } from "examma-ray/dist/response/responses";
 import { db_insertManualGradingQuestionSkinIfNotExists } from "../db/db_rubrics";
+import { ExamGrader } from "examma-ray/dist/ExamGrader";
+import { RATE_LIMITED_POST_MESSAGE } from "./common";
+import { WorkerData_ProcessSubmissions } from "./types";
 
-// type Upload_Status = {
-//   "complete" | 
-// }
+const workerData: WorkerData_ProcessSubmissions = workerDataUntyped;
 
 async function addSubmission(exam: Exam, filepath: string, originalFilename: string) {
   
@@ -42,8 +42,9 @@ async function addSubmission(exam: Exam, filepath: string, originalFilename: str
 
     // Add submission to database
     await db_addExamSubmission(new_submission);
-
     await assignGrading(exam, new_submission);
+
+    return new_submission;
   }
   catch (e: unknown) {
     console.log("ERROR processing submission for " + filepath);
@@ -66,11 +67,14 @@ async function assignGrading(exam: Exam, submission: TrustedExamSubmission) {
 
 // import { CURVE, EXAM_GRADER } from "../grader-spec";
 async function main() {
-  const exam_id = <string>workerData.exam_id;
 
+  const exam_id = <string>workerData.exam_id;
   const exam = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${exam_id}/exam-spec.json`));
 
-  const uploaded_files : Express.Multer.File[] = workerData.files ?? [];
+  
+  const EXAM_GRADER = new ExamGrader(exam, {}, {}, {}, RATE_LIMITED_POST_MESSAGE());
+
+  const uploaded_files : readonly Express.Multer.File[] = workerData.files ?? [];
 
   let toProcess : {
     filepath: string,
@@ -100,13 +104,19 @@ async function main() {
     const originalFilename = toProcess[i].originalFilename;
 
     // Add uploaded submission
-    await addSubmission(exam, filepath, originalFilename);
+    let submission = await addSubmission(exam, filepath, originalFilename);
+
+    if (submission) {
+      EXAM_GRADER.addSubmission(submission);
+    }
 
     // Remove uploaded file
     rmSync(filepath, { force: true });
   };
 
   console.log(`DONE processing submissions!`);
+  console.log(`Rendering submitted exams...`);
+  EXAM_GRADER.writeSubmissions();
   
   await query.destroy();
   

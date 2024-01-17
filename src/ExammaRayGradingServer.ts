@@ -1,17 +1,16 @@
-import { AssignedExam, Exam, ExamSpecification, StudentInfo } from "examma-ray";
-import { readdirSync, readFileSync } from "fs";
-import { copyFile, readFile, rm } from "fs/promises";
-import { JwtUserInfo } from "./auth/jwt_auth";
-import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, reassignGradingGroups } from "./manual_grading";
-import { asMutable, assert, assertExists, assertFalse, assertNever } from "./util/util";
-import { Worker } from "worker_threads";
-import { ExamGeneratorSpecification } from "examma-ray/dist/ExamGenerator";
+import { Exam, ExamSpecification } from "examma-ray";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
-import { db_deleteExamSubmissionByUuid, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
-import { WorkerData_Generate } from "./run/types";
-import { db_createManualGradingRubricItem, db_getGroupSubmissions, db_getManualGradingQuestion, db_getManualGradingQuestionSkin, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
-import { db_createCodeGraderConfig, db_createGroup, db_deleteQuestionSubmissionsByExam, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
+import { readFileSync } from "fs";
+import { copyFile, readFile, rm } from "fs/promises";
+import { DB_Exams } from "knex/types/tables";
+import { Worker } from "worker_threads";
 import { RunGradingRequest } from "./dashboard";
+import { db_createCodeGraderConfig, db_createGroup, db_deleteManualGradingByExam, db_deleteManualGradingBySubmission, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
+import { db_getOrCreateExam, db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExam, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch, db_updateExamUuidV5Namespace } from "./db/db_exams";
+import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
+import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingSkins, reassignGradingGroups } from "./manual_grading";
+import { WorkerData_Generate, WorkerData_ProcessSubmissions } from "./run/types";
+import { asMutable, assert, assertFalse, assertNever } from "./util/util";
 
 const GRADER_IDLE_THRESHOLD = 4000; // ms
 
@@ -21,29 +20,51 @@ export type ExamTaskStatus = {
   grade?: string
 }
 
-export class ServerExam {
+export class ExamServer {
 
   public readonly exam: Exam;
   public readonly epoch: number;
 
   public readonly taskStatus: ExamTaskStatus = { };
+  
+  private uuidv5_namespace;
 
   private readonly questionGradingServers: {
     [index: string]: QuestionGradingServer | undefined
   } = {};
 
-  private constructor(exam: Exam, epoch: number, question_servers: readonly QuestionGradingServer[]) {
+  private constructor(exam: Exam, db_exam: DB_Exams, epoch: number, question_servers: readonly QuestionGradingServer[]) {
     this.exam = exam;
     this.epoch = epoch;
+    this.uuidv5_namespace = db_exam.uuidv5_namespace;
     question_servers.forEach(qs => this.questionGradingServers[qs.question_id] = qs);
   }
 
   public static async create(exam_spec: ExamSpecification) {
+    const db_exam = await db_getOrCreateExam(exam_spec.exam_id);
     const exam = Exam.create(exam_spec);
-    return new ServerExam(
+    return new ExamServer(
       exam,
+      db_exam,
       0,
       await Promise.all(exam.allQuestions.map(q => QuestionGradingServer.create(q.question_id)))
+    );
+  }
+
+  public getExamInfo() {
+    return {
+      exam_id: this.exam.exam_id,
+      uuidv5_namespace: this.uuidv5_namespace,
+      epoch: this.epoch,
+    };
+  }
+
+  public async updateSpec(new_exam_spec: ExamSpecification) {
+    asMutable(this).exam = Exam.create(new_exam_spec);
+    await Promise.all(
+      this.exam.allQuestions.map(
+        async (question) => this.questionGradingServers[question.question_id] ??= await QuestionGradingServer.create(question.question_id)
+      )
     );
   }
   
@@ -51,37 +72,24 @@ export class ServerExam {
     return ExamUtils.loadCSVRoster(`data/${this.exam.exam_id}/roster.csv`);
   }
 
-  public async update(updates: {
-    new_roster_csv_filepath?: string,
-    new_secret_filepath?: string
-  }) {
-
-    if (updates.new_roster_csv_filepath) {
-      this.setRoster(updates.new_roster_csv_filepath);
-    }
-
-    if (updates.new_secret_filepath) {
-      this.setSecret(updates.new_secret_filepath);
-    }
-
-    await this.generateExams();
-    await this.nextEpoch();
-  }
-
-  private async setRoster(new_roster_csv_filepath: string) {
+  public async setRoster(new_roster_csv_filepath: string) {
     await copyFile(new_roster_csv_filepath, `data/${this.exam.exam_id}/roster.csv`);
-  }
-  
-  private async setSecret(new_secret_filepath: string) {
-    await copyFile(new_secret_filepath, `data/${this.exam.exam_id}/secret`);
+
+    // We don't await this, let it run async
+    this.generateExams();
   }
 
-  private async generateExams() {
+  public async setUuidV5Namespace(namespace: string) {
+    this.uuidv5_namespace = namespace;
+    await db_updateExamUuidV5Namespace(this.exam.exam_id, namespace);
+  }
+
+  public async generateExams() {
     
     console.log("GENERATING EXAMS".bgBlue);
 
-    let secret = await readFile(`data/${this.exam.exam_id}/secret`, "utf-8");
-    let roster = await ExamUtils.loadCSVRoster(`data/${this.exam.exam_id}/roster.csv`);
+    // TODO: can we make this async? (probably not a huge deal, but still)
+    let roster = ExamUtils.loadCSVRoster(`data/${this.exam.exam_id}/roster.csv`);
 
     const worker = new Worker("./build/run/gen.js", {
       workerData: <WorkerData_Generate>{
@@ -89,13 +97,14 @@ export class ServerExam {
         roster: roster,
         gen_spec: {
           uuid_strategy: "uuidv5",
-          uuidv5_namespace: secret,
+          uuidv5_namespace: this.uuidv5_namespace,
           frontend_js_path: "js"
         }
       }
     });
 
     await this.workerTask(worker, "generate", `Preparing to generate ${roster.length} exams...`);
+    await this.nextEpoch();
   }
 
   public async gradeExams(run_request: RunGradingRequest) {
@@ -104,7 +113,7 @@ export class ServerExam {
 
     const grader_spec = {
       uuid_strategy: "uuidv5",
-      uuidv5_namespace: readFileSync(`data/${this.exam.exam_id}/secret`, "utf-8"),
+      uuidv5_namespace: this.uuidv5_namespace,
       frontend_js_path: "js",
     };
 
@@ -124,7 +133,7 @@ export class ServerExam {
     // each is in the files object. We'll pass this off to a worker
     // script to process each
     const worker = new Worker("./build/run/process_submissions.js", {
-      workerData: {
+      workerData: <WorkerData_ProcessSubmissions>{
         exam_id: this.exam.exam_id,
         files: files
       }
@@ -133,8 +142,7 @@ export class ServerExam {
     await this.workerTask(worker, "submissions", "Preparing to add submissions...");
     await this.nextEpoch();
 
-    // All question grading servers will need to reload new submission
-    // data from the DB
+    // All question grading servers will need to reload new submission data from the DB
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
   }
   
@@ -151,12 +159,24 @@ export class ServerExam {
     await db_deleteExamSubmissionByUuid(exam_submission.uuid);
 
     // Remove all associated question submission info and grading records from the DB
-    await db_deleteQuestionSubmissionsByExam(exam_submission.exam_id, exam_submission.uniqname);
+    await db_deleteManualGradingBySubmission(exam_submission.exam_id, exam_submission.uniqname);
     
     // Remove our stored copy of the submission file
     await rm(`data/${exam_submission.exam_id}/submissions/${exam_submission.uniqname}-submission.json`, { force: true });
 
     await this.nextEpoch();
+
+    // All question grading servers will need to reload new submission data from the DB
+    await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
+  }
+
+  public async deleteEverything() {
+    await db_deleteManualGradingByExam(this.exam.exam_id);
+    await db_deleteExamSubmissions(this.exam.exam_id);
+    await db_deleteExam(this.exam.exam_id);
+
+    // Remove the exam data directory
+    await rm(`data/${this.exam.exam_id}/`, { force: true, recursive: true });
 
     // All question grading servers will need to reload new submission data from the DB
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
@@ -227,7 +247,6 @@ export class QuestionGradingServer {
   private transitionRecorderQueue: ManualGradingEpochTransition[] = [];
   private transitionRecorderQueueLock?: Promise<void>;
 
-  // TODO: these unnecessarily index based on question_id which is always the same for a single question server
   public readonly active_graders: ActiveQuestionGraders = {graders: {}};
   private next_active_graders: ActiveQuestionGraders = {graders: {}};
 
@@ -513,34 +532,36 @@ export class QuestionGradingServer {
 
 export class ExammaRayGradingServer {
 
-  public readonly exams: readonly ServerExam[];
-  public readonly exams_by_id: {
-    [index: string]: ServerExam | undefined
+  private readonly exams_by_id: {
+    [index: string]: ExamServer | undefined
   } = {};
 
-  private constructor(exams: readonly ServerExam[]) {
-    this.exams = exams;
-    this.exams.forEach(exam => this.exams_by_id[exam.exam.exam_id] = exam);
+  private constructor(exams: readonly ExamServer[]) {
+    exams.forEach(exam => this.exams_by_id[exam.exam.exam_id] = exam);
   }
 
   public static async create(exam_specs: readonly ExamSpecification[]) {
     return new ExammaRayGradingServer(
-      await Promise.all(exam_specs.map(spec => ServerExam.create(spec)))
+      await Promise.all(exam_specs.map(spec => ExamServer.create(spec)))
     )
   }
 
-  public async loadExam(exam_spec: ExamSpecification) {
-    const newExam = await ServerExam.create(exam_spec);
+  public getExamServer(exam_id: string) {
+    return this.exams_by_id[exam_id];
+  }
 
-    let existingIndex = this.exams.findIndex(ex => ex.exam.exam_id === newExam.exam.exam_id);
-    if (existingIndex !== -1) {
-      asMutable(this.exams)[existingIndex] = newExam;
-    }
-    else {
-      asMutable(this.exams).push(newExam);
-    }
+  public async loadExamServer(exam_spec: ExamSpecification) {
+    this.exams_by_id[exam_spec.exam_id] = await ExamServer.create(exam_spec);
+  }
 
-    this.exams_by_id[newExam.exam.exam_id] = newExam;
+  public unloadExamServer(exam_id: string) {
+    const exam_server = this.exams_by_id[exam_id];
+    delete this.exams_by_id[exam_id];
+    return exam_server;
+  }
+
+  public getAllExams() {
+    return Object.values(this.exams_by_id) as ExamServer[];
   }
 
 }

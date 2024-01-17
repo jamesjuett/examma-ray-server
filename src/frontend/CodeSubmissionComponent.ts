@@ -1,10 +1,10 @@
 import indentString from "indent-string";
-import { Program, SimpleProgram, SourceFile } from "lobster-vis/dist/js/core/Program"
+import { Program, SimpleProgram, SourceFile } from "lobster-vis/dist/js/core/compilation/Program"
 import { SimpleExerciseLobsterOutlet } from "lobster-vis/dist/js/view/SimpleExerciseLobsterOutlet"
 import { createRunestoneExerciseOutlet } from "lobster-vis/dist/js/view/embeddedExerciseOutlet"
 
 import { applySkin, highlightCode } from "examma-ray/dist/core/render";
-import "highlight.js/styles/github.css";
+import "highlightjs/styles/github.css";
 
 import "./code-grader.css";
 import { COMPLETION_ALL_CHECKPOINTS, Exercise, Project } from "lobster-vis/dist/js/core/Project";
@@ -21,15 +21,16 @@ import queryString from "query-string";
 import { isMeaningfulRubricItemGradingResult, ManualGradingGroupRecord, ManualGradingSubmission, RubricItemGradingResult } from "../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../util/util";
 import axios from "axios";
-import { Simulation } from "lobster-vis/dist/js/core/Simulation";
-import { AsynchronousSimulationRunner } from "lobster-vis/dist/js/core/simulationRunners";
+import { Simulation } from "lobster-vis/dist/js/core/runtime/Simulation";
+import { AsynchronousSimulationRunner } from "lobster-vis/dist/js/core/runtime/simulationRunners";
 
 import hotkeys from "hotkeys-js";
 import { ManualGradingSubmissionComponent, ManualGraderApp } from "./ManualGrader";
 import { parse_submission } from "examma-ray/dist/response/responses";
 import { BLANK_SUBMISSION } from "examma-ray/dist/response/common";
-import { AutoObject } from "lobster-vis/dist/js/core/objects";
-import { CompleteObjectType } from "lobster-vis/dist/js/core/types";
+import { AutoObject } from "lobster-vis/dist/js/core/runtime/objects";
+import { CompleteObjectType } from "lobster-vis/dist/js/core/compilation/types";
+import { parseQualifiedName } from "lobster-vis/dist/js/core/compilation/lexical";
 
 
 
@@ -151,71 +152,79 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
   
   
   
-  public groupOneSubmission(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program })[], sub: ManualGradingSubmission) {
+  public groupOneSubmission(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program, repString?: string })[], sub: ManualGradingSubmission) {
 
     return new Promise<void>((resolve, reject) => {
 
       window.setTimeout(() => {
-        let code = this.applyHarness(sub);
 
-        try {
-    
-          let p = new SimpleProgram(code);
-    
-          let fn = getFunc(p, this.getGroupingFunctionName(sub));
-          if (!fn) {
-            // Didn't parse or can't find function, make a new group
-            equivalenceGroups.push({
-              group_uuid: uuidv4(),
-              finished: false,
-              repProgram: p,
-              submissions: [sub],
-              grading_result: {}
-            });
-            resolve();
-            return;
-          }
-    
-          let matchingGroup = equivalenceGroups.find(group => {
-
-            // Only group blank submissions with other blank submissions
-            if ( (group.submissions[0].submission === "") !== (sub.submission === "")) {
-              return false;
-            }
-            
-            let rep = group.repProgram;
-            if (!rep) { return false; }
-            let repFunc = getFunc(rep, this.getGroupingFunctionName(group.submissions[0]));
-            return repFunc && getFunc(p, this.getGroupingFunctionName(sub))!.isSemanticallyEquivalent(repFunc, {});
-          });
-    
-          if (matchingGroup) {
-            matchingGroup.submissions.push(sub);
-          }
-          else {
-            equivalenceGroups.push({
-              group_uuid: uuidv4(),
-              finished: false,
-              repProgram: p,
-              submissions: [sub],
-              grading_result: {}
-            });
-          }
+        let matchingGroup = this.findMatchingGroup(equivalenceGroups, sub);
+        if (matchingGroup) {
+          matchingGroup.submissions.push(sub);
         }
-        catch(e) {
-          // Lobster might randomly crash on an obscure case. Just add to
-          // a new group with no representative program.
+        else {
+          let code = this.applyHarness(sub);
+          let p: SimpleProgram | undefined = undefined;
+          try {
+            p = new SimpleProgram(code);
+          }
+          catch(e) {
+
+          } 
           equivalenceGroups.push({
             group_uuid: uuidv4(),
             finished: false,
+            repString: sub.submission.replace(/\s+|\n+/g,""),
+            repProgram: p,
             submissions: [sub],
-            grading_result: {}
+            grading_result: {},
           });
         }
         
         resolve();
       }, 0);
    });
+  }
+
+  private findMatchingGroup(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program, repString?: string })[], sub: ManualGradingSubmission) {
+
+    let repString = sub.submission.replace(/\s+|\n+/g,"");
+    let exactMatch = equivalenceGroups.find(group => repString === group.repString);
+    if (exactMatch) {
+      return exactMatch;
+    }
+
+    let code = this.applyHarness(sub);
+    try {
+    
+      let p = new SimpleProgram(code);
+
+      let fn = getFunc(p, this.getGroupingFunctionName(sub));
+      
+      if (!fn) {
+        return;
+      }
+
+      let matchingGroup = equivalenceGroups.find(group => {
+
+        // Only group blank submissions with other blank submissions
+        if ( (group.submissions[0].submission === "") !== (sub.submission === "")) {
+          return false;
+        }
+        
+        let rep = group.repProgram;
+        if (!rep) { return false; }
+        let repFunc = getFunc(rep, this.getGroupingFunctionName(group.submissions[0]));
+        return repFunc && getFunc(p, this.getGroupingFunctionName(sub))!.isSemanticallyEquivalent(repFunc, {});
+      });
+      return matchingGroup;
+      
+    }
+    catch(e) {
+      // Lobster might randomly crash on an obscure case. Just add to
+      // a new group with no representative program.
+      return undefined;
+    }
   }
 
   private getGroupingFunctionName(sub: ManualGradingSubmission) {
@@ -245,7 +254,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
 
       sim = new Simulation(program);
       let runner = new AsynchronousSimulationRunner(sim);
-      await runner.stepToEndOfMain(0, 5000);
+      await runner.stepToEndOfMain(0, parseInt(<string>$("#examma-ray-autograde-step-limit").val()));
 
       if (!sim.hasAnyEventOccurred) {
         regexes.push(/AG-ON-TESTS-PASS\(([a-zA-Z]+)\)/i);
@@ -299,24 +308,27 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
 
 
 
-function getFunc(program: Program, name: string | string[]) {
-  if (typeof name === "string") {
-    name = [name];
-  }
-  for(let i = 0; i < name.length; ++i) {
-    if (name[0].indexOf("::[[constructor]]") !== -1) {
-      let className = name[0].slice(0, name[0].indexOf("::[[constructor]]"));
-      let ctor = program.linkedClassDefinitions[className]?.constructors[0].definition;
+function getFunc(program: Program, name: string) {
+  if (name[0].indexOf("::[[constructor]]") !== -1) {
+    let className = name[0].slice(0, name[0].indexOf("::[[constructor]]"));
+    let entity = program.translationUnits["main.cpp"].qualifiedLookup(parseQualifiedName(className));
+    if (entity?.declarationKind === "class") {
+      let ctor = entity.definition?.constructors[0].definition;
       if (ctor) {
         return ctor;
       }
-      continue;
     }
-
-    let def = program.linkedFunctionDefinitions[name[i]]?.definitions[0];
-    if (def) {
-      return def;
-    }
+    return undefined;
   }
-  return undefined;
+  else {
+    let entity = program.translationUnits["main.cpp"].qualifiedLookup(parseQualifiedName(name));
+    if (entity?.declarationKind === "function") {
+      let def = entity.overloads[0].definition;
+      if (def) {
+        return def;
+      }
+    }
+    return undefined;
+  }
+
 }

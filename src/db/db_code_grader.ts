@@ -90,21 +90,18 @@ export async function db_setSubmissionGroup(submission_uuid: string, group_uuid:
   });
 }
 
-export async function db_deleteQuestionSubmissionsByExam(exam_id: string, uniqname: string) {
+export async function db_deleteManualGradingBySubmission(exam_id: string, uniqname: string) {
   return await query("manual_grading_submissions").where({
     exam_id: exam_id,
     uniqname: uniqname
   }).delete();
 }
 
-// export async function getSubmissionGroups(question_id: string) {
-//   const submissions = await query("manual_grading_submissions").where({
-//     question_id: question_id
-//   }).select("*");
-
-//   const result : {[index: string]: }= {};
-//   submissions.forEach()
-// }
+export async function db_deleteManualGradingByExam(exam_id: string) {
+  return await query("manual_grading_submissions").where({
+    exam_id: exam_id
+  }).delete();
+}
 
 export async function getAllSubmissions(question_id: string) {
   return await query("manual_grading_submissions").where({

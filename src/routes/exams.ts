@@ -1,11 +1,12 @@
-import { ExamSpecification } from "examma-ray";
-import { NextFunction, Request, Response, Router } from "express";
-import { copyFile, mkdir, readFile, rename, rm, writeFile } from "fs/promises";
+import { ExamSpecification, parseExamSpecification, stringifyExamComponentSpecification } from "examma-ray";
+import { ExamUtils } from "examma-ray/dist/ExamUtils";
+import { Request, Response, Router } from "express";
+import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import multer from "multer";
-import { Worker } from "worker_threads";
-import { db_createExam, db_getExamEpoch, db_getSubmissionsList } from "../db/db_exams";
+import { requireAdmin } from "../auth/jwt_auth";
+import { db_getExam, db_getExamEpoch, db_getExams, db_getExamSubmissions } from "../db/db_exams";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParamExammaRayId, validateParamUuid } from "./common";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
 
 // const upload = multer({
 //   storage: multer.diskStorage({
@@ -32,11 +33,7 @@ exams_router
     validation: NO_VALIDATION,
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      res.status(200);
-      res.json(EXAMMA_RAY_GRADING_SERVER.exams.map(exam => {
-        const {sections, ...rest} = exam.exam.spec;
-        return rest;
-      }));
+      return res.status(200).json(await db_getExams());
     }
   }))
   .post(createRoute({
@@ -52,12 +49,13 @@ exams_router
         }
 
         const uploaded_filepath = `uploads/${req.file?.filename}`;
-        const new_exam_spec = <ExamSpecification>JSON.parse(await readFile(uploaded_filepath, "utf8"));
+        const new_exam_spec = parseExamSpecification(await readFile(uploaded_filepath, "utf8"));
         await rm(uploaded_filepath, { force: true });
 
-        if (EXAMMA_RAY_GRADING_SERVER.exams_by_id[new_exam_spec.exam_id]) {
-          // just update file
-          await writeFile(`data/${new_exam_spec.exam_id}/exam-spec.json`, JSON.stringify(new_exam_spec, null, 2), "utf8");
+        const existing_exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(new_exam_spec.exam_id);
+        if (existing_exam_server) {
+          await writeFile(`data/${new_exam_spec.exam_id}/exam-spec.json`, stringifyExamComponentSpecification(new_exam_spec), "utf8");
+          await existing_exam_server.updateSpec(new_exam_spec)
           return res.sendStatus(201);
         }
         
@@ -68,12 +66,10 @@ exams_router
         await mkdir(`data/${exam_id}/submissions`);
         await mkdir(`data/${exam_id}/error-submissions`);
   
-        await writeFile(`data/${exam_id}/exam-spec.json`, JSON.stringify(new_exam_spec, null, 2), "utf8");
+        await writeFile(`data/${exam_id}/exam-spec.json`, stringifyExamComponentSpecification(new_exam_spec), "utf8");
         await writeFile(`data/${exam_id}/roster.csv`, "uniqname,name", "utf8");
-  
-        await db_createExam(new_exam_spec);
 
-        EXAMMA_RAY_GRADING_SERVER.loadExam(new_exam_spec);
+        EXAMMA_RAY_GRADING_SERVER.loadExamServer(new_exam_spec);
   
         return res.sendStatus(201);
       }
@@ -89,12 +85,59 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
-      if (!exam) {
+      
+      const exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
+
+      if (!exam_server) {
+        return res.sendStatus(404);
+      }
+
+      return res.status(200).json(exam_server.getExamInfo());
+    }
+  }))
+  .delete(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: requireAdmin,
+    handler: [
+      async (req: Request, res: Response) => {
+
+        const exam_id = req.params["exam_id"];
+
+        // Unload the exam server, which means we immediately cease to process
+        // any exam-level requests (that would go to the to-be-deleted exam)
+        const exam_server = EXAMMA_RAY_GRADING_SERVER.unloadExamServer(exam_id);
+        
+        // There wasn't any server for that exam
+        if (!exam_server) {
+          return res.sendStatus(404);
+        }
+
+        // Remove all manual grading, exam submissions, and exam info from the DB
+        await exam_server.deleteEverything();
+        
+        return res.sendStatus(204); // 204 No Content (delete was successful)
+      }
+    ]
+  }));
+
+exams_router
+  .route("/:exam_id/spec")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      const exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
+      if (!exam_server) {
         res.sendStatus(404);
         return;
       }
-      res.status(200).json(exam.exam.spec);
+      res.status(200).send(stringifyExamComponentSpecification(exam_server.exam.spec));
     }
   }));
 
@@ -110,7 +153,7 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      const question = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]]?.exam.allQuestions.find(q => q.question_id === req.params["question_id"]);
+      const question = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.exam.allQuestions.find(q => q.question_id === req.params["question_id"]);
       return question ? res.status(200).json(question.spec) : res.sendStatus(404);
     }
   }));
@@ -127,7 +170,7 @@ exams_router
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
       const exam_id = req.params["exam_id"];
-      res.status(200).json(await db_getSubmissionsList(exam_id));
+      res.status(200).json(await db_getExamSubmissions(exam_id));
     }
   }))
   .post(createRoute({
@@ -139,7 +182,7 @@ exams_router
     handler: [
       upload.array("submissions"),
       async (req: Request, res: Response) => {
-        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+        const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
         if (!exam) {
           res.sendStatus(404);
           return;
@@ -162,7 +205,7 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+      const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
       if (!exam) {
         res.sendStatus(404);
         return;
@@ -182,7 +225,7 @@ exams_router
     handler: [
       upload.array("submissions"),
       async (req: Request, res: Response) => {
-        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+        const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
         if (!exam) {
           res.sendStatus(404);
           return;
@@ -204,7 +247,7 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+      const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
 
       if (!exam) {
         return res.sendStatus(404);
@@ -222,7 +265,7 @@ exams_router
     handler: [
       upload.single("roster"),
       async (req: Request, res: Response) => {
-        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+        const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
 
         if (!exam) {
           return res.sendStatus(404);
@@ -234,7 +277,7 @@ exams_router
 
         const uploaded_filepath = `uploads/${req.file?.filename}`;
 
-        await exam.update({ new_roster_csv_filepath: uploaded_filepath });
+        await exam.setRoster(uploaded_filepath);
 
         await rm(uploaded_filepath, { force: true });
         return res.sendStatus(201);
@@ -245,32 +288,28 @@ exams_router
   
 
 exams_router
-  .route("/:exam_id/secret")
+  .route("/:exam_id/uuidv5_namespace")
   .put(createRoute({
-    preprocessing: NO_PREPROCESSING,
+    preprocessing: jsonBodyParser,
     validation: [
-      validateParamExammaRayId("exam_id")
+      validateParamExammaRayId("exam_id"),
+      validateBody("uuidv5_namespace").isUUID(),
     ],
-    authorization: NO_AUTHORIZATION,
+    authorization: requireAdmin,
     handler: [
-      upload.single("secret"),
       async (req: Request, res: Response) => {
-        const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+        const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
 
         if (!exam) {
           return res.sendStatus(404);
         }
 
-        if (!req.file) {
-          return res.sendStatus(400);
-        }
+        await exam.setUuidV5Namespace(req.body.uuidv5_namespace);
 
-        const uploaded_filepath = `uploads/${req.file?.filename}`;
+        // We don't await this, let it run async
+        exam.generateExams();
 
-        await exam.update({ new_secret_filepath: uploaded_filepath});
-
-        await rm(uploaded_filepath, { force: true });
-        return res.sendStatus(201);
+        return res.sendStatus(204);
       }
     ]
   }));
@@ -300,7 +339,7 @@ exams_router
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
       
-      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+      const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
       if (exam) {
         res.status(200).json({
           epoch: exam.epoch,
@@ -324,7 +363,7 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+      const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
 
       if (!exam) {
         return res.sendStatus(404);
@@ -345,7 +384,7 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADING_SERVER.exams_by_id[req.params["exam_id"]];
+      const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
       if (!exam) {
         res.sendStatus(404);
         return;

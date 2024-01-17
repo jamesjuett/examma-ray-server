@@ -4,6 +4,7 @@
 import axios from "axios";
 import { ExamSpecification } from "examma-ray";
 import { read } from "fs";
+import { DB_Exams } from "knex/types/tables";
 import { ExammaRayGraderClient } from "./Application";
 
 // import 'katex/dist/katex.min.css';
@@ -40,11 +41,11 @@ export class IndexExammaRayGraderApplication {
         });
   
         $(".examma-ray-exams-list").empty();
-        response.data.forEach((exam_spec: Omit<ExamSpecification, "sections">) => {
-          const exam_id = exam_spec.exam_id;
+        response.data.forEach((exam_info: DB_Exams) => {
+          const exam_id = exam_info.exam_id;
           $(".examma-ray-exams-list").append(`
             <li>
-              <a href="dashboard.html?exam-id=${exam_id}">${exam_id}: ${exam_spec.title}</a>
+              <a href="dashboard.html?exam-id=${exam_id}">${exam_id}</a>
             </li>
           `);
 
