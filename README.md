@@ -75,3 +75,10 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'));" > secr
 ```
 psql --host=127.0.0.1 -p 5000 --user=exammaray
 ```
+
+```
+docker-compose -f docker-compose-dev.yml down
+docker-compose -f docker-compose-dev.yml build
+docker-compose -f docker-compose-dev.yml up -d
+docker-compose -f docker-compose-dev.yml logs --follow examma-ray-server
+```

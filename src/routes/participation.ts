@@ -10,6 +10,7 @@ import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VAL
 import { OAuth2Client } from "google-auth-library";
 import { auth_config } from "../auth/config";
 import { db_getParticipation, db_setParticipation } from "../db/db_participation";
+import cors from "cors";
 
 const client = new OAuth2Client();
 
@@ -17,45 +18,49 @@ export const participation_router = Router();
 
 participation_router
   .route("/me/:exam_id")
+  .options(cors())
   .get(createRoute({
     preprocessing: NO_PREPROCESSING,
     validation: [
       validateParamExammaRayId("exam_id"),
     ],
     authorization: NO_AUTHORIZATION,
-    handler: async (req: Request, res: Response) => {
+    handler: [
+      cors(),
+      async (req: Request, res: Response) => {
 
-      const exam_id = req.params["exam_id"];
-      
-      const token = req.header("Authorization")
-      if (!token || token === "") {
-        return res.sendStatus(404);
-      }
+        const exam_id = req.params["exam_id"];
+        
+        const token = req.header("Authorization")
+        if (!token || token === "") {
+          return res.sendStatus(404);
+        }
 
-      const ticket = await client.verifyIdToken({
-        idToken: token,
-        audience: auth_config.participation.clientID,
-      });
+        const ticket = await client.verifyIdToken({
+          idToken: token,
+          audience: auth_config.participation.clientID,
+        });
 
-      const payload = ticket.getPayload();
-      if (!payload) {
-        return res.sendStatus(404);
-      }
-      
-      const email = payload['email'];
-      if (!email) {
-        return res.sendStatus(404);
-      }
+        const payload = ticket.getPayload();
+        if (!payload) {
+          return res.sendStatus(404);
+        }
+        
+        const email = payload['email'];
+        if (!email) {
+          return res.sendStatus(404);
+        }
 
-      const result = await db_getParticipation(exam_id, email);
-      
-      if (result) {
-        res.status(200).json(result);
+        const result = await db_getParticipation(exam_id, email);
+        
+        if (result) {
+          res.status(200).json(result);
+        }
+        else {
+          return res.sendStatus(404);
+        }
       }
-      else {
-        return res.sendStatus(404);
-      }
-    }
+    ]
   }))
   .post(createRoute({
     preprocessing: NO_PREPROCESSING,
@@ -64,6 +69,7 @@ participation_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: [
+      cors(),
       async (req: Request, res: Response) => {
 
         const exam_id = req.params["exam_id"];

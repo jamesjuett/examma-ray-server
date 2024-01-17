@@ -27,6 +27,10 @@ route {
         reverse_proxy examma-ray-server:3000
     }
 
+    route /public_api/* {
+        reverse_proxy examma-ray-server:3000
+    }
+
     file_server {
         root /public
         index index.html

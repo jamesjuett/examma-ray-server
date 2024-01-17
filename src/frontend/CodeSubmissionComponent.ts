@@ -1,7 +1,7 @@
 import indentString from "indent-string";
 import { Program, SimpleProgram, SourceFile } from "lobster-vis/dist/js/core/compilation/Program"
 import { SimpleExerciseLobsterOutlet } from "lobster-vis/dist/js/view/SimpleExerciseLobsterOutlet"
-import { createRunestoneExerciseOutlet } from "lobster-vis/dist/js/view/embeddedExerciseOutlet"
+import { createEmbeddedExerciseOutlet } from "lobster-vis/dist/js/view/embeddedExerciseOutlet"
 
 import { applySkin, highlightCode } from "examma-ray/dist/core/render";
 import "highlightjs/styles/github.css";
@@ -58,7 +58,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
   
     let elem = $("#examma-ray-current-submission");
 
-    elem.append(createRunestoneExerciseOutlet("1"));
+    elem.append(createEmbeddedExerciseOutlet("1"));
   
     let ex = new Exercise({
       checkpoints: [
