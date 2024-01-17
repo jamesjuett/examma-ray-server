@@ -84,6 +84,13 @@ declare module "knex/types/tables" {
     // created_at: string; // timestamp
     // updated_at: string; // timestamp
   }
+
+  interface DB_Participation {
+    exam_id: string;
+    email: string;
+    created_at: string; // timestamp
+    updated_at: string; // timestamp
+  }
   
   type ExceptID<T> = Knex.CompositeTableType<T, Omit<T, "id"> & {id?: undefined}, Partial<Omit<T, "id">> & {id?: undefined}>;
 
@@ -187,6 +194,17 @@ declare module "knex/types/tables" {
       // Update Type
       //   Only allowed to update status and notes
       Partial<Pick<DB_Manual_Grading_Records, "status" | "notes">>
+    >;
+    
+    participation: Knex.CompositeTableType<
+      // Base Type
+      DB_Participation,
+      // Insert Type
+      //   All required
+      Omit<DB_Participation, "created_at" | "updated_at">,
+      // Update Type
+      //   Doesn't make sense to update (you should be using insert/delete)
+      never
     >;
   }
 }

@@ -13,6 +13,7 @@ import { manual_grading_router } from './routes/manual_grading';
 import { questions_router } from './routes/questions';
 import { run_router } from './routes/run';
 import { users_router } from './routes/users';
+import { participation_router } from './routes/participation';
 
 export let EXAMMA_RAY_GRADING_SERVER: ExammaRayGradingServer;
 
@@ -65,12 +66,8 @@ async function main() {
     run_router
   );
 
-  // app.use("/api/projects", projects_router);
-  // app.use("/api/courses", courses_router);
-  // app.use("/api/exercises", exercises_router);
-
   // Public API routes do not require authentication
-  // app.use("/public_api", public_router);
+  app.use("/public_api/participation", participation_router);
 
   // Route to obtain authentication
   // (does not require prior authentication)
