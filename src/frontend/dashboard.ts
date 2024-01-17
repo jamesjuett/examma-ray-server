@@ -313,7 +313,7 @@ export class DashboardExammaRayGraderApplication {
             'Authorization': 'bearer ' + this.client.getBearerToken()
         },
         responseType: "text",
-        transformResponse: [v => v]
+        transformResponse: [v => v] // Avoid default transformation that attempts JSON parsing (so we can parse our special way below)
       });
       const exam_spec = parseExamSpecification(exam_spec_response.data);
 
