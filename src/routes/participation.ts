@@ -42,6 +42,7 @@ async function PARTICIPATION_AUTH(req: Request, res: Response, next: NextFunctio
   }
 
   (<ParticipationRequest>req).participation_email = email;
+  next();
 }
 
 participation_router.route("/me")
@@ -52,8 +53,6 @@ participation_router.route("/me")
     authorization: PARTICIPATION_AUTH,
     handler: [
       async (req: ParticipationRequest, res: Response) => {
-
-        const exam_id = req.params["exam_id"];
         const email = req.participation_email;
 
         if (!email) {
