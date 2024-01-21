@@ -27,7 +27,7 @@ import { AsynchronousSimulationRunner } from "lobster-vis/dist/js/core/runtime/s
 import hotkeys from "hotkeys-js";
 import { ManualGradingSubmissionComponent, ManualGraderApp } from "./ManualGrader";
 import { parse_submission } from "examma-ray/dist/response/responses";
-import { BLANK_SUBMISSION } from "examma-ray/dist/response/common";
+import { BLANK_SUBMISSION, INVALID_SUBMISSION } from "examma-ray/dist/response/common";
 import { AutoObject } from "lobster-vis/dist/js/core/runtime/objects";
 import { CompleteObjectType } from "lobster-vis/dist/js/core/compilation/types";
 import { parseQualifiedName } from "lobster-vis/dist/js/core/compilation/lexical";
@@ -128,7 +128,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
     let code = this.app.config.test_harness;
     if (this.app.question.kind === "fill_in_the_blank") {
       let parsed = parse_submission("fill_in_the_blank", sub.submission);
-      if (parsed === BLANK_SUBMISSION) {
+      if (parsed === BLANK_SUBMISSION || parsed === INVALID_SUBMISSION) {
         parsed = [];
       }
       parsed.forEach((blankSub, i) => {
