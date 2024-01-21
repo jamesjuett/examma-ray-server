@@ -47,11 +47,10 @@ async function PARTICIPATION_AUTH(req: Request, res: Response, next: NextFunctio
 participation_router.route("/me")
   .options(cors())
   .get(createRoute({
-    preprocessing: NO_PREPROCESSING,
+    preprocessing: cors(),
     validation: NO_VALIDATION,
     authorization: PARTICIPATION_AUTH,
     handler: [
-      cors(),
       async (req: ParticipationRequest, res: Response) => {
 
         const exam_id = req.params["exam_id"];
@@ -70,7 +69,7 @@ participation_router.route("/me")
 participation_router.route("/me/:exam_id")
   .options(cors())
   .get(createRoute({
-    preprocessing: NO_PREPROCESSING,
+    preprocessing: cors(),
     validation: [
       validateParamExammaRayId("exam_id"),
     ],
@@ -98,7 +97,7 @@ participation_router.route("/me/:exam_id")
     ]
   }))
   .post(createRoute({
-    preprocessing: NO_PREPROCESSING,
+    preprocessing: cors(),
     validation: [
       validateParamExammaRayId("exam_id"),
     ],
