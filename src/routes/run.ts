@@ -1,7 +1,9 @@
 import { Request, Response, Router } from "express";
 import { RunGradingRequest } from "../dashboard";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, validateBody, validateParam, validateParamExamId } from "./common";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam, validateParamExamId } from "./common";
+import { ServerTasks } from "../ServerTasks";
+import { Worker } from "worker_threads";
 
 export const run_router = Router();
 
@@ -25,7 +27,7 @@ run_router.route("/grade/:exam_id").post(createRoute({
       return;
     }
 
-    if (exam.taskStatus["grade"]) {
+    if (exam.tasks.taskStatus["grade"]) {
       res.status(200).json("A grading task is already running. Please wait for it to finish.");
       return;
     }
@@ -49,7 +51,7 @@ run_router.route("/generate/:exam_id").post(createRoute({
       return;
     }
 
-    if (exam.taskStatus["generate"]) {
+    if (exam.tasks.taskStatus["generate"]) {
       res.status(200).json("A generation task is already running. Please wait for it to finish.");
       return;
     }
@@ -59,5 +61,23 @@ run_router.route("/generate/:exam_id").post(createRoute({
   }
 }));
 
+const participation_tasks = new ServerTasks<"generate_csv">();
 
+run_router.route("/participation/").post(createRoute({
+  authorization: NO_AUTHORIZATION,
+  preprocessing: NO_PREPROCESSING,
+  validation: NO_VALIDATION,
+  handler: (req: Request, res: Response) => {
+
+    if (participation_tasks.taskStatus["generate_csv"]) {
+      res.status(200).json("Participation CSV generation is already running. Please wait for it to finish.");
+      return;
+    }
+
+    const worker = new Worker("./build/run/participation.js");
+    participation_tasks.workerTask(worker, "generate_csv", "Preparing to grade submissions...");
+    
+    res.status(200).json("Participation CSV generation started...");
+  }
+}));
 

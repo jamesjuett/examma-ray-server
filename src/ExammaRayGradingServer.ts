@@ -11,21 +11,23 @@ import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getMa
 import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingSkins, reassignGradingGroups } from "./manual_grading";
 import { WorkerData_Generate, WorkerData_ProcessSubmissions } from "./run/types";
 import { asMutable, assert, assertFalse, assertNever } from "./util/util";
+import { ServerTasks } from "./ServerTasks";
 
 const GRADER_IDLE_THRESHOLD = 4000; // ms
 
-export type ExamTaskStatus = {
-  submissions?: string,
-  generate?: string,
-  grade?: string
-}
+export type ExamTask = 
+  | "submissions"
+  | "generate"
+  | "grade";
+
+export type ExamTaskStatus = ServerTasks<ExamTask>["taskStatus"];
 
 export class ExamServer {
 
   public readonly exam: Exam;
   public readonly epoch: number;
 
-  public readonly taskStatus: ExamTaskStatus = { };
+  public readonly tasks: ServerTasks<ExamTask>;
   
   private uuidv5_namespace;
 
@@ -38,6 +40,7 @@ export class ExamServer {
     this.epoch = epoch;
     this.uuidv5_namespace = db_exam.uuidv5_namespace;
     question_servers.forEach(qs => this.questionGradingServers[qs.question_id] = qs);
+    this.tasks = new ServerTasks();
   }
 
   public static async create(exam_spec: ExamSpecification) {
@@ -103,7 +106,7 @@ export class ExamServer {
       }
     });
 
-    await this.workerTask(worker, "generate", `Preparing to generate ${roster.length} exams...`);
+    await this.tasks.workerTask(worker, "generate", `Preparing to generate ${roster.length} exams...`);
     await this.nextEpoch();
   }
 
@@ -124,7 +127,7 @@ export class ExamServer {
         run_request: run_request
       }
     });
-    await this.workerTask(worker, "grade", "Preparing to grade submissions...");
+    await this.tasks.workerTask(worker, "grade", "Preparing to grade submissions...");
   }
 
   public async addSubmissions(files: readonly Express.Multer.File[]) {
@@ -139,7 +142,7 @@ export class ExamServer {
       }
     });
 
-    await this.workerTask(worker, "submissions", "Preparing to add submissions...");
+    await this.tasks.workerTask(worker, "submissions", "Preparing to add submissions...");
     await this.nextEpoch();
 
     // All question grading servers will need to reload new submission data from the DB
@@ -182,28 +185,6 @@ export class ExamServer {
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
   }
 
-  private workerTask(worker: Worker, task: keyof ExamTaskStatus, initial_status: string) {
-    this.taskStatus[task] = initial_status;
-    return new Promise<void>((resolve, reject) => {
-      worker.on("message", (status: string) => this.taskStatus[task] = status)
-      worker.on("error", () => {
-        this.taskStatus[task] = "ERROR";
-        reject();
-      });
-      worker.on("exit", (exitCode) => {
-        if (exitCode === 0) {
-          this.taskStatus[task] = "DONE";
-          setTimeout(() => this.taskStatus[task] === "DONE" && delete this.taskStatus[task], 10000);
-          resolve();
-        }
-        else {
-          this.taskStatus[task] = "ERROR";
-          reject();
-        }
-      });
-    });
-  }
-
   public async getEpoch() {
     return this.epoch ?? await db_getExamEpoch(this.exam.exam_id);
   }
@@ -213,7 +194,7 @@ export class ExamServer {
   }
 
   public getTaskStatus() {
-    return this.taskStatus;
+    return this.tasks.taskStatus;
   }
   
   public getGradingServer(question_id: string) {

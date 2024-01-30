@@ -9,7 +9,7 @@ import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam, validateParamExammaRayId, validateParamUuid } from "./common";
 import { OAuth2Client } from "google-auth-library";
 import { auth_config } from "../auth/config";
-import { db_getAllParticipation, db_getParticipation, db_setParticipation } from "../db/db_participation";
+import { db_getAllParticipationForUser, db_getParticipation, db_setParticipation } from "../db/db_participation";
 import cors from "cors";
 
 const client = new OAuth2Client();
@@ -59,7 +59,7 @@ participation_router.route("/me")
           return res.sendStatus(404);
         }
 
-        const result = await db_getAllParticipation(email);
+        const result = await db_getAllParticipationForUser(email);
         res.status(200).json(result);
       }
     ]
