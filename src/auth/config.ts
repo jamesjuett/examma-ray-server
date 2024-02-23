@@ -12,13 +12,14 @@ export const auth_config = {
     callbackURL: assertExists(process.env.GOOGLE_CALLBACK_URL)
   },
 
-  participation: {
-    clientID: assertExists(process.env.PARTICIPATION_CLIENT_ID)
-  },
-
   jwt_bearer: {
     jwtFromRequest: passportJwt.ExtractJwt.fromAuthHeaderAsBearerToken(),
     secretOrKey: getDockerSecret("jwt_secret")
+  },
+
+  participation: {
+    clientID: assertExists(process.env.PARTICIPATION_CLIENT_ID),
+    jwt_secret: getDockerSecret("participation_secret")
   },
 
   jwt_cookie: {

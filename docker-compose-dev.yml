@@ -17,6 +17,7 @@ services:
     secrets:
       - db_password
       - jwt_secret
+      - participation_secret
       - google_client_secret
     depends_on:
       - db
@@ -72,5 +73,7 @@ secrets:
       file: ./secrets/db_password
   jwt_secret:
       file: ./secrets/jwt_secret
+  participation_secret:
+      file: ./secrets/participation_secret
   google_client_secret:
       file: ./secrets/google_client_secret

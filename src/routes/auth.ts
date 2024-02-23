@@ -32,7 +32,8 @@ auth_router
     passport.authenticate("google", { session: false }),
     (req, res) => {
       res.cookie("bearer", generateJwt((req.user as any).email), {
-        secure: true
+        secure: true,
+        sameSite: true,
       });
       res.redirect(302, "/");
       // res.sendStatus(302);

@@ -2,22 +2,21 @@ import { firstResult, query } from "./db";
 
 
 export async function db_getParticipation(exam_id: string, email: string) {
-  return await query("participation").where({exam_id: exam_id, email: email}).select().first();
+  return query("participation").where({exam_id: exam_id, email: email}).select().first();
 }
 
 export async function db_getAllParticipationForUser(email: string) {
-  return await query("participation").where({email: email}).select();
+  return query("participation").where({email: email}).select();
 }
 
 export async function db_getAllParticipation() {
-  return await query("participation").select();
+  return query("participation").select();
 }
 
 export async function db_setParticipation(exam_id: string, email: string) {
-  return firstResult(await query("participation")
-    .insert({
+  return await db_getParticipation(exam_id, email)
+    ?? firstResult(await query("participation").insert({
       exam_id: exam_id,
       email: email
-    })
-    .returning("*"));
+    }).returning("*"));
 }
