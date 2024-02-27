@@ -63,6 +63,8 @@ mkcert localhost
 Then copy those files to `./secrets/certs`.
 
 
+If you get an ERR_CERT_DATE_INVALID then you need to do this again and replace the old certs.
+
 ### Secrets
 
 Create a secret key for JWT:
