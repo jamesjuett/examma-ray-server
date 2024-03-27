@@ -64,3 +64,4 @@ export function validateParamUuid(param_name: string) {
 export const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
 export const validateParamSectionId = validateParam("section_id").trim().isLength({min: 1, max: 100});
 export const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, max: 100});
+

@@ -91,6 +91,14 @@ declare module "knex/types/tables" {
     created_at: string; // timestamp
     updated_at: string; // timestamp
   }
+
+  interface DB_Online_Submissions {
+    exam_id: string;
+    email: string;
+    created_at: string; // timestamp
+    updated_at: string; // timestamp
+    submission: string; // jsonb
+  }
   
   type ExceptID<T> = Knex.CompositeTableType<T, Omit<T, "id"> & {id?: undefined}, Partial<Omit<T, "id">> & {id?: undefined}>;
 

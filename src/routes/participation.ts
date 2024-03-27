@@ -6,13 +6,14 @@ import multer from "multer";
 import { requireAdmin } from "../auth/jwt_auth";
 import { db_getExam, db_getExamEpoch, db_getExams, db_getExamSubmissions } from "../db/db_exams";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam, validateParamExammaRayId, validateParamUuid } from "./common";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam, validateParamExamId, validateParamExammaRayId, validateParamUuid } from "./common";
 import { OAuth2Client } from "google-auth-library";
 import { auth_config } from "../auth/config";
 import { db_getAllParticipationForUser, db_getParticipation, db_setParticipation } from "../db/db_participation";
 import cors from "cors";
 import jsonwebtoken from "jsonwebtoken";
 import { assert } from "../util/util";
+import { db_setOnlineSubmission } from "../db/db_online_submissions";
 
 const client = new OAuth2Client();
 
@@ -155,6 +156,42 @@ participation_router.route("/me/:exam_id")
         assert(email);
 
         const result = await db_setParticipation(exam_id, email);
+        
+        if (result) {
+          res.status(201).json({
+            ...result,
+            is_complete: true,
+          });
+        }
+        else {
+          return res.sendStatus(500);
+        }
+      }
+    ]
+  }));
+
+  participation_router.route("/me/:exam_id/submission")
+  .options(cors())
+  .put(createRoute({
+    preprocessing: [
+      cors(),
+      jsonBodyParser,
+    ],
+    validation: [
+      validateParamExammaRayId("exam_id"),
+      validateBody("submission").isString().trim().isLength({min: 1, max: 1000000}),
+    ],
+    authorization: PARTICIPATION_AUTH,
+    handler: [
+      cors(),
+      async (req: ParticipationRequest, res: Response) => {
+
+        const exam_id = req.params["exam_id"];
+        const submission = req.body["submission"];
+        const email = req.participation_email;
+        assert(email);
+
+        const result = await db_setOnlineSubmission(exam_id, email, submission);
         
         if (result) {
           res.status(201).json({
