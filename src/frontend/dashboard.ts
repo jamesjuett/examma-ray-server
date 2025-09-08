@@ -8,12 +8,12 @@ import { v4 } from "uuid";
 import { ExamPingResponse, ExamSubmissionRecord, RunGradingRequest } from "../dashboard";
 import { ExamTaskStatus } from "../ExammaRayGradingServer";
 import { asMutable, assert } from "../util/util";
-import { ExammaRayGraderClient } from "./Application";
+import { ExammaRayClient } from "./Application";
 
 
 export class DashboardExammaRayGraderApplication {
 
-  public readonly client: ExammaRayGraderClient;
+  public readonly client: ExammaRayClient;
 
   public readonly exam_id: string;
   public readonly exam_info?: DB_Exams;
@@ -21,7 +21,7 @@ export class DashboardExammaRayGraderApplication {
   
   private exam_epoch?: number;
 
-  private constructor(client: ExammaRayGraderClient, exam_id: string) {
+  private constructor(client: ExammaRayClient, exam_id: string) {
     this.client = client;
     this.exam_id = exam_id;
 
@@ -34,7 +34,7 @@ export class DashboardExammaRayGraderApplication {
 
   public static async create(exam_id: string) {
     return new DashboardExammaRayGraderApplication(
-      await ExammaRayGraderClient.create(),
+      await ExammaRayClient.create(),
       exam_id
     );
   }

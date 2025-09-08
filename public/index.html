@@ -4,8 +4,8 @@
 <head>
   <meta charset="utf-8" />
 
-  <title>Examma Ray</title>
-  <meta name="description" content="Exam development and grading server for examma-ray" />
+  <title>EECS 280 Quizzes</title>
+  <meta name="description" content="EECS 280 Quizzes" />
   <meta name="author" content="James Juett" />
 
   <!-- TODO: Check This -->
@@ -33,34 +33,25 @@
   <div style="width: 100vw; height: 100vh; overflow: hidden;">
 
     <div style="margin: 0.25em;">
-      <div style="float: right; vertical-align: middle;">
+      <div style="text-align: right;">
         <a class="btn btn-primary examma-ray-log-in-button" href="auth/google">Sign In</a>
         <button style="display:none;" class="btn btn-warning examma-ray-log-out-button"><i class="bi bi-person-x-fill"></i> Sign Out</button>
       </div>
     </div>
-    
-    <div>
-      <ul class="examma-ray-exams-list">
 
-      </ul>
+    <div class="container">
+      <div class="alert alert-primary" style="width: 400px; margin-left: auto; margin-right: auto;" role="alert">
+        <h2>Hello</h2>
+        Please go ahead and log in.
+      </div>
+      <div>
+        <ul class="examma-ray-exams-list">
+
+        </ul>
+      </div>
     </div>
 
-    <div class="alert alert-danger" style="position: absolute; bottom: 0;" role="alert">
-      <h2>DANGER DO NOT CLICK THESE</h2>
-      <form id="create-exam-form">
-        Upload the <code>exam-spec.json</code> file here.
-        <input id="exam-spec-file-input" type="file" name="exam-spec"/>
-        <button type="submit">Submit</button>
-      </form>
-      <button id="run-generate-participation-csv-button" class="btn btn-primary">Generate Participation CSV</button>
-      <a href="out/participation.csv">participation.csv</a>
-    </div>
-
-    
   </div>
-
-  
-
 
 </body>
 

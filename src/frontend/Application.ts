@@ -11,7 +11,7 @@ export type UserInfo = {
   name: string;
 };
 
-export class ExammaRayGraderClient {
+export class ExammaRayClient {
 
   public readonly currentUser?: UserInfo;
 
@@ -23,7 +23,7 @@ export class ExammaRayGraderClient {
   }
 
   public static async create() {
-    let client = new ExammaRayGraderClient();
+    let client = new ExammaRayClient();
     await client.checkLogin();
     return client;
   }

@@ -4,6 +4,7 @@ module.exports = {
   mode: "production",
   entry: {
     'index': './src/frontend/index',
+    'staff': './src/frontend/staff',
     'dashboard': './src/frontend/dashboard',
     'manual-code-grader': './src/frontend/manual-code-grader',
     'manual-generic-grader': './src/frontend/manual-generic-grader',

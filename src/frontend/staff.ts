@@ -2,7 +2,7 @@ import axios from "axios";
 import { DB_Exams } from "knex/types/tables";
 import { ExammaRayClient } from "./Application";
 
-export class IndexExammaRayApplication {
+export class StaffExammaRayGraderApplication {
 
   public readonly client: ExammaRayClient;
 
@@ -11,7 +11,7 @@ export class IndexExammaRayApplication {
   }
 
   public static async create() {
-    let app = new IndexExammaRayApplication(await ExammaRayClient.create());
+    let app = new StaffExammaRayGraderApplication(await ExammaRayClient.create());
     await app.reloadExams();
     setInterval(() => app.reloadExams(), 30000)
     return app;
@@ -23,7 +23,7 @@ export class IndexExammaRayApplication {
       try {
   
         let response = await axios({
-          url: `student_api/exams`,
+          url: `api/exams`,
           method: "GET",
           data: {},
           headers: {
@@ -32,13 +32,16 @@ export class IndexExammaRayApplication {
         });
   
         $(".examma-ray-exams-list").empty();
-        response.data.forEach((exam_info: {exam_id: string}) => {
+        response.data.forEach((exam_info: DB_Exams) => {
           const exam_id = exam_info.exam_id;
           $(".examma-ray-exams-list").append(`
             <li>
-              <a href="student.html?exam-id=${exam_id}">${exam_id}</a>
+              <a href="dashboard.html?exam-id=${exam_id}">${exam_id}</a>
             </li>
           `);
+
+         
+  
         });
 
       }
@@ -54,7 +57,7 @@ export class IndexExammaRayApplication {
 
 async function main() {
 
-  const app = await IndexExammaRayApplication.create();
+  const app = await StaffExammaRayGraderApplication.create();
   $("#create-exam-form").on("submit", async (e) => {
     e.preventDefault();
     let files = (<HTMLInputElement>$("#exam-spec-file-input")[0]).files;
@@ -73,6 +76,21 @@ async function main() {
     });
 
     app.reloadExams();
+  });
+
+  $("#run-generate-participation-csv-button").on("click", async () => {
+    alert("hi");
+    let response = await axios({
+      url: `run/participation`,
+      method: "POST",
+      headers: {
+        'Authorization': 'bearer ' + app.client.getBearerToken()
+      }
+    });
+
+    if (response.status !== 200) {
+      alert(response.data);
+    }
   });
 
 }

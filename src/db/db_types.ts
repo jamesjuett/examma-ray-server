@@ -99,6 +99,36 @@ declare module "knex/types/tables" {
     updated_at: string; // timestamp
     submission: string; // jsonb
   }
+
+  interface DB_Live_Exam_Instances {
+    exam_id: string;
+    duration_seconds: number;
+  }
+
+  interface DB_Live_Exam_Assignments {
+    exam_uuid: string;
+    exam_id: string;
+    uniqname: string;
+    student_email: string; // email that is allowed to take exam
+    window_id?: number;
+    force_open: boolean;
+  }
+
+  interface DB_Live_Windows {
+    window_id: number;
+    exam_id: string;
+    start_time: Date; // timestamp
+    end_time: Date; // timestamp
+  }
+
+  interface DB_Live_Submissions {
+    exam_uuid: string;
+    uniqname: string; // uniqname of student who exam was assigned to
+    updated_by_email: string; // email of user who last updated this
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+    submission: string; // jsonb
+  }
   
   type ExceptID<T> = Knex.CompositeTableType<T, Omit<T, "id"> & {id?: undefined}, Partial<Omit<T, "id">> & {id?: undefined}>;
 
@@ -213,6 +243,50 @@ declare module "knex/types/tables" {
       // Update Type
       //   Doesn't make sense to update (you should be using insert/delete)
       never
+    >;
+
+    live_exam_instances: Knex.CompositeTableType<
+      // Base Type
+      DB_Live_Exam_Instances,
+      // Insert Type
+      //   All required
+      DB_Live_Exam_Instances,
+      // Update Type
+      //   Only allowed to update duration_seconds
+      Partial<Pick<DB_Live_Exam_Instances, "duration_seconds">>
+    >;
+    
+    live_exam_assignments: Knex.CompositeTableType<
+      // Base Type
+      DB_Live_Exam_Assignments,
+      // Insert Type
+      //   All required, except window_id is optional (nullable)
+      Omit<DB_Live_Exam_Assignments, "window_id"> & Partial<Pick<DB_Live_Exam_Assignments, "window_id">>,
+      // Update Type
+      //   Only allowed to update window_id
+      Partial<Pick<DB_Live_Exam_Assignments, "window_id">>
+    >;
+
+    live_windows: Knex.CompositeTableType<
+      // Base Type
+      DB_Live_Windows,
+      // Insert Type
+      //   All required
+      DB_Live_Windows,
+      // Update Type
+      //   Only allowed to update start_time, end_time
+      Partial<Pick<DB_Live_Windows, "start_time" | "end_time">>
+    >;
+
+    live_submissions: Knex.CompositeTableType<
+      // Base Type
+      DB_Live_Submissions,
+      // Insert Type
+      //   All required
+      DB_Live_Submissions,
+      // Update Type
+      //   Only allowed to update updated_by_email, updated_at, and submission
+      Partial<Pick<DB_Live_Submissions, "updated_by_email" | "updated_at" | "submission">>
     >;
   }
 }

@@ -14,6 +14,7 @@ import { questions_router } from './routes/questions';
 import { run_router } from './routes/run';
 import { users_router } from './routes/users';
 import { participation_router } from './routes/participation';
+import { student_router } from './routes/student';
 
 export let EXAMMA_RAY_GRADING_SERVER: ExammaRayGradingServer;
 
@@ -47,7 +48,7 @@ async function main() {
   app.use('/api',
     passport.initialize(),
     passport.authenticate('jwt-bearer', { session: false }),
-    requireStaff
+    requireStaff,
   );
 
   // Regular API Routes
@@ -55,6 +56,14 @@ async function main() {
   app.use("/api/exams", exams_router);
   app.use("/api/questions", questions_router);
   app.use("/api/manual_grading", manual_grading_router);
+
+  // Separate student API routes, require authentication but
+  // do not require any additional staff authorization
+  app.use('/student_api',
+    passport.initialize(),
+    passport.authenticate('jwt-bearer', { session: false }),
+    student_router
+  );
 
 
   // Routes to run jobs, which require authentication via a bearer

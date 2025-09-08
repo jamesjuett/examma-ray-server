@@ -19,6 +19,10 @@ route {
         reverse_proxy examma-ray-server:3000
     }
 
+    route /student_api/* {
+        reverse_proxy examma-ray-server:3000
+    }
+
     route /run/* {
         reverse_proxy examma-ray-server:3000
     }

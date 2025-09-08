@@ -9,7 +9,7 @@ import randomColor from "randomcolor";
 import { v4 as uuidv4 } from "uuid";
 import { ActiveQuestionGraders, GradingGroupReassignment, isMeaningfulManualGradingResult, isMeaningfulRubricItemGradingResult, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingGroupRecord, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingResult, ManualGradingRubricItem, ManualGradingRubricItemStatus, ManualGradingSkins, ManualGradingSubmission, NextUngradedRequest, NextUngradedResponse, reassignGradingGroups, RubricItemGradingResult } from "../manual_grading";
 import { asMutable, assert, assertFalse, assertNever } from "../util/util";
-import { ExammaRayGraderClient } from "./Application";
+import { ExammaRayClient } from "./Application";
 import "./code-grader.css";
 
 
@@ -44,7 +44,7 @@ const SUBMISSION_FILTERS : {
 
 export class ManualGraderApp {
 
-  public readonly client: ExammaRayGraderClient;
+  public readonly client: ExammaRayClient;
   public readonly groupGrader: GroupGraderOutlet;
   public readonly groupThumbnailsPanel: GroupThumbnailsPanel;
 
@@ -68,7 +68,7 @@ export class ManualGraderApp {
 
   public submissionComponent: ManualGradingSubmissionComponent;
   
-  private constructor(client: ExammaRayGraderClient, submissionComponent: new (app: ManualGraderApp) => ManualGradingSubmissionComponent, exam_id: string, question: Question, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, records: ManualGradingQuestionRecords, skins: ManualGradingSkins) {
+  private constructor(client: ExammaRayClient, submissionComponent: new (app: ManualGraderApp) => ManualGradingSubmissionComponent, exam_id: string, question: Question, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, records: ManualGradingQuestionRecords, skins: ManualGradingSkins) {
     this.client = client;
     this.exam_id = exam_id;
     this.question = question;
@@ -161,7 +161,7 @@ export class ManualGraderApp {
   public static async create(submissionComponent: new (app: ManualGraderApp) => ManualGradingSubmissionComponent, exam_id: string, question_id: string) {
 
     try {
-      const client = await ExammaRayGraderClient.create();
+      const client = await ExammaRayClient.create();
 
       const question_response = await axios({
         url: `api/exams/${exam_id}/questions/${question_id}`,
@@ -1426,7 +1426,7 @@ class GroupThumbnailOutlet {
 }
 
 
-async function loadRubric(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
+async function loadRubric(client: ExammaRayClient, exam_id: string, question_id: string) {
   const rubric_response = await axios({
     url: `api/manual_grading/${exam_id}/questions/${question_id}/rubric`,
     method: "GET",
@@ -1438,7 +1438,7 @@ async function loadRubric(client: ExammaRayGraderClient, exam_id: string, questi
   return <ManualGradingRubricItem[]>rubric_response.data;
 }
 
-async function loadConfig(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
+async function loadConfig(client: ExammaRayClient, exam_id: string, question_id: string) {
   const rubric_response = await axios({
     url: `api/manual_grading/${exam_id}/questions/${question_id}/config`,
     method: "GET",
@@ -1450,7 +1450,7 @@ async function loadConfig(client: ExammaRayGraderClient, exam_id: string, questi
   return <ManualCodeGraderConfiguration>rubric_response.data;
 }
 
-async function loadGradingRecords(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
+async function loadGradingRecords(client: ExammaRayClient, exam_id: string, question_id: string) {
   const records_response = await axios({
     url: `api/manual_grading/${exam_id}/questions/${question_id}/records`,
     method: "GET",
@@ -1462,7 +1462,7 @@ async function loadGradingRecords(client: ExammaRayGraderClient, exam_id: string
   return <ManualGradingQuestionRecords>records_response.data;
 }
 
-async function loadSkins(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
+async function loadSkins(client: ExammaRayClient, exam_id: string, question_id: string) {
   const records_response = await axios({
     url: `api/manual_grading/${exam_id}/questions/${question_id}/skins`,
     method: "GET",
