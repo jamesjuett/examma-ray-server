@@ -17,25 +17,24 @@ student_router
     }
   }));
 
-export const users_router = Router();
-  users_router.route("/users/me")
-    .get(createRoute({
-      preprocessing: NO_PREPROCESSING,
-      validation: NO_VALIDATION,
-      authorization: NO_AUTHORIZATION,
-      handler: async (req: Request, res: Response) => {
-        let userInfo = getJwtUserInfo(req);
-        let user = await db_getUserByEmail(userInfo.email);
-        if (user) {
-          res.status(200);
-          res.json(user);
-        }
-        else {
-          res.status(404);
-          res.send("This user does not exist.");
-        }
+student_router.route("/users/me")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: NO_VALIDATION,
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      let userInfo = getJwtUserInfo(req);
+      let user = await db_getUserByEmail(userInfo.email);
+      if (user) {
+        res.status(200);
+        res.json(user);
       }
-    }));
+      else {
+        res.status(404);
+        res.send("This user does not exist.");
+      }
+    }
+  }));
 
 student_router.route("/exams/:exam_uuid/live_submission")
   .put(createRoute({
