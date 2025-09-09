@@ -33,7 +33,7 @@ auth_router
     (req, res) => {
       res.cookie("bearer", generateJwt((req.user as any).email), {
         secure: true,
-        sameSite: true,
+        sameSite: "strict", // (same as true, but using "strict" is more explicit)
       });
       res.redirect(302, "/");
       // res.sendStatus(302);

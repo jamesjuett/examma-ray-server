@@ -1,4 +1,4 @@
-import { fill_response, parse_submission } from "examma-ray/dist/response/responses";
+import { BLANK_SUBMISSION, fill_response, parse_submission } from "examma-ray/dist/response/responses";
 import { Program } from "lobster-vis/dist/js/core/compilation/Program";
 import { v4 as uuidv4 } from "uuid";
 import { ManualGradingGroupRecord, ManualGradingSubmission } from "../manual_grading";
@@ -51,10 +51,11 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
     const sampleSolutionElem = this.responseElem.find("td").last();
 
     studentSubmissionElem.html(this.app.question.renderResponse(uuidv4(), skin));
+    const parsed = parse_submission(this.app.question.response.kind, sub.submission);
     fill_response(
       studentSubmissionElem,
       this.app.question.response.kind,
-      parse_submission(this.app.question.response.kind, sub.submission)
+      parsed.validity === "viable" ? parsed : BLANK_SUBMISSION()
     );
 
     if (sampleSolution) {

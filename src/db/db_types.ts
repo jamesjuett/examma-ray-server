@@ -101,29 +101,29 @@ declare module "knex/types/tables" {
   }
 
   interface DB_Live_Exam_Instances {
+    exam_instance_uuid: string;
     exam_id: string;
     duration_seconds: number;
   }
 
+  interface DB_Live_Windows {
+    window_uuid: number;
+    exam_instance_uuid: string;
+    start_time: Date; // timestamp
+    end_time: Date; // timestamp
+  }
+
   interface DB_Live_Exam_Assignments {
     exam_uuid: string;
-    exam_id: string;
+    exam_instance_uuid: string;
     uniqname: string;
     student_email: string; // email that is allowed to take exam
     window_id?: number;
     force_open: boolean;
   }
 
-  interface DB_Live_Windows {
-    window_id: number;
-    exam_id: string;
-    start_time: Date; // timestamp
-    end_time: Date; // timestamp
-  }
-
   interface DB_Live_Submissions {
     exam_uuid: string;
-    uniqname: string; // uniqname of student who exam was assigned to
     updated_by_email: string; // email of user who last updated this
     created_at: Date; // timestamp
     updated_at: Date; // timestamp
@@ -255,17 +255,6 @@ declare module "knex/types/tables" {
       //   Only allowed to update duration_seconds
       Partial<Pick<DB_Live_Exam_Instances, "duration_seconds">>
     >;
-    
-    live_exam_assignments: Knex.CompositeTableType<
-      // Base Type
-      DB_Live_Exam_Assignments,
-      // Insert Type
-      //   All required, except window_id is optional (nullable)
-      Omit<DB_Live_Exam_Assignments, "window_id"> & Partial<Pick<DB_Live_Exam_Assignments, "window_id">>,
-      // Update Type
-      //   Only allowed to update window_id
-      Partial<Pick<DB_Live_Exam_Assignments, "window_id">>
-    >;
 
     live_windows: Knex.CompositeTableType<
       // Base Type
@@ -276,6 +265,17 @@ declare module "knex/types/tables" {
       // Update Type
       //   Only allowed to update start_time, end_time
       Partial<Pick<DB_Live_Windows, "start_time" | "end_time">>
+    >;
+    
+    live_exam_assignments: Knex.CompositeTableType<
+      // Base Type
+      DB_Live_Exam_Assignments,
+      // Insert Type
+      //   All required, except window_id is optional (nullable)
+      Omit<DB_Live_Exam_Assignments, "window_id"> & Partial<Pick<DB_Live_Exam_Assignments, "window_id">>,
+      // Update Type
+      //   Only allowed to update window_id
+      Partial<Pick<DB_Live_Exam_Assignments, "window_id">>
     >;
 
     live_submissions: Knex.CompositeTableType<

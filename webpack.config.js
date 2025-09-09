@@ -5,6 +5,7 @@ module.exports = {
   entry: {
     'index': './src/frontend/index',
     'staff': './src/frontend/staff',
+    'participation': './src/frontend/participation',
     'dashboard': './src/frontend/dashboard',
     'manual-code-grader': './src/frontend/manual-code-grader',
     'manual-generic-grader': './src/frontend/manual-generic-grader',
@@ -38,6 +39,12 @@ module.exports = {
       {
         test: /\.css$/i,
         use: ['style-loader', 'css-loader']
+      },
+      { // Need this because animal-avatar-generator doesn't fully specify extensions
+        test: /\.m?js$/, // Match JavaScript and MJS files
+        resolve: {
+          fullySpecified: false, // This is the key setting to add
+        },
       },
       {
         test: /\.(woff(2)?|ttf|eot|svg)(\?v=\d+\.\d+\.\d+)?$/,

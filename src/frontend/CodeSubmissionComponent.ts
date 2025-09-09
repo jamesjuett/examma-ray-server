@@ -26,8 +26,8 @@ import { AsynchronousSimulationRunner } from "lobster-vis/dist/js/core/runtime/s
 
 import hotkeys from "hotkeys-js";
 import { ManualGradingSubmissionComponent, ManualGraderApp } from "./ManualGrader";
-import { parse_submission } from "examma-ray/dist/response/responses";
-import { BLANK_SUBMISSION, INVALID_SUBMISSION } from "examma-ray/dist/response/common";
+import { parse_submission, validate_submission } from "examma-ray/dist/response/responses";
+import {  } from "examma-ray/dist/response/common";
 import { AutoObject } from "lobster-vis/dist/js/core/runtime/objects";
 import { CompleteObjectType } from "lobster-vis/dist/js/core/compilation/types";
 import { parseQualifiedName } from "lobster-vis/dist/js/core/compilation/lexical";
@@ -126,14 +126,16 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
   public applyHarness(sub: ManualGradingSubmission) {
 
     let code = this.app.config.test_harness;
-    if (this.app.question.kind === "fill_in_the_blank") {
+    if (this.app.question.isKind("fill_in_the_blank")) {
       let parsed = parse_submission("fill_in_the_blank", sub.submission);
-      if (parsed === BLANK_SUBMISSION || parsed === INVALID_SUBMISSION) {
-        parsed = [];
+      if (parsed.validity !== "malformed") {
+        parsed = validate_submission(this.app.question.response, parsed);
+        if (parsed.validity === "viable") {
+          parsed.encoding.forEach((blankSub, i) => {
+            code = code.replace(`{{submission[${i}]}}`, blankSub);
+          });
+        }
       }
-      parsed.forEach((blankSub, i) => {
-        code = code.replace(`{{submission[${i}]}}`, blankSub);
-      });
       // replace any remaining
       code = code.replace(/\{\{submission\[.*\]\}\}/gi, "");
 
@@ -142,10 +144,6 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
       code = code.replace("{{submission}}", indentString(sub.submission, 4));
     }
 
-    code = code.replace(/vector\s*\<\s*Topping\s*\>/gi, "VectorOfTopping");
-    code = code.replace(/vector\s*\<\s*Sundae\s*\>/gi, "VectorOfSundae");
-    code = code.replace(/vector\s*\<\s*Ingredient\s*\>/gi, "VectorOfIngredient");
-    code = code.replace(/vector\s*\<\s*Sandwich\s*\>/gi, "VectorOfSandwich");
     code = applySkin(code, this.app.skins[sub.skin_id]);
     return code;
   }

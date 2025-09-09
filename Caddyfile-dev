@@ -31,6 +31,10 @@ route {
         reverse_proxy examma-ray-server:3000
     }
 
+    route /live/* {
+        reverse_proxy examma-ray-server:3000
+    }
+
     route /public_api/* {
         reverse_proxy examma-ray-server:3000
     }

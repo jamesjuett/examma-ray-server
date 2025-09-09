@@ -1,15 +1,15 @@
 // import minimist from "minimist";
-import { ExamUtils, writeFrontendJS } from "examma-ray/dist/ExamUtils";
-import { copyFileSync, rmSync, writeFileSync } from "fs";
-import { workerData as workerDataUntyped } from "worker_threads";
-import extract from "extract-zip";
-import { db_addExamSubmission, db_getExamSubmissionByUuid } from "../db/db_exams";
-import { query } from "../db/db";
-import { v4 as uuidv4 } from "uuid";
 import { AssignedExam, Exam, TrustedExamSubmission } from "examma-ray";
-import { db_createGroup, db_createSubmission } from "../db/db_code_grader";
-import { db_insertManualGradingQuestionSkinIfNotExists } from "../db/db_rubrics";
 import { ExamGrader } from "examma-ray/dist/ExamGrader";
+import { ExamUtils } from "examma-ray/dist/ExamUtils";
+import extract from "extract-zip";
+import { copyFileSync, rmSync, writeFileSync } from "fs";
+import { v4 as uuidv4 } from "uuid";
+import { workerData as workerDataUntyped } from "worker_threads";
+import { query } from "../db/db";
+import { db_createGroup, db_createSubmission } from "../db/db_code_grader";
+import { db_addExamSubmission, db_getExamSubmissionByUuid } from "../db/db_exams";
+import { db_insertManualGradingQuestionSkinIfNotExists } from "../db/db_rubrics";
 import { RATE_LIMITED_POST_MESSAGE } from "./common";
 import { WorkerData_ProcessSubmissions } from "./types";
 
@@ -60,7 +60,7 @@ async function assignGrading(exam: Exam, submission: TrustedExamSubmission) {
     const group_uuid = uuidv4();
     await db_createGroup(group_uuid, aq.question.question_id, false);
     await db_insertManualGradingQuestionSkinIfNotExists(aq.question.question_id, aq.skin);
-    await db_createSubmission(aq.uuid, aq.question.question_id, aq.skin.skin_id, exam.exam_id, aq.student.uniqname, aq.rawSubmission, group_uuid);
+    await db_createSubmission(aq.uuid, aq.question.question_id, aq.skin.skin_id, exam.exam_id, aq.student.uniqname, aq.rawSubmission ?? "", group_uuid);
   }));
 }
 

@@ -27,6 +27,7 @@ services:
       - ./src:/usr/src/app/src
       - ./data:/usr/src/app/data
       - ./out:/usr/src/app/out
+      - ./live:/usr/src/app/live
       - ./uploads:/usr/src/app/uploads
     networks:
         - http

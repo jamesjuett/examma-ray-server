@@ -5,7 +5,7 @@ import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { readdirSync } from 'fs';
 import passport from 'passport';
 import path from 'path';
-import { requireStaff } from './auth/jwt_auth';
+import { requireAdmin, requireStaff } from './auth/jwt_auth';
 import { ExammaRayGradingServer } from './ExammaRayGradingServer';
 import { auth_router } from './routes/auth';
 import { exams_router } from './routes/exams';
@@ -35,12 +35,27 @@ async function main() {
   // files via GET requests. None of these routes perform any state
   // changing actions or have side effects, so CSRF (which cookie
   // authentication would allow) is not a big concern.
+  // THe relevant cookie is set with secure and sameSite=strict flags.
   app.use('/out',
     cookieParser(),
     passport.initialize(),
     passport.authenticate('jwt-cookie', { session: false }),
     requireStaff,
     express.static("out")
+  );
+
+  // Requests to live exam files allow authentication via a bearer
+  // token stored in a cookie. These routes are used ONLY to serve
+  // files via GET requests. None of these routes perform any state
+  // changing actions or have side effects, so CSRF (which cookie
+  // authentication would allow) is not a big concern.
+  // THe relevant cookie is set with secure and sameSite=strict flags.
+  app.use('/live',
+    cookieParser(),
+    passport.initialize(),
+    passport.authenticate('jwt-cookie', { session: false }),
+    // any authenticated user can access live exam files
+    express.static("live")
   );
 
   // ALL requests to the api require authentication via a bearer
@@ -71,7 +86,7 @@ async function main() {
   app.use('/run',
     passport.initialize(),
     passport.authenticate('jwt-bearer', { session: false }),
-    requireStaff,
+    requireAdmin,
     run_router
   );
 

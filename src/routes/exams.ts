@@ -39,7 +39,7 @@ exams_router
   .post(createRoute({
     preprocessing: NO_PREPROCESSING,
     validation: NO_VALIDATION,
-    authorization: NO_AUTHORIZATION,
+    authorization: requireAdmin,
     handler: [
       upload.single("exam_spec"),
       async (req: Request, res: Response) => {
@@ -130,7 +130,7 @@ exams_router
     validation: [
       validateParamExammaRayId("exam_id")
     ],
-    authorization: NO_AUTHORIZATION,
+    authorization: requireAdmin,
     handler: async (req: Request, res: Response) => {
       const exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
       if (!exam_server) {
@@ -178,7 +178,7 @@ exams_router
     validation: [
       validateParamExammaRayId("exam_id")
     ],
-    authorization: NO_AUTHORIZATION,
+    authorization: requireAdmin,
     handler: [
       upload.array("submissions"),
       async (req: Request, res: Response) => {
@@ -203,7 +203,7 @@ exams_router
       validateParamExammaRayId("exam_id"),
       validateParamUuid("submission_uuid"),
     ],
-    authorization: NO_AUTHORIZATION,
+    authorization: requireAdmin,
     handler: async (req: Request, res: Response) => {
       const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
       if (!exam) {
@@ -221,7 +221,7 @@ exams_router
     validation: [
       validateParamExammaRayId("exam_id")
     ],
-    authorization: NO_AUTHORIZATION,
+    authorization: requireAdmin,
     handler: [
       upload.array("submissions"),
       async (req: Request, res: Response) => {
@@ -261,7 +261,7 @@ exams_router
     validation: [
       validateParamExammaRayId("exam_id")
     ],
-    authorization: NO_AUTHORIZATION,
+    authorization: requireAdmin,
     handler: [
       upload.single("roster"),
       async (req: Request, res: Response) => {

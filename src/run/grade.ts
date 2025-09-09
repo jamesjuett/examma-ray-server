@@ -1,14 +1,13 @@
 // import minimist from "minimist";
-import { Exam, Question, QuestionGrader, SampleSolutionExamRenderer } from "examma-ray";
+import { Exam, Question, QuestionGrader } from "examma-ray";
 import { IndividualizedNormalCurve } from "examma-ray/dist/core/ExamCurve";
-import { ExamGenerator } from "examma-ray/dist/ExamGenerator";
 import { ExamGrader, ExamGraderOptions, ExceptionMap, GraderSpecificationMap } from "examma-ray/dist/ExamGrader";
-import { ExamUtils, writeFrontendJS } from "examma-ray/dist/ExamUtils";
+import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
 import { ManualGenericGrader } from "examma-ray/dist/graders/ManualGenericGrader";
-import { mkdirSync, readFileSync, writeFileSync } from "fs";
-import { parentPort, workerData } from "worker_threads";
+import { readFileSync } from "fs";
+import { workerData } from "worker_threads";
 import { RunGradingRequest } from "../dashboard";
 import { query } from "../db/db";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
