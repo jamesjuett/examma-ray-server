@@ -2,6 +2,7 @@ import { Request, Response, Router } from "express";
 import { getJwtUserInfo } from "../auth/jwt_auth";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
 import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByEmail, db_saveLiveExamSubmission } from "../db/db_live";
+import { db_getUserByEmail } from "../db/db_user";
 
 export const student_router = Router();
 student_router
@@ -15,6 +16,26 @@ student_router
       return res.status(200).json(await db_getLiveExamAssignmentsByEmail(userInfo.email));
     }
   }));
+
+export const users_router = Router();
+  users_router.route("/users/me")
+    .get(createRoute({
+      preprocessing: NO_PREPROCESSING,
+      validation: NO_VALIDATION,
+      authorization: NO_AUTHORIZATION,
+      handler: async (req: Request, res: Response) => {
+        let userInfo = getJwtUserInfo(req);
+        let user = await db_getUserByEmail(userInfo.email);
+        if (user) {
+          res.status(200);
+          res.json(user);
+        }
+        else {
+          res.status(404);
+          res.send("This user does not exist.");
+        }
+      }
+    }));
 
 student_router.route("/exams/:exam_uuid/live_submission")
   .put(createRoute({

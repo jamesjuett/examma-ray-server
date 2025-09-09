@@ -30,7 +30,7 @@ export class ExammaRayClient {
 
   private async checkLogin() {
     if (Cookies.get("bearer")) {
-      const response = await fetch("api/users/me", {
+      const response = await fetch("student_api/users/me", {
         method: 'GET',
         headers: {
           'Authorization': 'bearer ' + Cookies.get('bearer')
