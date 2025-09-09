@@ -8,5 +8,6 @@ COPY ./webpack.config.js ./webpack.config.js
 RUN npm install
 RUN npm install -g node-wait-for-it
 RUN npm run build
+RUN npm run build-frontend
 EXPOSE 3000
 CMD ["node","./build/server.js"]
