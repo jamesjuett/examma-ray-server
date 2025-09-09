@@ -37,9 +37,9 @@ export class IndexExammaRayApplication {
           const uniqname = exam_info.uniqname;
           const exam_id = exam_info.exam_id;
           $("#examma-ray-live-exams-list").append(`
-            <li>
+            <p>
               <a href="live/${exam_id}/exams/${uniqname}-${exam_uuid}.html">${exam_id}</a>
-            </li>
+            </p>
           `);
         });
 
