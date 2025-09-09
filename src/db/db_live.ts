@@ -37,3 +37,28 @@ export async function db_getLiveExamAssignmentsByEmail(email: string) {
     .join('live_exam_instances', 'live_exam_instances.exam_instance_uuid', '=', 'live_exam_assignments.exam_instance_uuid')
     .where({student_email: email}).select("*");
 }
+
+export async function db_getLiveExamAssignmentByExamUuid(exam_uuid: string) {
+  return await query("live_exam_assignments").where({exam_uuid: exam_uuid}).select("*").first();
+}
+
+export async function db_saveLiveExamSubmission(
+  exam_uuid: string, updated_by_email: string, submission: string) {
+
+  // check if submission exists
+  const existing = await query("live_submissions").where({exam_uuid: exam_uuid}).select("*").first();
+  if (existing) {
+    return (await query("live_submissions").where({exam_uuid: exam_uuid}).update({
+      updated_by_email: updated_by_email,
+      submission: submission,
+      updated_at: new Date()
+    }).returning("*"))[0];
+  }
+  else {
+    return (await query("live_submissions").insert({
+      exam_uuid: exam_uuid,
+      updated_by_email: updated_by_email,
+      submission: submission
+    }).returning("*"))[0];
+  }
+}

@@ -282,8 +282,8 @@ declare module "knex/types/tables" {
       // Base Type
       DB_Live_Submissions,
       // Insert Type
-      //   All required
-      DB_Live_Submissions,
+      //   All required except created_at and updated_at (set automatically)
+      Omit<DB_Live_Submissions, "created_at" | "updated_at">,
       // Update Type
       //   Only allowed to update updated_by_email, updated_at, and submission
       Partial<Pick<DB_Live_Submissions, "updated_by_email" | "updated_at" | "submission">>

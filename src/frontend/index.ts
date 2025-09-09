@@ -57,26 +57,6 @@ export class IndexExammaRayApplication {
 async function main() {
 
   const app = await IndexExammaRayApplication.create();
-  $("#create-exam-form").on("submit", async (e) => {
-    e.preventDefault();
-    let files = (<HTMLInputElement>$("#exam-spec-file-input")[0]).files;
-    if (!files || !files[0]) {
-      return;
-    }
-    const formData = new FormData();
-    formData.append("exam_spec", files[0]);
-    await axios({
-      url: `api/exams`,
-      method: "POST",
-      data: formData,
-      headers: {
-        'Authorization': 'bearer ' + app.client.getBearerToken(),
-      },
-    });
-
-    app.reloadExams();
-  });
-
 }
 
 if (typeof $ === "function") {
