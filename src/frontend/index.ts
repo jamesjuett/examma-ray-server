@@ -23,7 +23,7 @@ export class IndexExammaRayApplication {
       try {
   
         let response = await axios({
-          url: `student_api/exams`,
+          url: `/student_api/exams`,
           method: "GET",
           data: {},
           headers: {

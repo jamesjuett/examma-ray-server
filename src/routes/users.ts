@@ -28,36 +28,3 @@ users_router.route("/me")
     }
   }));
 
-// users_router.route("/me/projects")
-//   .get(createRoute({
-//     preprocessing: NO_PREPROCESSING,
-//     validation: NO_VALIDATION,
-//     authorization: NO_AUTHORIZATION,
-//     handler: async (req: Request, res: Response) => {
-//       let userInfo = getJwtUserInfo(req);
-//       let projects = await getUserProjectsById(userInfo.id);
-//       assert(projects);
-//       res.status(200).json(projects);
-//     }
-//   }));
-
-// users_router.route("/:id/projects")
-//   .get(createRoute({
-//     preprocessing: NO_PREPROCESSING,
-//     validation: validateParamId,
-//     authorization: NO_AUTHORIZATION,
-//     handler: async (req: Request, res: Response) => {
-//       let projects = await getUserProjectsById(parseInt(req.params["id"]));
-//       assert(projects);
-//       res.status(200).json(projects);
-//     }
-//   }));
-
-
-
-
-// async function getUserProjectsById(id: number) {
-//   return await query("projects")
-//     .join("users_projects", "projects.id", "users_projects.project_id")
-//     .select("projects.*").where({user_id: id});
-// }

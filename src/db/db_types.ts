@@ -12,7 +12,6 @@ declare module "knex/types/tables" {
 
   interface DB_Exams {
     exam_id: string;
-    uuidv5_namespace: string;
     epoch: number;
   }
 
@@ -100,10 +99,12 @@ declare module "knex/types/tables" {
     submission: string; // jsonb
   }
 
-  interface DB_Live_Exam_Instances {
+  type DB_Live_Exam_Instances = {
     exam_instance_uuid: string;
     exam_id: string;
     duration_seconds: number;
+    uuidv5_namespace: string;
+    randomization_seed: string;
   }
 
   interface DB_Live_Windows {
@@ -113,7 +114,7 @@ declare module "knex/types/tables" {
     end_time: Date; // timestamp
   }
 
-  interface DB_Live_Exam_Assignments {
+  type DB_Live_Exam_Assignments = {
     exam_uuid: string;
     exam_instance_uuid: string;
     uniqname: string;
@@ -143,7 +144,7 @@ declare module "knex/types/tables" {
       DB_Exams,
       // Update Type
       //   Only allowed to update epoch or uuidv5_namespace
-      Partial<Pick<DB_Exams, "epoch" | "uuidv5_namespace">>
+      Partial<Pick<DB_Exams, "epoch">>
     >;
     
     exam_submissions: Knex.CompositeTableType<

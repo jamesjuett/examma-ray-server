@@ -1,17 +1,24 @@
-import { Exam, ExamSpecification } from "examma-ray";
+import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { readFileSync } from "fs";
 import { copyFile, readFile, rm } from "fs/promises";
-import { DB_Exams } from "knex/types/tables";
+import { DB_Exams, DB_Live_Exam_Assignments, DB_Live_Exam_Instances } from "knex/types/tables";
 import { Worker } from "worker_threads";
 import { RunGradingRequest } from "./dashboard";
 import { db_createCodeGraderConfig, db_createGroup, db_deleteManualGradingByExam, db_deleteManualGradingBySubmission, db_getCodeGraderConfig, db_getGroup, db_setSubmissionGroup, db_updateCodeGraderConfig } from "./db/db_code_grader";
-import { db_getOrCreateExam, db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExam, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch, db_updateExamUuidV5Namespace } from "./db/db_exams";
+import { db_getOrCreateExam, db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExam, db_getExamEpoch, db_getExamSubmissionByUuid, db_nextExamEpoch } from "./db/db_exams";
 import { db_createManualGradingRubricItem, db_getManualGradingQuestion, db_getManualGradingQuestionSkins, db_getManualGradingRecords, db_getManualGradingRubric, db_getManualGradingRubricItem, db_setManualGradingGroupFinished, db_setManualGradingQuestion, db_setManualGradingRecordNotes, db_setManualGradingRecordStatus, db_updateManualGradingRubricItem } from "./db/db_rubrics";
 import { ActiveExamGraders, ActiveQuestionGraders, ManualCodeGraderConfiguration, ManualGradingEpochTransition, ManualGradingOperation, ManualGradingPingRequest, ManualGradingPingResponse, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingSkins, reassignGradingGroups } from "./manual_grading";
-import { WorkerData_Generate, WorkerData_ProcessSubmissions } from "./run/types";
-import { asMutable, assert, assertFalse, assertNever } from "./util/util";
+import { WorkerData_Generate, WorkerData_Grade, WorkerData_ProcessSubmissions } from "./run/types";
+import { asMutable, assert, assertExists, assertFalse, assertNever } from "./util/util";
 import { ServerTasks } from "./ServerTasks";
+import { db_createLiveExamAssignment, db_getLiveExamAssignmentsByInstance, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId } from "./db/db_live";
+import { createStudentExamUuid } from "examma-ray/dist/core/assigned_exams";
+import { v4 as uuidv4 } from "uuid";
+
+function MAKE_UMICH_EMAIL(uniqname: string) {
+  return uniqname + "@umich.edu";
+}
 
 const GRADER_IDLE_THRESHOLD = 4000; // ms
 
@@ -22,42 +29,162 @@ export type ExamTask =
 
 export type ExamTaskStatus = ServerTasks<ExamTask>["taskStatus"];
 
+export class ExamInstanceServer {
+  // all the fields from DB_Live_Exam_Instances
+  public readonly exam_instance_uuid: string
+  public readonly exam_id: string
+  public readonly duration_seconds: number
+  public readonly uuidv5_namespace: string
+  public readonly randomization_seed: string
+
+  public readonly epoch: string;
+  
+  public readonly tasks: ServerTasks<ExamTask>;
+
+  public readonly exam_assignments: readonly DB_Live_Exam_Assignments[];
+  public readonly exam_assignments_by_uniqname: Map<string, Readonly<DB_Live_Exam_Assignments>>;
+
+  private readonly uniqnames_pending_exam_assignment: Set<string> = new Set();
+
+  private constructor(db_instance: DB_Live_Exam_Instances, db_assignments: readonly DB_Live_Exam_Assignments[]) {
+    this.exam_instance_uuid = db_instance.exam_instance_uuid;
+    this.exam_id = db_instance.exam_id;
+    this.duration_seconds = db_instance.duration_seconds;
+    this.uuidv5_namespace = db_instance.uuidv5_namespace;
+    this.randomization_seed = db_instance.randomization_seed;
+    this.epoch = uuidv4();
+    this.exam_assignments = db_assignments;
+    this.exam_assignments_by_uniqname = new Map(db_assignments.map(assgn => [assgn.uniqname, assgn]));
+  }
+
+  public static async create(exam_instance_uuid: string) {
+    return new ExamInstanceServer( 
+      assertExists(await db_getLiveExamInstanceByUuid(exam_instance_uuid)),
+      await db_getLiveExamAssignmentsByInstance(exam_instance_uuid),
+    );
+  }
+
+  public getEpoch() {
+    return this.epoch;
+  }
+
+  private nextEpoch() {
+    asMutable(this).epoch = uuidv4();
+  }
+
+  public async addToRoster(roster: StudentInfo[]) {
+    // Add all students in the roster to the exam assignments if they aren't already there
+    const new_students = roster.filter(student =>
+      !this.exam_assignments_by_uniqname.has(student.uniqname)
+      && !this.uniqnames_pending_exam_assignment.has(student.uniqname)
+    );
+
+    new_students.forEach(student => this.uniqnames_pending_exam_assignment.add(student.uniqname));
+
+    // Prior to this point, things run synchronously/atomically and will make sure other, interleaved
+    // calls to addToRoster() won't try to add the same student multiple times.
+
+    const new_assns = await Promise.all(new_students.map(async (student) => db_createLiveExamAssignment(
+      createStudentExamUuid({strategy: "uuidv5", v5_namespace: this.uuidv5_namespace}, student, this.exam_id),
+      this.exam_instance_uuid,
+      student.uniqname,
+      MAKE_UMICH_EMAIL(student.uniqname),
+    )));
+
+    await this.generateExams(new_students);
+
+    // This is also synchronous/atomic
+    new_assns.forEach(assn => {
+      this.uniqnames_pending_exam_assignment.delete(assn.uniqname);
+      asMutable(this.exam_assignments).push(assn);
+    });
+    
+    this.nextEpoch();
+  };
+
+  public async generateExams(students: readonly StudentInfo[]) {
+    
+    console.log("GENERATING EXAMS".bgBlue);
+
+    const worker_data : WorkerData_Generate = {
+      exam_id: this.exam_id,
+      exam_instance_uuid: this.exam_instance_uuid,
+      students: students,
+      gen_spec: {
+        uuid_options: {
+          strategy: "uuidv5",
+          v5_namespace: this.uuidv5_namespace,
+        },
+        frontend_js_path: "js"
+      }
+    };
+    const worker = new Worker("./build/run/gen.js", {
+      workerData: worker_data
+    });
+
+    return this.tasks.workerTask(worker, "generate", `Preparing to generate ${students.length} exams...`);
+  }
+
+};
+
+
 export class ExamServer {
 
   public readonly exam: Exam;
+  
+  public readonly exam_instances : readonly ExamInstanceServer[] = [];
+  public readonly exam_instances_by_uuid: {
+    [index: string]: ExamInstanceServer | undefined
+  };
+
   public readonly epoch: number;
 
   public readonly tasks: ServerTasks<ExamTask>;
-  
-  private uuidv5_namespace;
 
   private readonly questionGradingServers: {
     [index: string]: QuestionGradingServer | undefined
   } = {};
 
-  private constructor(exam: Exam, db_exam: DB_Exams, epoch: number, question_servers: readonly QuestionGradingServer[]) {
+  private constructor(exam: Exam, exam_instances: readonly ExamInstanceServer[], epoch: number, question_servers: readonly QuestionGradingServer[]) {
     this.exam = exam;
+    this.exam_instances = exam_instances;
+    this.exam_instances_by_uuid = Object.fromEntries(this.exam_instances.map(ei => [ei.exam_instance_uuid, ei]));
     this.epoch = epoch;
-    this.uuidv5_namespace = db_exam.uuidv5_namespace;
     question_servers.forEach(qs => this.questionGradingServers[qs.question_id] = qs);
     this.tasks = new ServerTasks();
   }
 
   public static async create(exam_spec: ExamSpecification) {
-    const db_exam = await db_getOrCreateExam(exam_spec.exam_id);
+    const db_exam_instances = await db_getLiveExamInstancesByExamId(exam_spec.exam_id);
     const exam = Exam.create(exam_spec);
     return new ExamServer(
       exam,
-      db_exam,
+      await Promise.all(db_exam_instances.map(ei => ExamInstanceServer.create(ei.exam_instance_uuid))),
       0,
-      await Promise.all(exam.allQuestions.map(q => QuestionGradingServer.create(q.question_id)))
+      await Promise.all(exam.allQuestions.map(q => QuestionGradingServer.getOrCreate(q.question_id)))
     );
+  }
+
+  public async getEpoch() {
+    return this.epoch ?? await db_getExamEpoch(this.exam.exam_id);
+  }
+
+  private async nextEpoch() {
+    asMutable(this).epoch = (await db_nextExamEpoch(this.exam.exam_id))[0];
+  }
+  
+  public async getExamInstances() {
+    return this.exam_instances;
+  }
+
+  public async getExamInstanceByUuid(exam_instance_uuid: string) {
+    return this.exam_instances_by_uuid[exam_instance_uuid];
   }
 
   public getExamInfo() {
     return {
       exam_id: this.exam.exam_id,
-      uuidv5_namespace: this.uuidv5_namespace,
+      exam_instances: this.exam_instances.map(ei => (ei.exam_instance_uuid)),
       epoch: this.epoch,
     };
   }
@@ -66,68 +193,32 @@ export class ExamServer {
     asMutable(this).exam = Exam.create(new_exam_spec);
     await Promise.all(
       this.exam.allQuestions.map(
-        async (question) => this.questionGradingServers[question.question_id] ??= await QuestionGradingServer.create(question.question_id)
+        async (question) => this.questionGradingServers[question.question_id] ??= await QuestionGradingServer.getOrCreate(question.question_id)
       )
     );
   }
-  
-  public async getRoster() {
-    return ExamUtils.loadCSVRoster(`data/${this.exam.exam_id}/roster.csv`);
-  }
 
-  public async setRoster(new_roster_csv_filepath: string) {
-    await copyFile(new_roster_csv_filepath, `data/${this.exam.exam_id}/roster.csv`);
-
-    // We don't await this, let it run async
-    this.generateExams();
-  }
-
-  public async setUuidV5Namespace(namespace: string) {
-    this.uuidv5_namespace = namespace;
-    await db_updateExamUuidV5Namespace(this.exam.exam_id, namespace);
-  }
-
-  public async generateExams() {
-    
-    console.log("GENERATING EXAMS".bgBlue);
-
-    // TODO: can we make this async? (probably not a huge deal, but still)
-    let roster = ExamUtils.loadCSVRoster(`data/${this.exam.exam_id}/roster.csv`);
-
-    const worker = new Worker("./build/run/gen.js", {
-      workerData: <WorkerData_Generate>{
-        exam_id: this.exam.exam_id,
-        roster: roster,
-        gen_spec: {
-          uuid_strategy: "uuidv5",
-          uuidv5_namespace: this.uuidv5_namespace,
-          frontend_js_path: "js"
-        }
-      }
-    });
-
-    await this.tasks.workerTask(worker, "generate", `Preparing to generate ${roster.length} exams...`);
-    await this.nextEpoch();
-  }
-
-  public async gradeExams(run_request: RunGradingRequest) {
+  public async gradeAllExams(run_request: RunGradingRequest) {
     
     console.log(run_request.reports ? "Grading...".bgBlue : "Generating grading reports...".bgBlue);
 
-    const grader_spec = {
-      uuid_strategy: "uuidv5",
-      uuidv5_namespace: this.uuidv5_namespace,
-      frontend_js_path: "js",
+    // Grade all 
+  }
+
+  public async gradeExamInstance(exam_instance: DB_Live_Exam_Instances, run_request: RunGradingRequest) {
+    const grader_worker_data : WorkerData_Grade = {
+      exam_instance: exam_instance,
+      grade_request: run_request,
     };
 
     const worker = new Worker("./build/run/grade.js", {
-      workerData: {
-        exam_id: this.exam.exam_id,
-        grader_spec: grader_spec,
-        run_request: run_request
-      }
+      workerData: grader_worker_data
     });
-    await this.tasks.workerTask(worker, "grade", "Preparing to grade submissions...");
+    return this.tasks.workerTask(worker, "grade", `Preparing to grade exam instance ${exam_instance.exam_instance_uuid}...`);
+  }
+
+  public async getLiveSubmissionByExamUuid(exam_uuid: string) {
+    return db_getExamSubmissionByUuid(exam_uuid);
   }
 
   public async addSubmissions(files: readonly Express.Multer.File[]) {
@@ -185,14 +276,6 @@ export class ExamServer {
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
   }
 
-  public async getEpoch() {
-    return this.epoch ?? await db_getExamEpoch(this.exam.exam_id);
-  }
-
-  private async nextEpoch() {
-    asMutable(this).epoch = (await db_nextExamEpoch(this.exam.exam_id))[0];
-  }
-
   public getTaskStatus() {
     return this.tasks.taskStatus;
   }
@@ -237,7 +320,7 @@ export class QuestionGradingServer {
     [index: string] : QuestionGradingServer | undefined
   } = { };
 
-  public static async create(question_id: string) {
+  public static async getOrCreate(question_id: string) {
 
     const existing = this.INSTANCES[question_id];
     if (existing) {

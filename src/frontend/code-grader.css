@@ -165,7 +165,7 @@ body {
 }
 
 
-#lobster-exercise > .tab-content {
+.lobster-embedded-height-control {
   height: calc(100vh - 225px) !important;
 }
 

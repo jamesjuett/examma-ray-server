@@ -2,14 +2,14 @@ import avatar from "animal-avatar-generator";
 import axios from "axios";
 import { Exam, ExamSpecification, parseExamSpecification, StudentInfo } from "examma-ray";
 import { ExamDiff } from "examma-ray/dist/ExamDiff";
-import { DB_Exams } from "knex/types/tables";
+import { DB_Exams, DB_Live_Exam_Assignments, DB_Live_Exam_Instances } from "knex/types/tables";
 import queryString from "query-string";
 import { v4 } from "uuid";
 import { ExamPingResponse, ExamSubmissionRecord, RunGradingRequest } from "../dashboard";
 import { ExamTaskStatus } from "../ExammaRayGradingServer";
 import { asMutable, assert } from "../util/util";
 import { ExammaRayClient } from "./Application";
-
+import { LiveSubmissionViewer } from "./LiveSubmissionViewer";
 
 export class DashboardExammaRayGraderApplication {
 
@@ -18,8 +18,11 @@ export class DashboardExammaRayGraderApplication {
   public readonly exam_id: string;
   public readonly exam_info?: DB_Exams;
   public readonly exam?: Exam;
+  public readonly exam_instance_uuid?: string;
   
   private exam_epoch?: number;
+
+  private live_submission_viewer?: LiveSubmissionViewer;
 
   private constructor(client: ExammaRayClient, exam_id: string) {
     this.client = client;
@@ -138,7 +141,7 @@ export class DashboardExammaRayGraderApplication {
         url: `api/exams/${this.exam_id}`,
         method: "DELETE",
         headers: {
-            'Authorization': 'bearer ' + this.client.getBearerToken()
+          'Authorization': 'bearer ' + this.client.getBearerToken()
         }
       });
 
@@ -175,6 +178,29 @@ export class DashboardExammaRayGraderApplication {
       
       $("#specification-exam-spec-file-input").val("");
       $("#specification-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
+    });
+
+    $("#live-submission-viewer-view-button").on("click", async () => {
+      
+      if (!this.exam_instance_uuid) { return; }
+      try {
+        const uniqname = $("#live-submission-viewer-uniqname-input").val();
+        const assignments : (DB_Live_Exam_Assignments & DB_Live_Exam_Instances)[] = (await axios({
+          url: `api/assigned_exams/${this.exam_instance_uuid}/uniqnames/${uniqname}`,
+          method: "GET",
+          headers: {
+              'Authorization': 'bearer ' + this.client.getBearerToken()
+          }
+        })).data;
+
+        const assn = assignments.find(a => a.uniqname === uniqname && a.exam_id === this.exam_id);
+        if(assn) {
+          this.live_submission_viewer?.setStudent(assn);
+        }
+      }
+      catch(e: unknown) {
+        alert("Error loading student submission :(");
+      }
     });
 
 
@@ -319,6 +345,19 @@ export class DashboardExammaRayGraderApplication {
 
       asMutable(this).exam = Exam.create(exam_spec);
       assert(this.exam);
+
+      const exam_instance_response = await axios({
+        url: `api/exams/${this.exam_id}/instances`,
+        method: "GET",
+        headers: {
+            'Authorization': 'bearer ' + this.client.getBearerToken()
+        },
+      });
+      const exam_instances = <DB_Live_Exam_Instances[]>exam_instance_response.data;
+      if (exam_instances.length > 0) {
+        asMutable(this).exam_instance_uuid = exam_instances[0].exam_instance_uuid;
+      }
+      this.live_submission_viewer = new LiveSubmissionViewer(this.client, this.exam, $("#live-submission-viewer-elem"));
 
       const submissions_response = await axios({
         url: `api/exams/${this.exam_id}/submissions`,

@@ -25,6 +25,9 @@
 
   <!-- frontend -->
   <script src="js/dashboard.js?v=8"></script>
+  
+  <!-- frontend.css -->
+  <link rel="stylesheet" href="js/frontend.css?v=8">
 
 </head>
 
@@ -62,6 +65,11 @@
             <li class="nav-item">
               <a class="nav-link" id="roster-tab" data-toggle="pill" href="#roster" role="tab" aria-controls="roster" aria-selected="false">
                 <i class="bi bi-people"></i> Roster
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="live-submission-viewer-tab" data-toggle="pill" href="#live-submission-viewer" role="tab" aria-controls="roster" aria-selected="false">
+                <i class="bi bi-lightning"></i> Submissions
               </a>
             </li>
           </ul>
@@ -164,6 +172,17 @@
         <h3>Students</h3>
         <ul class="examma-ray-students-list">
         </ul>
+      </div>
+
+      <div class="tab-pane container-fluid" id="live-submission-viewer" role="tabpanel" aria-labelledby="live-submission-viewer-tab">
+        <div>
+          <input id="live-submission-viewer-uniqname-input" class="form-control" type="text" size="20" maxlength="100" style="font-family: monospace"
+            autocomplete="off" autocorrect="off" spellcheck="false"
+          >
+          <button id="live-submission-viewer-view-button" class="btn btn-primary">View</button>
+        </div>
+        <div id="live-submission-viewer-elem"></div>
+        
       </div>
     </div>
 

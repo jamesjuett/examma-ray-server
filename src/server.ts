@@ -15,6 +15,7 @@ import { run_router } from './routes/run';
 import { users_router } from './routes/users';
 import { participation_router } from './routes/participation';
 import { student_router } from './routes/student';
+import { assigned_exams } from './routes/assigned_exams';
 
 export let EXAMMA_RAY_GRADING_SERVER: ExammaRayGradingServer;
 
@@ -69,6 +70,7 @@ async function main() {
   // Regular API Routes
   app.use("/api/users", users_router);
   app.use("/api/exams", exams_router);
+  app.use("/api/assigned_exams", assigned_exams);
   app.use("/api/questions", questions_router);
   app.use("/api/manual_grading", manual_grading_router);
 

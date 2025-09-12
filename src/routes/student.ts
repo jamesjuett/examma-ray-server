@@ -50,20 +50,19 @@ student_router.route("/exams/:exam_uuid/live_submission")
     handler: async (req: Request, res: Response) => {
       const userInfo = getJwtUserInfo(req);
       const exam_uuid = req.params["exam_uuid"];
-      console.log(`Student ${userInfo.email} saving live exam submission for exam ${exam_uuid}`);
 
       const exam_info = await db_getLiveExamAssignmentByExamUuid(exam_uuid);
       if (!exam_info) {
-        console.log(`No such exam assignment for exam ${exam_uuid}`);
+        console.log(`Live submission ERROR: No such exam ${exam_uuid} attempted by ${userInfo.email}`);
         return res.sendStatus(404);
       }
 
       if (exam_info.student_email !== userInfo.email) {
-        console.log(`Student ${userInfo.email} not authorized to submit for exam ${exam_uuid}`);
+        console.log(`Live submission FORBIDDEN: ${userInfo.email} not authorized to submit for exam ${exam_uuid} for ${exam_info.uniqname} (${exam_info.student_email})`);
         return res.sendStatus(404); // 404 and not 403 - don't reveal existence
       }
 
-      console.log(`Saving submission for student ${userInfo.email} for exam ${exam_uuid}`);
+      console.log(`Live submission SUCCESS: Saving submission from ${userInfo.email} for exam ${exam_uuid} for ${exam_info.uniqname} (${exam_info.student_email})`);
       return res.status(200).json(await db_saveLiveExamSubmission(
         exam_uuid, userInfo.email, req.body.submission
       ));

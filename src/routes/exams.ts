@@ -7,6 +7,7 @@ import { requireAdmin } from "../auth/jwt_auth";
 import { db_getExam, db_getExamEpoch, db_getExams, db_getExamSubmissions } from "../db/db_exams";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
+import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId, db_getLiveExamSubmissionByUuid } from "../db/db_live";
 
 // const upload = multer({
 //   storage: multer.diskStorage({
@@ -277,6 +278,9 @@ exams_router
 
         const uploaded_filepath = `uploads/${req.file?.filename}`;
 
+        // TODO: can we make this async? (probably not a huge deal, but still)
+        let roster = ExamUtils.loadCSVRoster(uploaded_filepath);
+
         await exam.setRoster(uploaded_filepath);
 
         await rm(uploaded_filepath, { force: true });
@@ -285,7 +289,20 @@ exams_router
     ]
   }));
 
-  
+
+
+exams_router
+  .route("/:exam_id/instances")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      return res.status(200).json(await db_getLiveExamInstancesByExamId(req.params["exam_id"]));
+    }
+  }));
 
 exams_router
   .route("/:exam_id/uuidv5_namespace")

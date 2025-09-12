@@ -2,12 +2,15 @@ import { TrustedExamSubmission } from "examma-ray";
 import { v4 as uuidv4 } from "uuid";
 import { assert } from "../util/util";
 import { query } from "./db";
+import * as crypto from "crypto";
 
 export async function db_createLiveExamInstance(exam_id: string, duration_seconds: number) {
   return (await query("live_exam_instances").insert({
     exam_instance_uuid: uuidv4(),
     exam_id: exam_id,
-    duration_seconds: duration_seconds
+    duration_seconds: duration_seconds,
+    uuidv5_namespace: uuidv4(),
+    randomization_seed: crypto.randomBytes(12).toString('base64') // 3 bytes -> 4 base64 chars, so 12 bytes -> 16 char seed
   }).returning("*"))[0];
 }
 
@@ -24,7 +27,11 @@ export async function db_createLiveExamAssignment(
   }).returning("*"))[0];
 }
 
-export async function db_getLiveExamInstance(exam_instance_uuid: string) {
+export async function db_getLiveExamInstancesByExamId(exam_id: string) {
+  return await query("live_exam_instances").where({exam_id: exam_id}).select("*");
+}
+
+export async function db_getLiveExamInstanceByUuid(exam_instance_uuid: string) {
   return await query("live_exam_instances").where({exam_instance_uuid: exam_instance_uuid}).select("*").first();
 }
 
@@ -38,8 +45,19 @@ export async function db_getLiveExamAssignmentsByEmail(email: string) {
     .where({student_email: email}).select("*");
 }
 
+export async function db_getLiveExamAssignmentsByUniqname(uniqname: string) {
+  return await query("live_exam_assignments")
+    .join('live_exam_instances', 'live_exam_instances.exam_instance_uuid', '=', 'live_exam_assignments.exam_instance_uuid')
+    .where({uniqname: uniqname}).select("*");
+}
+
 export async function db_getLiveExamAssignmentByExamUuid(exam_uuid: string) {
   return await query("live_exam_assignments").where({exam_uuid: exam_uuid}).select("*").first();
+}
+
+
+export async function db_getLiveExamSubmissionByUuid(exam_uuid: string) {
+  return await query("live_submissions").where({exam_uuid: exam_uuid}).select("*").first();
 }
 
 export async function db_saveLiveExamSubmission(
