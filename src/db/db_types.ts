@@ -118,6 +118,7 @@ declare module "knex/types/tables" {
     exam_uuid: string;
     exam_instance_uuid: string;
     uniqname: string;
+    name?: string;
     student_email: string; // email that is allowed to take exam
     window_id?: number;
     force_open: boolean;
@@ -275,8 +276,8 @@ declare module "knex/types/tables" {
       //   All required, except window_id is optional (nullable)
       Omit<DB_Live_Exam_Assignments, "window_id"> & Partial<Pick<DB_Live_Exam_Assignments, "window_id">>,
       // Update Type
-      //   Only allowed to update window_id
-      Partial<Pick<DB_Live_Exam_Assignments, "window_id">>
+      //   Only allowed to update window_id, name, force open
+      Partial<Pick<DB_Live_Exam_Assignments, "window_id" | "name" | "force_open">>
     >;
 
     live_submissions: Knex.CompositeTableType<

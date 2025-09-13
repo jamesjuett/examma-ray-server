@@ -1,13 +1,13 @@
-import { ExamSpecification, parseExamSpecification, stringifyExamComponentSpecification } from "examma-ray";
+import { parseExamSpecification, stringifyExamComponentSpecification } from "examma-ray";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { Request, Response, Router } from "express";
 import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import multer from "multer";
 import { requireAdmin } from "../auth/jwt_auth";
-import { db_getExam, db_getExamEpoch, db_getExams, db_getExamSubmissions } from "../db/db_exams";
+import { db_getExams, db_getExamSubmissions } from "../db/db_exams";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId, db_getLiveExamSubmissionByUuid } from "../db/db_live";
+import { db_getLiveExamInstancesByExamId } from "../db/db_live";
 
 // const upload = multer({
 //   storage: multer.diskStorage({
@@ -239,55 +239,6 @@ exams_router
     ]
   }));
 
-exams_router
-  .route("/:exam_id/roster")
-  .get(createRoute({
-    preprocessing: NO_PREPROCESSING,
-    validation: [
-      validateParamExammaRayId("exam_id")
-    ],
-    authorization: NO_AUTHORIZATION,
-    handler: async (req: Request, res: Response) => {
-      const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
-
-      if (!exam) {
-        return res.sendStatus(404);
-      }
-
-      res.status(200).json(await exam.getRoster());
-    }
-  }))
-  .put(createRoute({
-    preprocessing: NO_PREPROCESSING,
-    validation: [
-      validateParamExammaRayId("exam_id")
-    ],
-    authorization: requireAdmin,
-    handler: [
-      upload.single("roster"),
-      async (req: Request, res: Response) => {
-        const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
-
-        if (!exam) {
-          return res.sendStatus(404);
-        }
-
-        if (!req.file) {
-          return res.sendStatus(400);
-        }
-
-        const uploaded_filepath = `uploads/${req.file?.filename}`;
-
-        // TODO: can we make this async? (probably not a huge deal, but still)
-        let roster = ExamUtils.loadCSVRoster(uploaded_filepath);
-
-        await exam.setRoster(uploaded_filepath);
-
-        await rm(uploaded_filepath, { force: true });
-        return res.sendStatus(201);
-      }
-    ]
-  }));
 
 
 
@@ -304,24 +255,79 @@ exams_router
     }
   }));
 
+
 exams_router
-  .route("/:exam_id/uuidv5_namespace")
+  .route("/:exam_id/instances/:exam_instance_uuid/roster")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id"),
+      validateParamUuid("exam_instance_uuid"),
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      const exam_inst = EXAMMA_RAY_GRADING_SERVER
+        .getExamServer(req.params["exam_id"])
+        ?.getExamInstanceByUuid(req.params["exam_instance_uuid"]);
+
+      if (!exam_inst) {
+        return res.sendStatus(404);
+      }
+
+      res.status(200).json(exam_inst.getRoster());
+    }
+  }))
+  .put(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: requireAdmin,
+    handler: [
+      upload.single("roster"),
+      async (req: Request, res: Response) => {
+        const exam_inst = EXAMMA_RAY_GRADING_SERVER
+          .getExamServer(req.params["exam_id"])
+          ?.getExamInstanceByUuid(req.params["exam_instance_uuid"]);
+
+        if (!exam_inst) {
+          return res.sendStatus(404);
+        }
+
+        if (!req.file) {
+          return res.sendStatus(400);
+        }
+
+        const uploaded_filepath = `uploads/${req.file?.filename}`;
+
+        // TODO: can we make this async? (probably not a huge deal, but still)
+        let roster = ExamUtils.loadCSVRoster(uploaded_filepath);
+
+        await exam_inst.addToRoster(roster);
+
+        await rm(uploaded_filepath, { force: true });
+        return res.sendStatus(201);
+      }
+    ]
+  }));
+
+exams_router
+  .route("/:exam_id/instances/:exam_instance_uuid/uuidv5_namespace")
   .put(createRoute({
     preprocessing: jsonBodyParser,
     validation: [
       validateParamExammaRayId("exam_id"),
+      validateParamUuid("exam_instance_uuid"),
       validateBody("uuidv5_namespace").isUUID(),
     ],
     authorization: requireAdmin,
     handler: [
       async (req: Request, res: Response) => {
-        const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
+        const exam_inst = EXAMMA_RAY_GRADING_SERVER
+          .getExamServer(req.params["exam_id"])
+          ?.getExamInstanceByUuid(req.params["exam_instance_uuid"]);
 
-        if (!exam) {
-          return res.sendStatus(404);
-        }
-
-        await exam.setUuidV5Namespace(req.body.uuidv5_namespace);
+        await exam_inst.setUuidV5Namespace(req.body.uuidv5_namespace);
 
         // We don't await this, let it run async
         exam.generateExams();

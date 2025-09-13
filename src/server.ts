@@ -6,7 +6,7 @@ import { readdirSync } from 'fs';
 import passport from 'passport';
 import path from 'path';
 import { requireAdmin, requireStaff } from './auth/jwt_auth';
-import { ExammaRayGradingServer } from './ExammaRayGradingServer';
+import { ExammaRayServer } from './ExammaRayGradingServer';
 import { auth_router } from './routes/auth';
 import { exams_router } from './routes/exams';
 import { manual_grading_router } from './routes/manual_grading';
@@ -17,11 +17,11 @@ import { participation_router } from './routes/participation';
 import { student_router } from './routes/student';
 import { assigned_exams } from './routes/assigned_exams';
 
-export let EXAMMA_RAY_GRADING_SERVER: ExammaRayGradingServer;
+export let EXAMMA_RAY_GRADING_SERVER: ExammaRayServer;
 
 async function main() {
 
-  EXAMMA_RAY_GRADING_SERVER = await ExammaRayGradingServer.create(
+  EXAMMA_RAY_GRADING_SERVER = await ExammaRayServer.create(
     readdirSync("data", "utf8").map(
       exam_id => ExamUtils.readExamSpecificationFromFileSync(
         path.join("data", exam_id, "exam-spec.json")

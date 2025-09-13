@@ -1,5 +1,5 @@
 // import minimist from "minimist";
-import { Exam, Question, QuestionGrader } from "examma-ray";
+import { Exam, fillManifest, parseExamSubmission, Question, QuestionGrader, TransparentExamManifest } from "examma-ray";
 import { IndividualizedNormalCurve } from "examma-ray/dist/core/ExamCurve";
 import { ExamGrader, ExamGraderOptions, ExceptionMap, GraderSpecificationMap } from "examma-ray/dist/ExamGrader";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
@@ -7,11 +7,17 @@ import { CodeWritingGrader } from "examma-ray/dist/graders";
 import { CodeWritingGraderData, CodeWritingGraderSubmissionResult } from "examma-ray/dist/graders/CodeWritingGrader";
 import { ManualGenericGrader } from "examma-ray/dist/graders/ManualGenericGrader";
 import { readFileSync } from "fs";
-import { workerData } from "worker_threads";
+import { workerData as workerDataUntyped } from "worker_threads";
 import { RunGradingRequest } from "../dashboard";
 import { query } from "../db/db";
 import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
 import { RATE_LIMITED_POST_MESSAGE } from "./common";
+import { WorkerData_Grade } from "./run";
+import { db_getLiveExamSubmissionByUuid } from "../db/db_live";
+import { isTransparentExamManifest } from "examma-ray/dist/core/submissions";
+import { assert } from "../util/util";
+
+const workerData: WorkerData_Grade = workerDataUntyped;
 
 class WebExamGrader extends ExamGrader {
   
@@ -59,9 +65,10 @@ class WebExamGrader extends ExamGrader {
 
 // import { CURVE, EXAM_GRADER } from "../grader-spec";
 async function main() {
-  const exam_id : string = workerData.exam_id;
-  const grader_spec : ExamGraderOptions = workerData.grader_spec;
-  const run_request : RunGradingRequest = workerData.run_request;
+  const exam_id = workerData.exam_id;
+  const assigned_exams = workerData.assigned_exams;
+  const grade_request = workerData.grade_request;
+  const uuidv5_namespace = workerData.uuidv5_namespace;
 
   const EXAM = Exam.create(ExamUtils.readExamSpecificationFromFileSync(`data/${exam_id}/exam-spec.json`));
   
@@ -74,23 +81,49 @@ async function main() {
     console.log(e);
   }
 
-  const EXAM_GRADER = await WebExamGrader.create(EXAM, grader_spec, {}, EXCEPTIONS, RATE_LIMITED_POST_MESSAGE());
+  const EXAM_GRADER = await WebExamGrader.create(
+    EXAM,
+    { uuid_options: { strategy: "uuidv5", v5_namespace: uuidv5_namespace } },
+    {},
+    EXCEPTIONS,
+    RATE_LIMITED_POST_MESSAGE()
+  );
+
+  // load submissions
+  const trusted_submissions = (await Promise.all(assigned_exams.map(async exam_assn => {
+    try {
+      const manifest = ExamUtils.loadExamManifest(`data/${exam_id}/manifests/${exam_assn.uniqname}-${exam_assn.exam_uuid}.json`);
+      assert(isTransparentExamManifest(manifest));
+      const db_submission = await db_getLiveExamSubmissionByUuid(exam_assn.exam_uuid);
+      if (!db_submission) {
+        console.log(`No submission found for ${exam_assn.uniqname} (${exam_assn.exam_uuid})`);
+        return undefined;
+      }
+      const submission = parseExamSubmission(db_submission.submission);
+      return fillManifest(manifest, submission);
+    }
+    catch(e) {
+      console.log(`Error loading submission for ${exam_assn.uniqname} (${exam_assn.exam_uuid}): ${e}`);
+      return undefined;
+    }
+  }))).filter(x => x !== undefined);
+
 
   // Load and verify answers
   console.log("loading submissions...");
-  EXAM_GRADER.loadAllSubmissions();
+  trusted_submissions.forEach(sub => EXAM_GRADER.addSubmission(sub));
   console.log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa");
 
   console.log("grading submissions...");
   EXAM_GRADER.gradeAll();
   
-  if (run_request.curve) {
-    EXAM_GRADER.applyCurve(new IndividualizedNormalCurve(EXAM_GRADER.stats, run_request.target_mean, run_request.target_stddev, true));
+  if (grade_request.curve) {
+    EXAM_GRADER.applyCurve(new IndividualizedNormalCurve(EXAM_GRADER.stats, grade_request.target_mean, grade_request.target_stddev, true));
   }
 
   EXAM_GRADER.writeAll();
   
-  if (run_request.reports) {
+  if (grade_request.reports) {
     try {
       EXAM_GRADER.writeReports();
     }

@@ -16,12 +16,13 @@ export async function db_createLiveExamInstance(exam_id: string, duration_second
 
 export async function db_createLiveExamAssignment(
   exam_uuid: string, exam_instance_uuid: string,
-  uniqname: string, student_email: string) {
+  uniqname: string, name: string | undefined, student_email: string) {
 
   return (await query("live_exam_assignments").insert({
     exam_uuid: exam_uuid,
     exam_instance_uuid: exam_instance_uuid,
     uniqname: uniqname,
+    name: name,
     student_email: student_email,
     force_open: false
   }).returning("*"))[0];

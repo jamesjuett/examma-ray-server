@@ -1,5 +1,6 @@
 
 import { Worker } from "worker_threads";
+import { WorkerData_Generate } from "./run/run";
 
 export class ServerTasks<Tasks extends string> {
 
@@ -26,6 +27,5 @@ export class ServerTasks<Tasks extends string> {
       });
     });
   }
-
-
 };
+

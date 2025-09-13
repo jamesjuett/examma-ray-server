@@ -11,7 +11,7 @@ import { db_createGroup, db_createSubmission } from "../db/db_code_grader";
 import { db_addExamSubmission, db_getExamSubmissionByUuid } from "../db/db_exams";
 import { db_insertManualGradingQuestionSkinIfNotExists } from "../db/db_rubrics";
 import { RATE_LIMITED_POST_MESSAGE } from "./common";
-import { WorkerData_ProcessSubmissions } from "./types";
+import { WorkerData_ProcessSubmissions } from "./run";
 
 const workerData: WorkerData_ProcessSubmissions = workerDataUntyped;
 

@@ -28,7 +28,7 @@ export type ExamPingRequest = {
 
 export type ExamPingResponse = {
 
-  epoch: number,
+  epoch: string,
   active_graders: ActiveExamGraders
 };
 

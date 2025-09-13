@@ -11,23 +11,25 @@ export async function db_getExams() {
   return query("exams").select("*");
 }
 
-export async function db_getExamEpoch(exam_id: string) {
-  return query("exams").where({exam_id: exam_id}).select("epoch").first();
-}
+// TODO: remove if no longer needed
+// export async function db_getExamEpoch(exam_id: string) {
+//   return query("exams").where({exam_id: exam_id}).select("epoch").first();
+// }
 
-export async function db_nextExamEpoch(exam_id: string, new_epoch?: number) {
+// TODO: remove if no longer needed
+// export async function db_nextExamEpoch(exam_id: string, new_epoch?: number) {
 
-  if (!new_epoch) {
-    new_epoch = (await query("exams").where({exam_id: exam_id}).select("epoch").first())?.epoch;
-    assert(new_epoch !== undefined);
-    ++new_epoch;
-    console.log(new_epoch);
-  }
+//   if (!new_epoch) {
+//     new_epoch = (await query("exams").where({exam_id: exam_id}).select("epoch").first())?.epoch;
+//     assert(new_epoch !== undefined);
+//     ++new_epoch;
+//     console.log(new_epoch);
+//   }
 
-  return await query("exams").where({exam_id: exam_id}).update({
-    epoch: new_epoch
-  }).returning("epoch");
-}
+//   return await query("exams").where({exam_id: exam_id}).update({
+//     epoch: new_epoch
+//   }).returning("epoch");
+// }
 
 export async function db_getOrCreateExam(exam_id: string) {
   return await query("exams").where({exam_id: exam_id}).first()
