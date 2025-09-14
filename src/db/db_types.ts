@@ -101,6 +101,7 @@ declare module "knex/types/tables" {
 
   type DB_Live_Exam_Instances = {
     exam_instance_uuid: string;
+    name: string;
     exam_id: string;
     duration_seconds: number;
     uuidv5_namespace: string;
@@ -254,8 +255,8 @@ declare module "knex/types/tables" {
       //   All required
       DB_Live_Exam_Instances,
       // Update Type
-      //   Only allowed to update duration_seconds
-      Partial<Pick<DB_Live_Exam_Instances, "duration_seconds">>
+      //   Only allowed to update name, uuidv5_namespace, randomization_seed, duration_seconds
+      Partial<Pick<DB_Live_Exam_Instances, "uuidv5_namespace" | "randomization_seed" | "name" | "duration_seconds">>
     >;
 
     live_windows: Knex.CompositeTableType<

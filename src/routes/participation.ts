@@ -1,19 +1,12 @@
-import { ExamSpecification, parseExamSpecification, stringifyExamComponentSpecification } from "examma-ray";
-import { ExamUtils } from "examma-ray/dist/ExamUtils";
-import { NextFunction, Request, Response, Router } from "express";
-import { mkdir, readFile, rm, writeFile } from "fs/promises";
-import multer from "multer";
-import { requireAdmin } from "../auth/jwt_auth";
-import { db_getExam, db_getExamEpoch, db_getExams, db_getExamSubmissions } from "../db/db_exams";
-import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam, validateParamExamId, validateParamExammaRayId, validateParamUuid } from "./common";
-import { OAuth2Client } from "google-auth-library";
-import { auth_config } from "../auth/config";
-import { db_getAllParticipationForUser, db_getParticipation, db_setParticipation } from "../db/db_participation";
 import cors from "cors";
+import { NextFunction, Request, Response, Router } from "express";
+import { OAuth2Client } from "google-auth-library";
 import jsonwebtoken from "jsonwebtoken";
-import { assert } from "../util/util";
+import { auth_config } from "../auth/config";
 import { db_setOnlineSubmission } from "../db/db_online_submissions";
+import { db_getAllParticipationForUser, db_getParticipation, db_setParticipation } from "../db/db_participation";
+import { assert } from "../util/util";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_VALIDATION, validateBody, validateParamExammaRayId } from "./common";
 
 const client = new OAuth2Client();
 

@@ -13,13 +13,6 @@ import { ActiveExamGraders } from "./manual_grading";
 
 
 
-export type ExamSubmissionRecord = {
-  uuid: string;
-  exam_id: string;
-  uniqname: string;
-  name: string;
-};
-
 
 export type ExamPingRequest = {
   client_uuid: string,

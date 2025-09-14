@@ -1,32 +1,67 @@
 import avatar from "animal-avatar-generator";
 import axios from "axios";
-import { Exam, ExamSpecification, parseExamSpecification, StudentInfo } from "examma-ray";
+import { Exam, parseExamSpecification } from "examma-ray";
 import { ExamDiff } from "examma-ray/dist/ExamDiff";
-import { DB_Exams, DB_Live_Exam_Assignments, DB_Live_Exam_Instances } from "knex/types/tables";
 import queryString from "query-string";
-import { v4 } from "uuid";
-import { ExamPingResponse, ExamSubmissionRecord, RunGradingRequest } from "../dashboard";
-import { ExamTaskStatus } from "../ExammaRayGradingServer";
-import { asMutable, assert } from "../util/util";
+import { ExamPingResponse, RunGradingRequest } from "../dashboard";
+import { ExamTaskStatus } from "../ExamServer";
+import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, SubmissionInfo } from "../rest_types";
+import { assert } from "../util/util";
 import { ExammaRayClient } from "./Application";
 import { LiveSubmissionViewer } from "./LiveSubmissionViewer";
+
+async function getExamInfo(client: ExammaRayClient, exam_id: string): Promise<ExamInfo> {
+  return (await axios({
+    url: `/api/exams/${exam_id}`,
+    method: "GET",
+    data: {},
+    headers: {
+      'Authorization': 'bearer ' + client.getBearerToken()
+    }
+  })).data as ExamInfo;
+}
+
+async function getExamInstanceInfo(client: ExammaRayClient, exam_id: string, exam_instance_uuid: string): Promise<ExamInstanceInfo> {
+  return (await axios({
+    url: `/api/exams/${exam_id}/instances/${exam_instance_uuid}`,
+    method: "GET",
+    data: {},
+    headers: {
+      'Authorization': 'bearer ' + client.getBearerToken()
+    }
+  })).data as ExamInstanceInfo;
+}
+
+async function getExamSpec(client: ExammaRayClient, exam_id: string): Promise<Exam> {
+  const exam_spec_response = await axios({
+    url: `/api/exams/${exam_id}/spec`,
+    method: "GET",
+    data: {},
+    headers: {
+      'Authorization': 'bearer ' + client.getBearerToken()
+    },
+    responseType: "text",
+    transformResponse: [v => v] // Avoid default transformation that attempts JSON parsing (so we can parse our special way below)
+  });
+  return Exam.create(parseExamSpecification(exam_spec_response.data as string));
+}
 
 export class DashboardExammaRayGraderApplication {
 
   public readonly client: ExammaRayClient;
 
-  public readonly exam_id: string;
-  public readonly exam_info?: DB_Exams;
-  public readonly exam?: Exam;
-  public readonly exam_instance_uuid?: string;
-  
-  private exam_epoch?: number;
+  public readonly exam_info: ExamInfo;
+  public readonly exam_instance_info: ExamInstanceInfo;
+  public readonly exam: Exam;
 
-  private live_submission_viewer?: LiveSubmissionViewer;
+  private live_submission_viewer: LiveSubmissionViewer;
 
-  private constructor(client: ExammaRayClient, exam_id: string) {
+  private constructor(client: ExammaRayClient, exam_info: ExamInfo, exam_instance_info: ExamInstanceInfo, exam: Exam) {
     this.client = client;
-    this.exam_id = exam_id;
+    this.exam_instance_info = exam_instance_info;
+    this.exam_info = exam_info;
+    this.exam = exam;
+    this.live_submission_viewer = new LiveSubmissionViewer(this.client, this.exam, $("#live-submission-viewer-elem"));
 
     this.initComponents();
 
@@ -35,34 +70,38 @@ export class DashboardExammaRayGraderApplication {
     setInterval(() => this.checkTaskStatus(), 2000);
   }
 
-  public static async create(exam_id: string) {
+  public static async create(exam_id: string, exam_instance_uuid: string) {
+    
+    const client = await ExammaRayClient.create();
+    
     return new DashboardExammaRayGraderApplication(
-      await ExammaRayClient.create(),
-      exam_id
+      client,
+      await getExamInfo(client, exam_id),
+      await getExamInstanceInfo(client, exam_id, exam_instance_uuid),
+      await getExamSpec(client, exam_id)
     );
   }
 
   private initComponents() {
-    $(".examma-ray-exam-id").html(this.exam_id);
-    $("#examma-ray-grading-overview-link").attr("href", `out/${this.exam_id}/graded/overview.html`);
+    $(".examma-ray-exam-id").html(this.exam_info.exam_id);
+    $("#examma-ray-grading-overview-link").attr("href", `out/${this.exam_info.exam_id}/${this.exam_instance_info.exam_instance_uuid}/graded/overview.html`);
 
-    
     $("#change_uuidv5_namespace-modal").on("show.bs.modal", () => {
-      $("#change_uuidv5_namespace-input").val(this.exam_info?.uuidv5_namespace ?? "");
+      $("#change_uuidv5_namespace-input").val(this.exam_instance_info.uuidv5_namespace);
       $("#change_uuidv5_namespace-submit-button").prop("disabled", true);
     });
   
     $("#change_uuidv5_namespace-input").on("input", () => {
       $("#change_uuidv5_namespace-submit-button").prop(
         "disabled",
-        $("#change_uuidv5_namespace-input").val() === this.exam_info?.uuidv5_namespace
+        $("#change_uuidv5_namespace-input").val() === this.exam_instance_info.uuidv5_namespace
         || !($("#change_uuidv5_namespace-input")[0] as HTMLInputElement).checkValidity()
       );
     });
 
     $("#change_uuidv5_namespace-submit-button").on("click", async () => {
       await axios({
-        url: `api/exams/${this.exam_id}/uuidv5_namespace`,
+        url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info}/uuidv5_namespace`,
         method: "PUT",
         data: {
           uuidv5_namespace: $("#change_uuidv5_namespace-input").val()
@@ -84,7 +123,7 @@ export class DashboardExammaRayGraderApplication {
       const formData = new FormData();
       formData.append("roster", files[0]);
       await axios({
-        url: `api/exams/${this.exam_id}/roster`,
+        url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/roster`,
         method: "put",
         data: formData,
         headers: {
@@ -95,9 +134,18 @@ export class DashboardExammaRayGraderApplication {
       $("#upload-roster-modal").modal("hide");
     });
 
+    
+    $("#submissions-file-input-form").on("submit", async (e) => {
+      e.preventDefault();
+      let files = (<HTMLInputElement>$("#submissions-file-input")[0]).files;
+      if (files) {
+        this.addSubmissions(files);
+      }
+    });
+
     $("#run-generate-submit-button").on("click", async () => {
       let response = await axios({
-        url: `run/generate/${this.exam_id}`,
+        url: `run/generate/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
         method: "POST",
         headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken()
@@ -120,7 +168,7 @@ export class DashboardExammaRayGraderApplication {
       };
 
       let response = await axios({
-        url: `run/grade/${this.exam_id}`,
+        url: `run/grade/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
         method: "POST",
         data: request,
         headers: {
@@ -132,13 +180,13 @@ export class DashboardExammaRayGraderApplication {
     });
 
     $("#delete-exam-id-confirmation").on("input", () => {
-      $("#delete-exam-button").prop("disabled", $("#delete-exam-id-confirmation").val() !== this.exam_id);
+      $("#delete-exam-button").prop("disabled", $("#delete-exam-id-confirmation").val() !== this.exam_instance_info.name);
     });
 
     $("#delete-exam-button").on("click", async () => {
       
       let response = await axios({
-        url: `api/exams/${this.exam_id}`,
+        url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
         method: "DELETE",
         headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken()
@@ -168,7 +216,7 @@ export class DashboardExammaRayGraderApplication {
       }
       formData.append("exam_spec", files[0]);
       await axios({
-        url: `api/exams`,
+        url: `/api/exams`,
         method: "POST",
         data: formData,
         headers: {
@@ -182,21 +230,17 @@ export class DashboardExammaRayGraderApplication {
 
     $("#live-submission-viewer-view-button").on("click", async () => {
       
-      if (!this.exam_instance_uuid) { return; }
       try {
         const uniqname = $("#live-submission-viewer-uniqname-input").val();
-        const assignments : (DB_Live_Exam_Assignments & DB_Live_Exam_Instances)[] = (await axios({
-          url: `api/assigned_exams/${this.exam_instance_uuid}/uniqnames/${uniqname}`,
+        const assn = (await axios({
+          url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/assigned_exams_by_uniqname/${uniqname}`,
           method: "GET",
           headers: {
               'Authorization': 'bearer ' + this.client.getBearerToken()
           }
-        })).data;
+        })).data as ExamAssignmentInfo;
 
-        const assn = assignments.find(a => a.uniqname === uniqname && a.exam_id === this.exam_id);
-        if(assn) {
-          this.live_submission_viewer?.setStudent(assn);
-        }
+        this.live_submission_viewer.setStudent(assn);
       }
       catch(e: unknown) {
         alert("Error loading student submission :(");
@@ -262,14 +306,13 @@ export class DashboardExammaRayGraderApplication {
 
   private async checkTaskStatus() {
 
-    const task_status_response = await axios({
-      url: `api/exams/${this.exam_id}/tasks`,
+    const task_status = (await axios({
+      url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/tasks`,
       method: "GET",
       headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken()
       }
-    });
-    const task_status = <ExamTaskStatus>task_status_response.data;
+    })).data as ExamTaskStatus;
 
     $("#examma-ray-task-status").html(`
       <table>
@@ -287,24 +330,32 @@ export class DashboardExammaRayGraderApplication {
 
   private async sendPing() {
 
-    const ping_response = <ExamPingResponse>(await axios({
-      url: `api/exams/${this.exam_id}/ping`,
+    const exam_ping_response = <ExamPingResponse>(await axios({
+      url: `/api/exams/${this.exam_info}/ping`,
       method: "GET",
       headers: {
-          'Authorization': 'bearer ' + this.client.getBearerToken()
+        'Authorization': 'bearer ' + this.client.getBearerToken()
       }
     })).data;
-    const current_epoch = ping_response.epoch;
 
-    if (this.exam_epoch !== current_epoch) {
-      this.exam_epoch = current_epoch;
-      await this.reloadExam();
-    }
+    const instance_epoch = (await axios({
+      url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/epoch`,
+      method: "GET",
+      headers: {
+        'Authorization': 'bearer ' + this.client.getBearerToken()
+      }
+    })).data.epoch;
+    assert(typeof instance_epoch === "string");
+
+    // if (this.exam_epoch !== current_epoch) {
+    //   this.exam_epoch = current_epoch;
+    //   await this.reloadExam();
+    // }
     
     $(".question-grader-avatars").empty();
-    Object.keys(ping_response.active_graders).forEach(question_id => {
+    Object.keys(exam_ping_response.active_graders).forEach(question_id => {
       let questionElem = $(`#question-grader-avatars-${question_id}`);
-      Object.values(ping_response.active_graders[question_id].graders).forEach(grader => {
+      Object.values(exam_ping_response.active_graders[question_id].graders).forEach(grader => {
         $(`<div style="display: inline-block;" data-toggle="tooltip" data-placement="bottom" title="${grader.email}">
           ${avatar(grader.email, { size: 30 })}
         </div>`).appendTo(questionElem);
@@ -317,87 +368,81 @@ export class DashboardExammaRayGraderApplication {
 
     try {
       
-      const exam_info : DB_Exams = (await axios({
-        url: `api/exams/${this.exam_id}`,
-        method: "GET",
-        data: {},
-        headers: {
-            'Authorization': 'bearer ' + this.client.getBearerToken()
-        }
-      })).data;
+      // const exam_info : DB_Exams = (await axios({
+      //   url: `/api/exams/${this.exam_id}`,
+      //   method: "GET",
+      //   data: {},
+      //   headers: {
+      //       'Authorization': 'bearer ' + this.client.getBearerToken()
+      //   }
+      // })).data;
 
-      console.log(exam_info);
-      asMutable(this).exam_info = exam_info;
+      // console.log(exam_info);
+      // asMutable(this).exam_info = exam_info;
       
-      $("#exam-uuidv5_namespace").val(this.exam_info?.uuidv5_namespace ?? "");
+      // $("#exam-uuidv5_namespace").val(this.exam_instance_info.uuidv5_namespace);
 
-      const exam_spec_response = await axios({
-        url: `api/exams/${this.exam_id}/spec`,
+      // const exam_spec_response = await axios({
+      //   url: `/api/exams/${this.exam_id}/spec`,
+      //   method: "GET",
+      //   data: {},
+      //   headers: {
+      //       'Authorization': 'bearer ' + this.client.getBearerToken()
+      //   },
+      //   responseType: "text",
+      //   transformResponse: [v => v] // Avoid default transformation that attempts JSON parsing (so we can parse our special way below)
+      // });
+      // const exam_spec = parseExamSpecification(exam_spec_response.data);
+
+      // asMutable(this).exam = Exam.create(exam_spec);
+      // assert(this.exam);
+
+      // const exam_instance_response = await axios({
+      //   url: `/api/exams/${this.exam_id}/instances`,
+      //   method: "GET",
+      //   headers: {
+      //       'Authorization': 'bearer ' + this.client.getBearerToken()
+      //   },
+      // });
+      // const exam_instances = <DB_Live_Exam_Instances[]>exam_instance_response.data;
+      // if (exam_instances.length > 0) {
+      //   asMutable(this).exam_instance_uuid = exam_instances[0].exam_instance_uuid;
+      // }
+
+      const assigned_exams = (await axios({
+        url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/assigned_exams`,
         method: "GET",
-        data: {},
         headers: {
-            'Authorization': 'bearer ' + this.client.getBearerToken()
-        },
-        responseType: "text",
-        transformResponse: [v => v] // Avoid default transformation that attempts JSON parsing (so we can parse our special way below)
-      });
-      const exam_spec = parseExamSpecification(exam_spec_response.data);
+          'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      })).data as ExamAssignmentInfo[];
 
-      asMutable(this).exam = Exam.create(exam_spec);
-      assert(this.exam);
-
-      const exam_instance_response = await axios({
-        url: `api/exams/${this.exam_id}/instances`,
-        method: "GET",
-        headers: {
-            'Authorization': 'bearer ' + this.client.getBearerToken()
-        },
-      });
-      const exam_instances = <DB_Live_Exam_Instances[]>exam_instance_response.data;
-      if (exam_instances.length > 0) {
-        asMutable(this).exam_instance_uuid = exam_instances[0].exam_instance_uuid;
-      }
-      this.live_submission_viewer = new LiveSubmissionViewer(this.client, this.exam, $("#live-submission-viewer-elem"));
-
-      const submissions_response = await axios({
-        url: `api/exams/${this.exam_id}/submissions`,
+      const submissions = (await axios({
+        url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/submissions`,
         method: "GET",
         headers: {
             'Authorization': 'bearer ' + this.client.getBearerToken()
         }
-      });
-      const submissions = <ExamSubmissionRecord[]>submissions_response.data;
+      })).data as SubmissionInfo[];
 
-      const roster_response = await axios({
-        url: `api/exams/${this.exam_id}/roster`,
-        method: "GET",
-        headers: {
-            'Authorization': 'bearer ' + this.client.getBearerToken()
-        }
-      });
-      const roster = <StudentInfo[]>roster_response.data;
+      const submissions_by_uuid: {[index: string]: SubmissionInfo} = {};
+      submissions.forEach(s => submissions_by_uuid[s.exam_uuid] = s);
 
-      let students : {
-        [index: string] : {
-          uniqname: string,
-          name: string,
-          submission?: ExamSubmissionRecord
-        }
-      } = {};
-      
-      roster.forEach(s => students[s.uniqname] = {
-        uniqname: s.uniqname,
-        name: s.name
-      });
+      // const roster_response = await axios({
+      //   url: `/api/exams/${this.exam_id}/roster`,
+      //   method: "GET",
+      //   headers: {
+      //       'Authorization': 'bearer ' + this.client.getBearerToken()
+      //   }
+      // });
+      // const roster = <StudentInfo[]>roster_response.data;
 
-      submissions.forEach(s => students[s.uniqname].submission = s);
-
-      $(".examma-ray-students-list").html(Object.values(students).sort((a,b) => a.uniqname.localeCompare(b.uniqname)).map(s => `<li>
-        ${s.uniqname}
-        ${s.submission
+      $(".examma-ray-students-list").html(Object.values(assigned_exams).sort((a,b) => a.uniqname.localeCompare(b.uniqname)).map(assn => `<li>
+        ${assn.uniqname}
+        ${submissions_by_uuid[assn.exam_uuid]
           ? `
-            <a class="btn btn-sm btn-primary" href="out/${this.exam?.exam_id}/submitted/${s.uniqname}-${this.exam?.exam_id}.html">Submission</a>
-            <a class="btn btn-sm btn-danger examma-ray-delete-submission-button" data-submission-uuid="${s.submission.uuid}">Delete</a>
+            <a class="btn btn-sm btn-primary" href="out/${this.exam.exam_id}/submitted/${assn.uniqname}-${this.exam.exam_id}.html">Submission</a>
+            <a class="btn btn-sm btn-danger examma-ray-delete-submission-button" data-submission-uuid="${submissions_by_uuid[assn.exam_uuid]}">Delete</a>
           `
           : "[no submission]"
         }
@@ -406,10 +451,8 @@ export class DashboardExammaRayGraderApplication {
       const self = this;
       $(".examma-ray-students-list .examma-ray-delete-submission-button").on("click", async function() {
 
-        if (!self.exam) { return; }
-
         await axios({
-          url: `api/exams/${self.exam.exam_id}/submissions/${$(this).data("submission-uuid")}`,
+          url: `/api/exams/${self.exam.exam_id}/submissions/${$(this).data("submission-uuid")}`,
           method: "DELETE",
           headers: {
             'Authorization': 'bearer ' + self.client.getBearerToken(),
@@ -420,15 +463,15 @@ export class DashboardExammaRayGraderApplication {
       });
 
       $("#examma-ray-question-grading-list").html(
-        this.exam!.allQuestions
+        this.exam.allQuestions
           .filter(q => q.response.default_grader?.grader_kind === "manual_code_writing")
-          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("\n")
+          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("\n")
         + 
-        this.exam!.allQuestions
+        this.exam.allQuestions
         .filter(q => q.response.default_grader?.grader_kind === "manual_generic")
-        .map(q => `<li><a href="manual-generic-grader.html?exam_id=${this.exam!.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("\n")
+        .map(q => `<li><a href="manual-generic-grader.html?exam_id=${this.exam.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("\n")
         + 
-        this.exam!.allQuestions
+        this.exam.allQuestions
         .filter(q => q.response.default_grader === undefined)
         .map(q => `<li><span style="color: red;">No grader defined for: ${q.question_id}</span></li>`).join("\n")
       );
@@ -452,7 +495,7 @@ export class DashboardExammaRayGraderApplication {
     }
 
     await axios({
-      url: `api/exams/${this.exam.exam_id}/submissions`,
+      url: `/api/exams/${this.exam.exam_id}/submissions`,
       method: "POST",
       data: formData,
       headers: {
@@ -465,20 +508,13 @@ export class DashboardExammaRayGraderApplication {
 async function main() {
   
   const qs = queryString.parse(location.search);
-  const EXAM_ID = qs["exam-id"];
-  assert(typeof EXAM_ID === "string");
+  const exam_id = qs["exam-id"];
+  const exam_instance_uuid = qs["exam-instance-uuid"];
+  assert(typeof exam_id === "string");
+  assert(typeof exam_instance_uuid === "string");
 
 
-  const app = await DashboardExammaRayGraderApplication.create(EXAM_ID);
-
-  
-  $("#submissions-file-input-form").on("submit", async (e) => {
-    e.preventDefault();
-    let files = (<HTMLInputElement>$("#submissions-file-input")[0]).files;
-    if (files) {
-      app.addSubmissions(files);
-    }
-  });
+  await DashboardExammaRayGraderApplication.create(exam_id, exam_instance_uuid);
 }
 
 if (typeof $ === "function") {

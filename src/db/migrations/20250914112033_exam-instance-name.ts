@@ -1,19 +1,16 @@
 import { Knex } from "knex";
 
-// This migration adds a randomization_seed column to the live_exam_instances table.
-// It used to be that the exam_id was used as the randomization seed, but now
-// that there can be multiple instances of an exam, each instance needs its own seed.
-// For any previously existing exam instances, the seed is set to the exam_id
-// of the corresponding exam.
+// This migration adds a name column to the live_exam_instances table so
+// that an instance can be identified by a human-friendly name (e.g.
+// "Quiz 1 Fall 2025") as well as the primary key UUID.
 
 export async function up(knex: Knex): Promise<void> {
-  
   await knex.schema
     .alterTable("live_exam_instances", table => {
-      table.string("randomization_seed", 100).notNullable().defaultTo("").after("uuidv5_namespace");
+      table.string("name", 200).notNullable().defaultTo("").after("exam_instance_uuid");
     });
 
-  // for all existing exam instances, copy the existing exam_id from the exams table
+  // for all existing exam instances, set the name to the exam_id of the corresponding exam
   const insts = await knex("live_exam_instances").select("*");
   await Promise.all(insts.map(async i => {
     const exam = await knex("exams").where({exam_id: i.exam_id}).select("exam_id").first();
@@ -23,17 +20,16 @@ export async function up(knex: Knex): Promise<void> {
     }
     
     await knex("live_exam_instances").where({exam_instance_uuid: i.exam_instance_uuid}).update({
-      randomization_seed: exam.exam_id
+      name: exam.exam_id
     });
   }));
 }
 
 
 export async function down(knex: Knex): Promise<void> {
-
   return knex.schema
     .alterTable("live_exam_instances", table => {
-      table.dropColumn("randomization_seed");
+      table.dropColumn("name");
     });
 }
 

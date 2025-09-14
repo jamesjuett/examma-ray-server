@@ -43,7 +43,7 @@ assigned_exams.route("/:exam_uuid/manifest")
     },
   }));
 
-assigned_exams.route("/:exam_uuid/live_submissions")
+assigned_exams.route("/:exam_uuid/submission")
   .get(createRoute({
     preprocessing: NO_PREPROCESSING,
     validation: [
@@ -53,11 +53,11 @@ assigned_exams.route("/:exam_uuid/live_submissions")
     
     handler: async (req: Request, res: Response) => {
       
-      const exam_info = await db_getLiveExamSubmissionByUuid(req.params["exam_uuid"]);
-      if (!exam_info) {
+      const submission = await db_getLiveExamSubmissionByUuid(req.params["exam_uuid"]);
+      if (!submission) {
         return res.sendStatus(404);
       }
 
-      return res.status(200).json(exam_info);
+      return res.status(200).json(submission);
     },
   }));

@@ -31,8 +31,8 @@ function requireAllValid(req: Request, res: Response, next: NextFunction) {
 // }
 
 export interface CommonRouteHandlers {
-  preprocessing: RequestHandler | readonly RequestHandler[];
   authorization: RequestHandler | readonly RequestHandler[];
+  preprocessing: RequestHandler | readonly RequestHandler[];
   validation: ValidationChain | readonly ValidationChain[];
   handler: RequestHandler | readonly RequestHandler[];
 };
@@ -40,9 +40,9 @@ export interface CommonRouteHandlers {
 export function createRoute(handlers: CommonRouteHandlers) {
   
   return [
+    ...(Array.isArray(handlers.authorization) ? handlers.authorization : [handlers.authorization]),
     ...(Array.isArray(handlers.preprocessing) ? handlers.preprocessing : [handlers.preprocessing]),
     ...(Array.isArray(handlers.validation) ? handlers.validation : [handlers.validation]),
-    ...(Array.isArray(handlers.authorization) ? handlers.authorization : [handlers.authorization]),
     requireAllValid,
     ...(Array.isArray(handlers.handler) ? handlers.handler : [handlers.handler]),
   ];
@@ -55,6 +55,9 @@ export const NO_AUTHORIZATION = [] as readonly never[];
 
 export function validateParamExammaRayId(param_name: string) {
   return validateParam(param_name).trim().isLength({min: 1, max: 100});
+}
+export function validateParamExammaRayName(param_name: string) {
+  return validateParam(param_name).trim().isLength({min: 1, max: 200});
 }
 
 export function validateParamUuid(param_name: string) {

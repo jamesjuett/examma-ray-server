@@ -7,12 +7,13 @@ import { Worker } from "worker_threads";
 import { RunGradingRequest } from "./dashboard";
 import { db_deleteManualGradingByExam, db_deleteManualGradingBySubmission } from "./db/db_code_grader";
 import { db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExamSubmissionByUuid } from "./db/db_exams";
-import { db_createLiveExamAssignment, db_getLiveExamAssignmentsByInstance, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId } from "./db/db_live";
+import { db_createLiveExamAssignment, db_createLiveExamInstance, db_getLiveExamAssignmentsByInstance, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId, db_getLiveExamSubmissions } from "./db/db_live";
 import { ActiveExamGraders } from "./manual_grading";
 import { QuestionGradingServer } from "./QuestionGradingServer";
 import { runGenerateWorker, runGradeWorker } from "./run/run";
 import { ServerTasks } from "./ServerTasks";
 import { asMutable, assertExists } from "./util/util";
+import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo } from "./rest_types";
 
 function MAKE_UMICH_EMAIL(uniqname: string) {
   return uniqname + "@umich.edu";
@@ -37,12 +38,12 @@ export class ExamInstanceServer {
   
   public readonly tasks: ServerTasks<ExamTask>;
 
-  public readonly assigned_exams: readonly DB_Live_Exam_Assignments[];
-  public readonly assigned_exams_by_uniqname: Map<string, Readonly<DB_Live_Exam_Assignments>>;
+  private readonly assigned_exams: readonly ExamAssignmentInfo[];
+  private readonly assigned_exams_by_uniqname: Map<string, Readonly<ExamAssignmentInfo>>;
 
   private readonly uniqnames_pending_exam_assignment: Set<string> = new Set();
 
-  private constructor(db_instance: DB_Live_Exam_Instances, db_assignments: readonly DB_Live_Exam_Assignments[]) {
+  private constructor(db_instance: DB_Live_Exam_Instances, db_assignments: readonly ExamAssignmentInfo[]) {
     this.exam_instance_uuid = db_instance.exam_instance_uuid;
     this.exam_id = db_instance.exam_id;
     this.duration_seconds = db_instance.duration_seconds;
@@ -68,6 +69,22 @@ export class ExamInstanceServer {
 
   private nextEpoch() {
     asMutable(this).epoch = uuidv4();
+  }
+
+  public getInfo() : ExamInstanceInfo {
+    return {
+      exam_instance_uuid: this.exam_instance_uuid,
+      name: this.exam_id,
+      exam_id: this.exam_id,
+      duration_seconds: this.duration_seconds,
+      uuidv5_namespace: this.uuidv5_namespace,
+      randomization_seed: this.randomization_seed,
+      epoch: this.epoch,
+    };
+  }
+
+  public getTaskStatus() {
+    return this.tasks.taskStatus;
   }
 
   public getRoster() : StudentInfo[] {
@@ -108,6 +125,18 @@ export class ExamInstanceServer {
     this.nextEpoch();
   };
 
+  public getAssignedExams() : readonly ExamAssignmentInfo[] {
+    return this.assigned_exams;
+  }
+
+  public getAssignedExamByUniqname(uniqname: string) : ExamAssignmentInfo | undefined {
+    return this.assigned_exams_by_uniqname.get(uniqname);
+  }
+
+  public async getSubmissions() {
+    return db_getLiveExamSubmissions(this.exam_instance_uuid);
+  }
+
   public async generateExams(students: readonly StudentInfo[]) {
 
     const worker = runGenerateWorker({
@@ -121,7 +150,11 @@ export class ExamInstanceServer {
     return this.tasks.workerTask(worker, "generate", `Preparing to generate ${students.length} exams...`);
   }
 
-  public async gradeExams(run_request: RunGradingRequest) {
+  public async regenerateALLExams() {
+    return this.generateExams(this.getRoster());
+  }
+
+  public async gradeAllExams(run_request: RunGradingRequest) {
 
     const worker = runGradeWorker({
       exam_id: this.exam_id,
@@ -142,7 +175,7 @@ export class ExamServer {
   
   public readonly exam_instances : readonly ExamInstanceServer[] = [];
   public readonly exam_instances_by_uuid: {
-    [index: string]: ExamInstanceServer | undefined
+    readonly [index: string]: ExamInstanceServer | undefined
   };
 
   public readonly epoch: string;
@@ -180,6 +213,14 @@ export class ExamServer {
   private nextEpoch() {
     asMutable(this).epoch = uuidv4();
   }
+
+  public getInfo() : ExamInfo{
+    return {
+      exam_id: this.exam.exam_id,
+      exam_instance_uuids: this.exam_instances.map(ei => (ei.exam_instance_uuid)),
+      epoch: this.epoch,
+    };
+  }
   
   public getExamInstances() {
     return this.exam_instances;
@@ -189,12 +230,20 @@ export class ExamServer {
     return this.exam_instances_by_uuid[exam_instance_uuid];
   }
 
-  public getExamInfo() {
-    return {
-      exam_id: this.exam.exam_id,
-      exam_instances: this.exam_instances.map(ei => (ei.exam_instance_uuid)),
-      epoch: this.epoch,
-    };
+  public async createExamInstance(
+    name: string, duration_seconds: number,
+    uuidv5_namespace?: string, randomization_seed?: string) {
+
+    const db_instance = await db_createLiveExamInstance(
+      this.exam.exam_id, name, duration_seconds,
+      uuidv5_namespace, randomization_seed
+    );
+    const exam_instance = await ExamInstanceServer.create(db_instance.exam_instance_uuid);
+    asMutable(this.exam_instances).push(exam_instance);
+    asMutable(this.exam_instances_by_uuid)[exam_instance.exam_instance_uuid] = exam_instance;
+    this.nextEpoch();
+    return exam_instance;
+    
   }
 
   public async updateSpec(new_exam_spec: ExamSpecification) {

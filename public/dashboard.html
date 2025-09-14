@@ -111,7 +111,7 @@
     
     
     
-        <div class="alert alert-success" style="position: absolute; bottom: 0.5em; right: 0.5em;" role="alert">
+        <!-- <div class="alert alert-success" style="position: absolute; bottom: 0.5em; right: 0.5em;" role="alert">
           <h2>Upload Submissions</h2>
           Upload individual .json files or a .zip file containing .json files.
           <div>
@@ -120,7 +120,7 @@
             <input id="submissions-file-input" type="file" name="submissions" multiple/>
             <button type="submit">Submit</button>
           </form>
-        </div>
+        </div> -->
 
       </div>
       <div class="tab-pane container-fluid" id="specification" role="tabpanel" aria-labelledby="specification-tab">
@@ -325,10 +325,10 @@
           </button>
         </div>
         <div class="modal-body">
-          Are you sure you want to delete this exam and <b>everything</b> associated with it? This includes all exam <b>submissions</b> and all <b>manual grading records</b>. Type the exam ID to confirm.
+          Are you sure you want to delete this exam and <b>everything</b> associated with it? This includes all exam <b>submissions</b> and all <b>manual grading records</b>. Type the exam name to confirm.
         </div>
         <div class="modal-footer">
-          <label for="delete-exam-id-confirmation">Confirm Exam ID:</label>
+          <label for="delete-exam-id-confirmation">Confirm Exam Name:</label>
           <input id="delete-exam-id-confirmation" type="text" size="30" style="font-family: monospace; font-size: smaller;" autocomplete="off" autocorrect="off" spellcheck="false" />
           <button id="delete-exam-button" type="button" class="btn btn-danger" data-dismiss="modal" disabled>Delete</button>
         </div>
