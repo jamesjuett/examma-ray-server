@@ -5,7 +5,7 @@ import { ExamDiff } from "examma-ray/dist/ExamDiff";
 import queryString from "query-string";
 import { ExamPingResponse, RunGradingRequest } from "../dashboard";
 import { ExamTaskStatus } from "../ExamServer";
-import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, SubmissionInfo } from "../rest_types";
+import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, SubmissionInfo, WindowInfo } from "../rest_types";
 import { assert } from "../util/util";
 import { ExammaRayClient } from "./Application";
 import { LiveSubmissionViewer } from "./LiveSubmissionViewer";
@@ -54,6 +54,9 @@ export class DashboardExammaRayGraderApplication {
   public readonly exam_instance_info: ExamInstanceInfo;
   public readonly exam: Exam;
 
+  private exam_windows: WindowInfo[] = [];
+  private exam_widows_by_uuid: Map<string, WindowInfo> = new Map();
+
   private live_submission_viewer: LiveSubmissionViewer;
 
   private constructor(client: ExammaRayClient, exam_info: ExamInfo, exam_instance_info: ExamInstanceInfo, exam: Exam) {
@@ -65,6 +68,7 @@ export class DashboardExammaRayGraderApplication {
 
     this.initComponents();
 
+    this.reloadExam();
     this.sendPing();
     setInterval(() => this.sendPing(), 5000);
     setInterval(() => this.checkTaskStatus(), 2000);
@@ -83,7 +87,15 @@ export class DashboardExammaRayGraderApplication {
   }
 
   private initComponents() {
-    $(".examma-ray-exam-id").html(this.exam_info.exam_id);
+    $("#examma-ray-exam-instance-name").html(this.exam_instance_info.name);
+    this.exam_info.exam_instances.forEach(ei => {
+      $("#examma-ray-exam-instances-dropdown").append(`
+        <a class="dropdown-item" href="dashboard.html?exam-id=${this.exam_info.exam_id}&exam-instance-uuid=${ei.exam_instance_uuid}">${ei.name}</a>
+      `);
+    });
+    $("#examma-ray-exam-instances-dropdown").append("<div class='dropdown-divider'></div>");
+    const create_link = $('<a class="dropdown-item"><i class="bi bi-plus"></i> Create New Instance</a>').appendTo($("#examma-ray-exam-instances-dropdown"));
+
     $("#examma-ray-grading-overview-link").attr("href", `out/${this.exam_info.exam_id}/${this.exam_instance_info.exam_instance_uuid}/graded/overview.html`);
 
     $("#change_uuidv5_namespace-modal").on("show.bs.modal", () => {
@@ -132,6 +144,28 @@ export class DashboardExammaRayGraderApplication {
       });
 
       $("#upload-roster-modal").modal("hide");
+    });
+
+    
+
+    $("#upload-windows-modal-button").on("click", async () => {
+      
+      let files = (<HTMLInputElement>$("#upload-windows-file-input")[0]).files;
+      if (!files || !files[0]) {
+        return;
+      }
+      const formData = new FormData();
+      formData.append("windows", files[0]);
+      await axios({
+        url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/windows`,
+        method: "put",
+        data: formData,
+        headers: {
+          'Authorization': 'bearer ' + this.client.getBearerToken(),
+        },
+      });
+
+      $("#upload-windows-modal").modal("hide");
     });
 
     
@@ -331,7 +365,7 @@ export class DashboardExammaRayGraderApplication {
   private async sendPing() {
 
     const exam_ping_response = <ExamPingResponse>(await axios({
-      url: `/api/exams/${this.exam_info}/ping`,
+      url: `/api/exams/${this.exam_info.exam_id}/ping`,
       method: "GET",
       headers: {
         'Authorization': 'bearer ' + this.client.getBearerToken()
@@ -344,7 +378,7 @@ export class DashboardExammaRayGraderApplication {
       headers: {
         'Authorization': 'bearer ' + this.client.getBearerToken()
       }
-    })).data.epoch;
+    })).data as string;
     assert(typeof instance_epoch === "string");
 
     // if (this.exam_epoch !== current_epoch) {
@@ -409,6 +443,23 @@ export class DashboardExammaRayGraderApplication {
       //   asMutable(this).exam_instance_uuid = exam_instances[0].exam_instance_uuid;
       // }
 
+      this.exam_windows = (await axios({
+        url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/windows`,
+        method: "GET",
+        headers: {
+          'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      })).data as WindowInfo[];
+      this.exam_widows_by_uuid = new Map(this.exam_windows.map(w => [w.window_uuid, w]));
+
+      $("#examma-ray-exam-windows-list").html(`
+        ${this.exam_windows.map(w => `
+          <li>
+            <strong>${w.name}</strong>: ${new Date(w.open_time).toLocaleString()} - ${new Date(w.close_time).toLocaleString()}
+          </li>
+        `).join("\n")}
+      `);
+
       const assigned_exams = (await axios({
         url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/assigned_exams`,
         method: "GET",
@@ -443,9 +494,11 @@ export class DashboardExammaRayGraderApplication {
           ? `
             <a class="btn btn-sm btn-primary" href="out/${this.exam.exam_id}/submitted/${assn.uniqname}-${this.exam.exam_id}.html">Submission</a>
             <a class="btn btn-sm btn-danger examma-ray-delete-submission-button" data-submission-uuid="${submissions_by_uuid[assn.exam_uuid]}">Delete</a>
+            <span class="text-muted">(${new Date(submissions_by_uuid[assn.exam_uuid].updated_at).toLocaleString()})</span>
           `
           : "[no submission]"
         }
+        ${assn.window_uuid ? `<span class="badge badge-info">${this.exam_widows_by_uuid.get(assn.window_uuid)?.name ?? assn.window_uuid}</span>` : ""}
       </li>`).join(""));
 
       const self = this;

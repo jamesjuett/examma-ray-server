@@ -1,14 +1,23 @@
 import { ExamSpecification } from "examma-ray";
-import { ExamServer } from "./ExamServer";
+import { ExamInstanceServer, ExamServer, ExamServerListener } from "./ExamServer";
+import { asMutable } from "./util/util";
 
-export class ExammaRayServer {
+export class ExammaRayServer implements ExamServerListener {
 
   private readonly exams_by_id: {
     [index: string]: ExamServer | undefined
   } = {};
 
+  public readonly exam_instances_by_uuid: ReadonlyMap<string, ExamInstanceServer> = new Map();
+
   private constructor(exams: readonly ExamServer[]) {
-    exams.forEach(exam => this.exams_by_id[exam.exam.exam_id] = exam);
+    exams.forEach(exam => {
+      this.exams_by_id[exam.exam.exam_id] = exam;
+      exam.getExamInstances().forEach(instance => {
+        asMutable(this.exam_instances_by_uuid).set(instance.exam_instance_uuid, instance);
+      })
+      exam.addListener(this);
+    });
   }
 
   public static async create(exam_specs: readonly ExamSpecification[]) {
@@ -31,8 +40,12 @@ export class ExammaRayServer {
     return exam_server;
   }
 
-  public getAllExams() {
-    return Object.values(this.exams_by_id) as ExamServer[];
+  public getAllExamsInfo() {
+    return Object.values(this.exams_by_id).map(exam => exam!.getInfo());
+  }
+
+  public onInstanceCreated(exam_instance: ExamInstanceServer) {
+    asMutable(this.exam_instances_by_uuid).set(exam_instance.exam_instance_uuid, exam_instance);
   }
 
 }

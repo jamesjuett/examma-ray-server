@@ -40,23 +40,24 @@
         <a class="btn btn-primary examma-ray-log-in-button" href="auth/google">Sign In</a>
         <button style="display:none;" class="btn btn-warning examma-ray-log-out-button"><i class="bi bi-person-x-fill"></i> Sign Out</button>
       </div>
-      <h4 class="mr-3" style="display:inline-block; vertical-align: middle;">
-        <span class="examma-ray-exam-id"></span>
-      </h4>
+      <div class="mr-3" style="display:inline-block; vertical-align: middle;">
+        <div class="dropdown">
+          <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="false">
+            <span id="examma-ray-exam-instance-name"></span>
+          </button>
+          <div id="examma-ray-exam-instances-dropdown" class="dropdown-menu">
+          </div>
+        </div>
+      </div>
       <div style="display: inline-block;">
 
         <nav>
           <ul class="nav nav-pills mb-3" id="dashboard-navigation" role="tablist">
-            <li class="nav-item">
-              <a class="nav-link" id="grading-tab" data-toggle="pill" href="#grading" role="tab" aria-controls="grading" aria-selected="true">
-                <i class="bi bi-journal-check"></i> Grading
-              </a>
-            </li>
-            <li class="nav-item">
+            <!-- <li class="nav-item">
               <a class="nav-link" id="specification-tab" data-toggle="pill" href="#specification" role="tab" aria-controls="specification" aria-selected="false">
                 <i class="bi bi-gear"></i> Specification
               </a>
-            </li>
+            </li> -->
             <li class="nav-item">
               <a class="nav-link" id="settings-tab" data-toggle="pill" href="#settings" role="tab" aria-controls="settings" aria-selected="false">
                 <i class="bi bi-gear"></i> Settings
@@ -70,6 +71,11 @@
             <li class="nav-item">
               <a class="nav-link" id="live-submission-viewer-tab" data-toggle="pill" href="#live-submission-viewer" role="tab" aria-controls="roster" aria-selected="false">
                 <i class="bi bi-lightning"></i> Submissions
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" id="grading-tab" data-toggle="pill" href="#grading" role="tab" aria-controls="grading" aria-selected="true">
+                <i class="bi bi-journal-check"></i> Grading
               </a>
             </li>
           </ul>
@@ -123,7 +129,7 @@
         </div> -->
 
       </div>
-      <div class="tab-pane container-fluid" id="specification" role="tabpanel" aria-labelledby="specification-tab">
+      <!-- <div class="tab-pane container-fluid" id="specification" role="tabpanel" aria-labelledby="specification-tab">
         
         <h5 class="modal-title"><b>Configure Exam</b></h5> 
 
@@ -143,7 +149,7 @@
         </div>
         <hr />
 
-      </div>
+      </div> -->
       <div class="tab-pane container" id="settings" role="tabpanel" aria-labelledby="settings-tab">
         
         <form class="form-inline">
@@ -153,12 +159,16 @@
             <input id="exam-uuidv5_namespace" class="form-control" type="text" size="36" style="font-family: monospace" readonly>
           </div>
           <p>Each exam has its own UUID V5 namespace that is used in the generation of deterministic exam and question UUIDs based on students uniqnames. Keep this namespace secret.</p>
+          <p><button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#upload-windows-modal">Upload Windows File</button></p>
         </form>
         <form>
           <div>
             <button type="button" class="btn btn-sm btn-danger" data-toggle="modal" data-target="#delete-exam-modal">DELETE EXAM</button>
           </div>
         </form>
+        <br />
+        <h5>Exam Windows</h5>
+        <ul id="examma-ray-exam-windows-list"></ul>
 
       </div>
 
@@ -204,6 +214,26 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
           <button type="button" id="upload-roster-modal-button" class="btn btn-primary">Upload</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="upload-windows-modal" tabindex="-1" role="dialog" aria-labelledby="upload-windows-modal-label" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="upload-windows-modal-label">Upload Windows</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <input id="upload-windows-file-input" type="file" name="windows" />
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button type="button" id="upload-windows-modal-button" class="btn btn-primary">Upload</button>
         </div>
       </div>
     </div>

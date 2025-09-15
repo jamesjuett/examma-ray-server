@@ -8,6 +8,10 @@ import { db_getExams, db_getExamSubmissions } from "../db/db_exams";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
 import { db_getLiveExamInstancesByExamId } from "../db/db_live";
+import { readFileSync } from "fs";
+import { WindowInfo } from "../rest_types";
+import Papa from "papaparse";
+import { assert, assertExists } from "../util/util";
 
 // const upload = multer({
 //   storage: multer.diskStorage({
@@ -34,7 +38,7 @@ exams_router
     validation: NO_VALIDATION,
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      return res.status(200).json(await db_getExams());
+      return res.status(200).json(EXAMMA_RAY_GRADING_SERVER.getAllExamsInfo());
     }
   }))
   .post(createRoute({
@@ -348,7 +352,13 @@ exams_router
     ],
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
-      return res.status(200).json(await db_getLiveExamInstancesByExamId(req.params["exam_id"]));
+      const exam = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])
+      
+      if (!exam) {
+        return res.sendStatus(404);
+      }
+
+      return res.status(200).json(exam.getExamInstances().map(ei => ei.getInfo()));
     }
   }))
   .post(createRoute({
@@ -447,6 +457,88 @@ exams_router
   }));
 
 exams_router
+  .route("/:exam_id/instances/:exam_instance_uuid/windows")
+  .get(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id"),
+      validateParamUuid("exam_instance_uuid"),
+    ],
+    authorization: NO_AUTHORIZATION,
+    handler: async (req: Request, res: Response) => {
+      const exam_inst = EXAMMA_RAY_GRADING_SERVER
+        .getExamServer(req.params["exam_id"])
+        ?.getExamInstanceByUuid(req.params["exam_instance_uuid"]);
+
+      if (!exam_inst) {
+        return res.sendStatus(404);
+      }
+
+      res.status(200).json(exam_inst.getWindows());
+    }
+  }))
+  .put(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id"),
+      validateParamUuid("exam_instance_uuid"),
+    ],
+    authorization: requireAdmin,
+    handler: [
+      upload.single("windows"),
+      async (req: Request, res: Response) => {
+        const exam_inst = EXAMMA_RAY_GRADING_SERVER
+          .getExamServer(req.params["exam_id"])
+          ?.getExamInstanceByUuid(req.params["exam_instance_uuid"]);
+
+        if (!exam_inst) {
+          return res.sendStatus(404);
+        }
+
+        if (!req.file) {
+          return res.sendStatus(400);
+        }
+
+        const uploaded_filepath = `uploads/${req.file?.filename}`;
+
+
+        type UploadedWindow = {
+          window_uuid?: string;
+          name?: string;
+          open_time?: string; // ISO 8601 datetime string
+          close_time?: string;   // ISO 8601 datetime string
+        };
+
+        // TODO: can we make this async? (probably not a huge deal, but still)
+        let uploaded_windows = Papa.parse<UploadedWindow>(readFileSync(uploaded_filepath, "utf8"), {
+          header: true,
+          skipEmptyLines: true
+        }).data;
+
+        // clean objects so they don't have extra properties
+        try {
+          const cleaned_windows = uploaded_windows.map(w => ({
+            window_uuid: assertExists(w.window_uuid, `Missing window_uuid for window with name ${JSON.stringify(w)}`),
+            name: assertExists(w.name, `Missing name for window with uuid ${JSON.stringify(w)}`),
+            open_time: new Date(assertExists(w.open_time, `Missing open_time for window with uuid ${JSON.stringify(w)}`)),
+            close_time: new Date(assertExists(w.close_time, `Missing close_time for window with uuid ${JSON.stringify(w)}`)),
+          }));
+
+          await exam_inst.addWindows(cleaned_windows);
+
+          return res.sendStatus(201);
+        }
+        catch(e) {
+          return res.status(400).send(`Error adding windows: ${e}`);
+        }
+        finally {
+          await rm(uploaded_filepath, { force: true });
+        }
+      }
+    ]
+  }));
+
+exams_router
   .route("/:exam_id/instances/:exam_instance_uuid/roster")
   .get(createRoute({
     preprocessing: NO_PREPROCESSING,
@@ -467,10 +559,44 @@ exams_router
       res.status(200).json(exam_inst.getRoster());
     }
   }))
-  .put(createRoute({
+  // .put(createRoute({
+  //   preprocessing: NO_PREPROCESSING,
+  //   validation: [
+  //     validateParamExammaRayId("exam_id")
+  //   ],
+  //   authorization: requireAdmin,
+  //   handler: [
+  //     upload.single("roster"),
+  //     async (req: Request, res: Response) => {
+  //       const exam_inst = EXAMMA_RAY_GRADING_SERVER
+  //         .getExamServer(req.params["exam_id"])
+  //         ?.getExamInstanceByUuid(req.params["exam_instance_uuid"]);
+
+  //       if (!exam_inst) {
+  //         return res.sendStatus(404);
+  //       }
+
+  //       if (!req.file) {
+  //         return res.sendStatus(400);
+  //       }
+
+  //       const uploaded_filepath = `uploads/${req.file?.filename}`;
+
+  //       // TODO: can we make this async? (probably not a huge deal, but still)
+  //       let roster = ExamUtils.loadCSVRoster(uploaded_filepath);
+
+  //       await exam_inst.addToRoster(roster);
+
+  //       await rm(uploaded_filepath, { force: true });
+  //       return res.sendStatus(201);
+  //     }
+  //   ]
+  // }));
+    .put(createRoute({
     preprocessing: NO_PREPROCESSING,
     validation: [
-      validateParamExammaRayId("exam_id")
+      validateParamExammaRayId("exam_id"),
+      validateParamUuid("exam_instance_uuid"),
     ],
     authorization: requireAdmin,
     handler: [
@@ -490,16 +616,42 @@ exams_router
 
         const uploaded_filepath = `uploads/${req.file?.filename}`;
 
+        type UploadedRosterEntry = {
+          uniqname?: string;
+          email?: string;
+          name?: string;
+          window_uuid?: string;
+        };
+
         // TODO: can we make this async? (probably not a huge deal, but still)
-        let roster = ExamUtils.loadCSVRoster(uploaded_filepath);
+        let uploaded_roster = Papa.parse<UploadedRosterEntry>(readFileSync(uploaded_filepath, "utf8"), {
+          header: true,
+          skipEmptyLines: true
+        }).data;
 
-        await exam_inst.addToRoster(roster);
+        // clean objects so they don't have extra properties
+        try {
+          const cleaned_roster = uploaded_roster.map(r => ({
+           uniqname: assertExists(r.uniqname, `Missing uniqname for roster entry with email ${JSON.stringify(r)}`),
+           student_email: r.email ?? r.uniqname + "@umich.edu",
+           name: r.name,
+           window_uuid: r.window_uuid,
+          }));
 
-        await rm(uploaded_filepath, { force: true });
-        return res.sendStatus(201);
+          await exam_inst.updateRoster(cleaned_roster);
+
+          return res.sendStatus(201);
+        }
+        catch(e) {
+          return res.status(400).send(`Error adding windows: ${e}`);
+        }
+        finally {
+          await rm(uploaded_filepath, { force: true });
+        }
       }
     ]
   }));
+  
 
 exams_router
   .route("/:exam_id/instances/:exam_instance_uuid/assigned_exams")
@@ -541,7 +693,7 @@ exams_router
         return res.sendStatus(404);
       }
 
-      res.status(200).json(exam_inst.getSubmissions());
+      res.status(200).json(await exam_inst.getSubmissions());
     }
   }));
 
@@ -564,7 +716,7 @@ exams_router
         return res.sendStatus(404);
       }
 
-      const assignment = await exam_inst.getAssignedExamByUniqname(req.params["uniqname"]);
+      const assignment = exam_inst.getAssignedExamByUniqname(req.params["uniqname"]);
       if (!assignment) {
         return res.sendStatus(404);
       }

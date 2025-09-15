@@ -1,19 +1,20 @@
 import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { createStudentExamUuid } from "examma-ray/dist/core/assigned_exams";
 import { rm } from "fs/promises";
-import { DB_Live_Exam_Assignments, DB_Live_Exam_Instances } from "knex/types/tables";
+import { DB_Live_Exam_Assignments, DB_Live_Exam_Instances, DB_Live_Windows } from "knex/types/tables";
 import { v4 as uuidv4 } from "uuid";
 import { Worker } from "worker_threads";
 import { RunGradingRequest } from "./dashboard";
 import { db_deleteManualGradingByExam, db_deleteManualGradingBySubmission } from "./db/db_code_grader";
 import { db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExamSubmissionByUuid } from "./db/db_exams";
-import { db_createLiveExamAssignment, db_createLiveExamInstance, db_getLiveExamAssignmentsByInstance, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId, db_getLiveExamSubmissions } from "./db/db_live";
+import { db_createExamInstanceWindowsWithUuids, db_createLiveExamAssignment, db_createLiveExamInstance, db_getExamInstanceWindows, db_getLiveExamAssignmentsByInstance, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId, db_getLiveExamSubmissions, db_updateLiveExamAssignment } from "./db/db_live";
 import { ActiveExamGraders } from "./manual_grading";
 import { QuestionGradingServer } from "./QuestionGradingServer";
 import { runGenerateWorker, runGradeWorker } from "./run/run";
 import { ServerTasks } from "./ServerTasks";
 import { asMutable, assertExists } from "./util/util";
-import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo } from "./rest_types";
+import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, WindowInfo } from "./rest_types";
+import { assert } from "console";
 
 function MAKE_UMICH_EMAIL(uniqname: string) {
   return uniqname + "@umich.edu";
@@ -41,9 +42,13 @@ export class ExamInstanceServer {
   private readonly assigned_exams: readonly ExamAssignmentInfo[];
   private readonly assigned_exams_by_uniqname: Map<string, Readonly<ExamAssignmentInfo>>;
 
-  private readonly uniqnames_pending_exam_assignment: Set<string> = new Set();
+  private readonly windows_by_uuid: Map<string, Readonly<WindowInfo>> = new Map();
+  private readonly windows_sorted_start_asc: Readonly<WindowInfo>[];
+  private readonly windows_sorted_end_asc: Readonly<WindowInfo>[];
 
-  private constructor(db_instance: DB_Live_Exam_Instances, db_assignments: readonly ExamAssignmentInfo[]) {
+  private modification_lock: Promise<void> = Promise.resolve();
+
+  private constructor(db_instance: DB_Live_Exam_Instances, db_assignments: readonly ExamAssignmentInfo[], db_windows: readonly DB_Live_Windows[]) {
     this.exam_instance_uuid = db_instance.exam_instance_uuid;
     this.exam_id = db_instance.exam_id;
     this.duration_seconds = db_instance.duration_seconds;
@@ -51,6 +56,9 @@ export class ExamInstanceServer {
     this.randomization_seed = db_instance.randomization_seed;
     this.assigned_exams = db_assignments;
     this.assigned_exams_by_uniqname = new Map(db_assignments.map(assgn => [assgn.uniqname, assgn]));
+    this.windows_sorted_start_asc = db_windows.slice().sort((a, b) => a.open_time.getTime() - b.open_time.getTime());
+    this.windows_sorted_end_asc = db_windows.slice().sort((a, b) => a.close_time.getTime() - b.close_time.getTime());
+    this.windows_by_uuid = new Map(db_windows.map(w => [w.window_uuid, w]));
     
     this.epoch = uuidv4();
     this.tasks = new ServerTasks();
@@ -60,6 +68,7 @@ export class ExamInstanceServer {
     return new ExamInstanceServer( 
       assertExists(await db_getLiveExamInstanceByUuid(exam_instance_uuid)),
       await db_getLiveExamAssignmentsByInstance(exam_instance_uuid),
+      await db_getExamInstanceWindows(exam_instance_uuid),
     );
   }
 
@@ -87,6 +96,28 @@ export class ExamInstanceServer {
     return this.tasks.taskStatus;
   }
 
+  public getWindows() {
+    return this.windows_sorted_start_asc;
+  }
+
+  public async addWindows(windows: readonly Omit<WindowInfo, "exam_instance_uuid">[]) {
+
+    const windows_with_exam_instance_uuid : readonly WindowInfo[] = windows.map(w => ({
+      ...w,
+      exam_instance_uuid: this.exam_instance_uuid,
+    }));
+
+    await db_createExamInstanceWindowsWithUuids(windows_with_exam_instance_uuid);
+
+    // Wait until they're definitely in the DB, then add all in one atomic/synchronous go here.
+    windows_with_exam_instance_uuid.forEach(w => this.windows_by_uuid.set(w.window_uuid, w));
+    this.windows_sorted_start_asc.push(...windows_with_exam_instance_uuid);
+    this.windows_sorted_start_asc.sort((a, b) => a.open_time.getTime() - b.open_time.getTime());
+    this.windows_sorted_end_asc.push(...windows_with_exam_instance_uuid);
+    this.windows_sorted_end_asc.sort((a, b) => a.close_time.getTime() - b.close_time.getTime());
+    this.nextEpoch();
+  }
+
   public getRoster() : StudentInfo[] {
     return this.assigned_exams.map(assn => ({
       uniqname: assn.uniqname,
@@ -94,36 +125,60 @@ export class ExamInstanceServer {
     }));
   }
 
-  public async addToRoster(roster: StudentInfo[]) {
-    // Add all students in the roster to the exam assignments if they aren't already there
-    const new_students = roster.filter(student =>
-      !this.assigned_exams_by_uniqname.has(student.uniqname)
-      && !this.uniqnames_pending_exam_assignment.has(student.uniqname)
-    );
+  public async updateRoster(roster: Pick<ExamAssignmentInfo, "uniqname" | "name" | "student_email" | "window_uuid">[]) {
+    this.modification_lock = new Promise(async (resolve) => {
+      await this.modification_lock;
+      resolve(this.updateRosterImpl(roster));
+    });
+    return this.modification_lock;
+  }
 
-    new_students.forEach(student => this.uniqnames_pending_exam_assignment.add(student.uniqname));
+  private async updateRosterImpl(roster: Pick<ExamAssignmentInfo, "uniqname" | "name" | "student_email" | "window_uuid">[]) {
+    
+    const new_students : typeof roster = [];
+    const existing_students : typeof roster = [];
+    
+    roster.forEach(student => {
+      if (this.assigned_exams_by_uniqname.has(student.uniqname)) {
+        existing_students.push(student);
+      } else {
+        new_students.push(student);
+      }
+    });
 
-    // Prior to this point, things run synchronously/atomically and will make sure other, interleaved
-    // calls to addToRoster() won't try to add the same student multiple times.
+    // Update existing students
+    await Promise.all(existing_students.map(async (student) => db_updateLiveExamAssignment(
+      this.assigned_exams_by_uniqname.get(student.uniqname)!.exam_uuid,
+      {
+        name: student.name,
+        student_email: student.student_email,
+        window_uuid: student.window_uuid,
+      }
+    )));
+    
+    existing_students.forEach(student => {
+      const student_assn = this.assigned_exams_by_uniqname.get(student.uniqname);
+      Object.assign(assertExists(student_assn), student)
+    });
 
+    // Add new students
     const new_assns = await Promise.all(new_students.map(async (student) => db_createLiveExamAssignment(
-      createStudentExamUuid({strategy: "uuidv5", v5_namespace: this.uuidv5_namespace}, student, this.exam_id),
+      createStudentExamUuid({strategy: "uuidv5", v5_namespace: this.uuidv5_namespace}, student.uniqname, this.exam_id),
       this.exam_instance_uuid,
       student.uniqname,
       student.name,
       MAKE_UMICH_EMAIL(student.uniqname),
     )));
 
-    await this.generateExams(new_students);
-
-    // This is also synchronous/atomic
     new_assns.forEach(assn => {
-      this.uniqnames_pending_exam_assignment.delete(assn.uniqname);
       asMutable(this.assigned_exams).push(assn);
     });
-    
+
+    // just run generation async, don't await it
+    this.generateExams(new_students.map(s => ({uniqname: s.uniqname, name: s.name ?? s.uniqname})));
+
     this.nextEpoch();
-  };
+  }
 
   public getAssignedExams() : readonly ExamAssignmentInfo[] {
     return this.assigned_exams;
@@ -168,15 +223,16 @@ export class ExamInstanceServer {
 
 };
 
+export interface ExamServerListener {
+  onInstanceCreated(exam_instance: ExamInstanceServer) : void;
+};
 
 export class ExamServer {
 
   public readonly exam: Exam;
   
   public readonly exam_instances : readonly ExamInstanceServer[] = [];
-  public readonly exam_instances_by_uuid: {
-    readonly [index: string]: ExamInstanceServer | undefined
-  };
+  public readonly exam_instances_by_uuid: ReadonlyMap<string, ExamInstanceServer>;
 
   public readonly epoch: string;
 
@@ -186,10 +242,12 @@ export class ExamServer {
     [index: string]: QuestionGradingServer | undefined
   } = {};
 
+  private readonly listeners: ExamServerListener[] = [];
+
   private constructor(exam: Exam, exam_instances: readonly ExamInstanceServer[], epoch: number, question_servers: readonly QuestionGradingServer[]) {
     this.exam = exam;
     this.exam_instances = exam_instances;
-    this.exam_instances_by_uuid = Object.fromEntries(this.exam_instances.map(ei => [ei.exam_instance_uuid, ei]));
+    this.exam_instances_by_uuid = new Map(exam_instances.map(ei => [ei.exam_instance_uuid, ei]));
     this.epoch = uuidv4();
     question_servers.forEach(qs => this.questionGradingServers[qs.question_id] = qs);
     this.tasks = new ServerTasks();
@@ -206,6 +264,10 @@ export class ExamServer {
     );
   }
 
+  public addListener(listener: ExamServerListener) {
+    this.listeners.push(listener);
+  }
+
   public getEpoch() {
     return this.epoch;
   }
@@ -214,10 +276,10 @@ export class ExamServer {
     asMutable(this).epoch = uuidv4();
   }
 
-  public getInfo() : ExamInfo{
+  public getInfo() : ExamInfo {
     return {
       exam_id: this.exam.exam_id,
-      exam_instance_uuids: this.exam_instances.map(ei => (ei.exam_instance_uuid)),
+      exam_instances: this.exam_instances.map(ei => ei.getInfo()),
       epoch: this.epoch,
     };
   }
@@ -227,7 +289,7 @@ export class ExamServer {
   }
 
   public getExamInstanceByUuid(exam_instance_uuid: string) {
-    return this.exam_instances_by_uuid[exam_instance_uuid];
+    return this.exam_instances_by_uuid.get(exam_instance_uuid);
   }
 
   public async createExamInstance(
@@ -240,7 +302,8 @@ export class ExamServer {
     );
     const exam_instance = await ExamInstanceServer.create(db_instance.exam_instance_uuid);
     asMutable(this.exam_instances).push(exam_instance);
-    asMutable(this.exam_instances_by_uuid)[exam_instance.exam_instance_uuid] = exam_instance;
+    asMutable(this.exam_instances_by_uuid).set(exam_instance.exam_instance_uuid, exam_instance);
+    this.listeners.forEach(listener => listener.onInstanceCreated(exam_instance));
     this.nextEpoch();
     return exam_instance;
     
@@ -279,7 +342,7 @@ export class ExamServer {
     });
 
     await this.tasks.workerTask(worker, "submissions", "Preparing to add submissions...");
-    await this.nextEpoch();
+    this.nextEpoch();
 
     // All question grading servers will need to reload new submission data from the DB
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
@@ -303,7 +366,7 @@ export class ExamServer {
     // Remove our stored copy of the submission file
     await rm(`data/${exam_submission.exam_id}/submissions/${exam_submission.uniqname}-submission.json`, { force: true });
 
-    await this.nextEpoch();
+    this.nextEpoch();
 
     // All question grading servers will need to reload new submission data from the DB
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));

@@ -1,6 +1,7 @@
 import axios from "axios";
 import { DB_Exams } from "knex/types/tables";
 import { ExammaRayClient } from "./Application";
+import { ExamInfo } from "../rest_types";
 
 export class StaffExammaRayGraderApplication {
 
@@ -22,26 +23,26 @@ export class StaffExammaRayGraderApplication {
     if (this.client.currentUser) {
       try {
   
-        let response = await axios({
+        let exams_info = (await axios({
           url: `api/exams`,
           method: "GET",
           data: {},
           headers: {
             'Authorization': 'bearer ' + this.client.getBearerToken()
           }
-        });
+        })).data as ExamInfo[];
   
         $(".examma-ray-exams-list").empty();
-        response.data.forEach((exam_info: DB_Exams) => {
-          const exam_id = exam_info.exam_id;
-          $(".examma-ray-exams-list").append(`
-            <li>
-              <a href="dashboard.html?exam-id=${exam_id}">${exam_id}</a>
-            </li>
-          `);
-
-         
-  
+        exams_info.forEach(ex => {
+          ex.exam_instances.forEach(ei => {
+            $(".examma-ray-exams-list").append(`
+              <li>
+                <a href="dashboard.html?exam-id=${ei.exam_id}&exam-instance-uuid=${ei.exam_instance_uuid}">
+                  ${ei.exam_id}: ${ei.name}
+                </a>
+              </li>
+            `);
+          })
         });
 
       }

@@ -2,16 +2,16 @@ import axios from "axios";
 import { AssignedExam, Exam } from "examma-ray";
 import { SubmittedExamRenderer } from "examma-ray/dist/core/exam_renderer";
 import { ExamSubmission, fillManifest, OpaqueExamSubmission, TransparentExamManifest, TrustedExamSubmission } from "examma-ray/dist/core/submissions";
-import type { DB_Live_Exam_Assignments } from "knex/types/tables";
 import { asMutable } from "../util/util";
 import { ExammaRayClient } from "./Application";
+import { ExamAssignmentInfo } from "../rest_types";
 
 
 export class LiveSubmissionViewer {
   
   public readonly client: ExammaRayClient;
   public readonly exam: Exam;
-  public readonly live_exam?: DB_Live_Exam_Assignments;
+  public readonly live_exam?: ExamAssignmentInfo;
   public readonly manifest?: TransparentExamManifest;
   
   private readonly renderer = new SubmittedExamRenderer();
@@ -26,7 +26,7 @@ export class LiveSubmissionViewer {
     setInterval(() => this.refreshSubmission(), 5000);
   }
 
-  public async setStudent(live_exam: DB_Live_Exam_Assignments) {
+  public async setStudent(live_exam: ExamAssignmentInfo) {
     asMutable(this).live_exam = live_exam;
 
     const manifest_response = await axios({

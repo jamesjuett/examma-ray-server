@@ -3,7 +3,8 @@ import { v4 as uuidv4 } from "uuid";
 import { assert } from "../util/util";
 import { query } from "./db";
 import * as crypto from "crypto";
-import { DB_Live_Submissions } from "knex/types/tables";
+import { DB_Live_Exam_Assignments, DB_Live_Submissions } from "knex/types/tables";
+import { WindowInfo } from "../rest_types";
 
 // TODO remove the name "live" from instances
 export async function db_createLiveExamInstance(
@@ -23,7 +24,8 @@ export async function db_createLiveExamInstance(
 
 export async function db_createLiveExamAssignment(
   exam_uuid: string, exam_instance_uuid: string,
-  uniqname: string, name: string | undefined, student_email: string) {
+  uniqname: string, name: string | undefined,
+  student_email: string, window_uuid?: string) {
 
   return (await query("live_exam_assignments").insert({
     exam_uuid: exam_uuid,
@@ -31,9 +33,18 @@ export async function db_createLiveExamAssignment(
     uniqname: uniqname,
     name: name,
     student_email: student_email,
+    window_uuid: window_uuid,
     force_open: false
   }).returning("*"))[0];
 }
+
+export async function db_updateLiveExamAssignment(
+  exam_uuid: string,
+  fields: Partial<Pick<DB_Live_Exam_Assignments, "name" | "student_email" | "window_uuid" | "force_open">>
+) {
+  return (await query("live_exam_assignments").where({exam_uuid: exam_uuid}).update(fields).returning("*"))[0];
+}
+
 
 export async function db_getLiveExamInstancesByExamId(exam_id: string) {
   return await query("live_exam_instances").where({exam_id: exam_id}).select("*");
@@ -98,4 +109,12 @@ export async function db_saveLiveExamSubmission(
       submission: submission
     }).returning("*"))[0];
   }
+}
+
+export async function db_getExamInstanceWindows(exam_instance_uuid: string) {
+  return await query("live_windows").where({exam_instance_uuid: exam_instance_uuid}).select("*");
+}
+
+export async function db_createExamInstanceWindowsWithUuids(windows: readonly WindowInfo[]) {
+  return await query("live_windows").insert(windows).returning("*");
 }

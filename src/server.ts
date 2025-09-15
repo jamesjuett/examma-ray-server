@@ -10,7 +10,6 @@ import { ExammaRayServer } from './ExammaRayGradingServer';
 import { auth_router } from './routes/auth';
 import { exams_router } from './routes/exams';
 import { manual_grading_router } from './routes/manual_grading';
-import { questions_router } from './routes/questions';
 import { run_router } from './routes/run';
 import { users_router } from './routes/users';
 import { participation_router } from './routes/participation';
@@ -29,8 +28,10 @@ async function main() {
     )
   );
 
+  console.log("Creating express app...");
   const app = express();
 
+  console.log("Creating routes...");
   // Requests to output files allow authentication via a bearer
   // token stored in a cookie. These routes are used ONLY to serve
   // files via GET requests. None of these routes perform any state
@@ -71,7 +72,7 @@ async function main() {
   app.use("/api/users", users_router);
   app.use("/api/exams", exams_router);
   app.use("/api/assigned_exams", assigned_exams);
-  app.use("/api/questions", questions_router);
+  // app.use("/api/questions", questions_router);
   app.use("/api/manual_grading", manual_grading_router);
 
   // Separate student API routes, require authentication but
@@ -110,7 +111,7 @@ async function main() {
   });
 
 
-
+  console.log("Launching server...");
   const PORT = 3000;
   app.listen(PORT, () => {
     console.log(`Server is running at https://localhost:${PORT}`);
