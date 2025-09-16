@@ -145,9 +145,9 @@ student_router.route("/exams/:exam_uuid/live_submission")
           console.log(`Live exam FORBIDDEN: ${userInfo.email} attempted to access exam ${exam_uuid} outside of window ${window.name} (${window.open_time} - ${window.close_time})`);
           return res.sendStatus(403);
         }
-
+        const duration_ms = exam_instance.duration_seconds * exam_info.duration_multiplier * 1000;
         // If the exam has a duration, are we within that time limit?
-        if (exam_info.start_time && exam_info.start_time.getTime() + exam_instance.duration_seconds * 1000 < now.getTime() - grace_period_ms) {
+        if (exam_info.start_time && exam_info.start_time.getTime() + duration_ms < now.getTime() - grace_period_ms) {
           console.log(`Live submission FORBIDDEN: ${userInfo.email} attempted to submit for exam ${exam_uuid} after time limit expired`);
           return res.sendStatus(403);
         }
