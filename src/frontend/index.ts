@@ -125,8 +125,9 @@ function renderExamButton(exam_info: StudentFacingExamInfo) {
   }
 
   // If duration has elapsed
+  const duration_ms = exam_info.exam_instance.duration_seconds * exam_info.assigned_exam.duration_multiplier * 1000;
   const start_time = exam_info.assigned_exam.start_time ? new Date(exam_info.assigned_exam.start_time) : undefined;
-  if (start_time && start_time.getTime() + exam_info.exam_instance.duration_seconds * 1000 < now.getTime()) {
+  if (start_time && start_time.getTime() + duration_ms < now.getTime()) {
     if (exam_info.submission !== undefined) {
       return `<button class="btn btn-success" disabled><i class="bi bi-check-lg"></i> Submitted</button>`;
     }
