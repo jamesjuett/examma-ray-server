@@ -46,7 +46,12 @@ export class IndexExammaRayApplication {
               <div class="card">
                 <div class="card-body">
                   <h5 class="card-title">${exam_instance.name}</h5>
-                  <h6 class="card-subtitle mb-2 text-muted"><i class="bi bi-hourglass"></i> ${Math.floor(exam_instance.duration_seconds / 60)} minutes</h6>
+                  <h6 class="card-subtitle mb-2 text-muted"><i class="bi bi-hourglass"></i>
+                    ${assigned_exam.duration_multiplier === 1.0 
+                      ? `${Math.floor(exam_instance.duration_seconds / 60)} minutes`
+                      : `${Math.floor(exam_instance.duration_seconds * assigned_exam.duration_multiplier / 60)} minutes <span class="badge badge-info">${assigned_exam.duration_multiplier}x applied</span>`
+                    }
+                  </h6>
                   <p class="card-text">
                   ${exam_window
                     ? `Open: ${new Date(exam_window.open_time).toLocaleString()}<br />Close: ${new Date(exam_window.close_time).toLocaleString()}`
@@ -120,7 +125,7 @@ function renderExamButton(exam_info: StudentFacingExamInfo) {
   }
 
   // If duration has elapsed
-  const start_time = exam_info.assigned_exam.start_time;
+  const start_time = exam_info.assigned_exam.start_time ? new Date(exam_info.assigned_exam.start_time) : undefined;
   if (start_time && start_time.getTime() + exam_info.exam_instance.duration_seconds * 1000 < now.getTime()) {
     if (exam_info.submission !== undefined) {
       return `<button class="btn btn-success" disabled><i class="bi bi-check-lg"></i> Submitted</button>`;

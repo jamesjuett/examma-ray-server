@@ -99,7 +99,7 @@ declare module "knex/types/tables" {
     submission: string; // jsonb
   }
 
-  type DB_Live_Exam_Instances = {
+  interface DB_Live_Exam_Instances {
     exam_instance_uuid: string;
     name: string;
     exam_id: string;
@@ -116,7 +116,7 @@ declare module "knex/types/tables" {
     close_time: Date; // timestamp
   }
 
-  type DB_Live_Exam_Assignments = {
+  interface DB_Live_Exam_Assignments {
     exam_uuid: string;
     exam_instance_uuid: string;
     uniqname: string;
@@ -125,7 +125,13 @@ declare module "knex/types/tables" {
     window_uuid?: string;
     force_open: boolean;
     start_time?: Date; // timestamp
+    duration_multiplier: number; // float, defaults to 1.0
   }
+  // Insert: All required, except window_uuid is optional (nullable)
+  export type DB_Live_Exam_Assignment_Insert = Omit<DB_Live_Exam_Assignments, "force_open" | "window_uuid" | "duration_multiplier"> & Partial<Pick<DB_Live_Exam_Assignments, "force_open" | "window_uuid" | "duration_multiplier">>;
+  // Update: Only allowed to update window_uuid, name, force open, start_time
+  export type DB_Live_Exam_Assignment_Update = Partial<Pick<DB_Live_Exam_Assignments, "name" | "window_uuid" | "force_open" | "start_time" | "duration_multiplier">>;
+
 
   interface DB_Live_Submissions {
     exam_uuid: string;
@@ -134,6 +140,7 @@ declare module "knex/types/tables" {
     updated_at: Date; // timestamp
     submission: string; // jsonb
   }
+
   
   type ExceptID<T> = Knex.CompositeTableType<T, Omit<T, "id"> & {id?: undefined}, Partial<Omit<T, "id">> & {id?: undefined}>;
 
@@ -276,11 +283,9 @@ declare module "knex/types/tables" {
       // Base Type
       DB_Live_Exam_Assignments,
       // Insert Type
-      //   All required, except window_uuid is optional (nullable)
-      Omit<DB_Live_Exam_Assignments, "window_uuid"> & Partial<Pick<DB_Live_Exam_Assignments, "window_uuid">>,
+      DB_Live_Exam_Assignment_Insert,
       // Update Type
-      //   Only allowed to update window_uuid, name, force open, start_time
-      Partial<Pick<DB_Live_Exam_Assignments, "window_uuid" | "name" | "force_open" | "start_time">>
+      DB_Live_Exam_Assignment_Update
     >;
 
     live_submissions: Knex.CompositeTableType<

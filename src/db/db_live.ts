@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { assert } from "../util/util";
 import { query } from "./db";
 import * as crypto from "crypto";
-import { DB_Live_Exam_Assignments, DB_Live_Submissions } from "knex/types/tables";
+import { DB_Live_Exam_Assignment_Insert, DB_Live_Exam_Assignment_Update, DB_Live_Exam_Assignments, DB_Live_Submissions } from "knex/types/tables";
 import { StudentFacingExamInfo, WindowInfo } from "../rest_types";
 
 // TODO remove the name "live" from instances
@@ -23,25 +23,17 @@ export async function db_createLiveExamInstance(
 }
 
 export async function db_createLiveExamAssignment(
-  exam_uuid: string, exam_instance_uuid: string,
-  uniqname: string, name: string | undefined,
-  student_email: string, window_uuid?: string) {
+  fields: DB_Live_Exam_Assignment_Insert
+) {
 
-  return (await query("live_exam_assignments").insert({
-    exam_uuid: exam_uuid,
-    exam_instance_uuid: exam_instance_uuid,
-    uniqname: uniqname,
-    name: name,
-    student_email: student_email,
-    window_uuid: window_uuid,
-    force_open: false
-  }).returning("*"))[0];
+  return (await query("live_exam_assignments").insert(fields).returning("*"))[0];
 }
 
 export async function db_updateLiveExamAssignment(
   exam_uuid: string,
-  fields: Partial<Pick<DB_Live_Exam_Assignments, "name" | "student_email" | "window_uuid" | "force_open">>
+  fields: DB_Live_Exam_Assignment_Update
 ) {
+    console.log(fields)
   return (await query("live_exam_assignments").where({exam_uuid: exam_uuid}).update(fields).returning("*"))[0];
 }
 
@@ -91,6 +83,7 @@ async function db_helper_getStudentExamInfo(orig_assn: DB_Live_Exam_Assignments)
       student_email: orig_assn.student_email,
       force_open: orig_assn.force_open,
       start_time: orig_assn.start_time,
+      duration_multiplier: orig_assn.duration_multiplier,
     },
     exam_instance: {
       name: exam_instance.name,

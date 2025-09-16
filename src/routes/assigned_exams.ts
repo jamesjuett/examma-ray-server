@@ -1,7 +1,7 @@
 import { Request, Response, Router } from "express";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getLiveExamInstanceByUuid, db_getLiveExamSubmissionByUuid, db_getWindowByUuid, db_updateLiveExamAssignment } from "../db/db_live";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
+import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getLiveExamSubmissionByUuid } from "../db/db_live";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, validateBody, validateParamUuid } from "./common";
 
 
 export const assigned_exams = Router();

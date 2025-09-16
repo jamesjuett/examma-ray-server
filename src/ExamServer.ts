@@ -123,7 +123,7 @@ export class ExamInstanceServer {
     }));
   }
 
-  public async updateRoster(roster: Pick<ExamAssignmentInfo, "uniqname" | "name" | "student_email" | "window_uuid">[]) {
+  public async updateRoster(roster: (Pick<ExamAssignmentInfo, "uniqname"> & Partial<Pick<ExamAssignmentInfo, "uniqname" | "name" | "window_uuid" | "force_open" | "duration_multiplier">>)[]) {
     this.modification_lock = new Promise(async (resolve) => {
       await this.modification_lock;
       resolve(this.updateRosterImpl(roster));
@@ -131,7 +131,7 @@ export class ExamInstanceServer {
     return this.modification_lock;
   }
 
-  private async updateRosterImpl(roster: Pick<ExamAssignmentInfo, "uniqname" | "name" | "student_email" | "window_uuid">[]) {
+  private async updateRosterImpl(roster: (Pick<ExamAssignmentInfo, "uniqname"> & Partial<Pick<ExamAssignmentInfo, "uniqname" | "name" | "window_uuid" | "force_open" | "duration_multiplier">>)[]) {
     
     const new_students : typeof roster = [];
     const existing_students : typeof roster = [];
@@ -144,13 +144,15 @@ export class ExamInstanceServer {
       }
     });
 
+
     // Update existing students
     await Promise.all(existing_students.map(async (student) => db_updateLiveExamAssignment(
       this.assigned_exams_by_uniqname.get(student.uniqname)!.exam_uuid,
       {
         name: student.name,
-        student_email: student.student_email,
         window_uuid: student.window_uuid,
+        force_open: student.force_open,
+        duration_multiplier: student.duration_multiplier,
       }
     )));
     
@@ -161,12 +163,16 @@ export class ExamInstanceServer {
 
     // Add new students
     const new_assns = await Promise.all(new_students.map(async (student) => db_createLiveExamAssignment(
-      createStudentExamUuid({strategy: "uuidv5", v5_namespace: this.uuidv5_namespace}, student.uniqname, this.exam_id),
-      this.exam_instance_uuid,
-      student.uniqname,
-      student.name,
-      MAKE_UMICH_EMAIL(student.uniqname),
-      student.window_uuid,
+      {
+        exam_uuid: createStudentExamUuid({strategy: "uuidv5", v5_namespace: this.uuidv5_namespace}, student.uniqname, this.exam_id),
+        exam_instance_uuid: this.exam_instance_uuid,
+        uniqname: student.uniqname,
+        name: student.name,
+        student_email: MAKE_UMICH_EMAIL(student.uniqname),
+        window_uuid: student.window_uuid,
+        force_open: student.force_open,
+        duration_multiplier: student.duration_multiplier,
+      }
     )));
 
     new_assns.forEach(assn => {
@@ -175,7 +181,8 @@ export class ExamInstanceServer {
     });
 
     // just run generation async, don't await it
-    this.generateExams(new_students.map(s => ({uniqname: s.uniqname, name: s.name ?? s.uniqname})));
+    // this.generateExams(new_students.map(s => ({uniqname: s.uniqname, name: s.name ?? s.uniqname})));
+    this.regenerateAllExams(); // TODO: Temporary fix is to run generation for all, since the ExamGenerator.writeAll() knocks out all files
 
     this.nextEpoch();
   }
@@ -188,7 +195,7 @@ export class ExamInstanceServer {
     return this.assigned_exams_by_uniqname.get(uniqname);
   }
 
-  public async updateAssignedExamByUuid(exam_uuid: string, fields: Partial<Pick<DB_Live_Exam_Assignments, "name" | "student_email" | "window_uuid" | "force_open">>) {
+  public async updateAssignedExamByUuid(exam_uuid: string, fields: Partial<Pick<DB_Live_Exam_Assignments, "name" | "student_email" | "window_uuid" | "force_open" | "duration_multiplier">>) {
     const assn = this.assigned_exams.find(a => a.exam_uuid === exam_uuid);
     if (!assn) {
       throw new Error(`No such assigned exam ${exam_uuid}`);

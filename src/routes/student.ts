@@ -83,6 +83,7 @@ student_router.route("/exams/:exam_uuid/session")
         now: new Date(),
         duration_seconds: exam_instance.duration_seconds,
         force_open: exam_assn.force_open,
+        duration_multiplier: exam_assn.duration_multiplier,
       };
 
 

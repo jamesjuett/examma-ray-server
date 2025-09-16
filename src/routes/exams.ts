@@ -628,6 +628,7 @@ exams_router
           email?: string;
           name?: string;
           window_uuid?: string;
+          duration_multiplier?: string;
         };
 
         // TODO: can we make this async? (probably not a huge deal, but still)
@@ -639,12 +640,16 @@ exams_router
         // clean objects so they don't have extra properties
         try {
           const cleaned_roster = uploaded_roster.map(r => ({
-           uniqname: assertExists(r.uniqname, `Missing uniqname for roster entry with email ${JSON.stringify(r)}`),
-           student_email: r.email ?? r.uniqname + "@umich.edu",
-           name: r.name,
-           window_uuid: r.window_uuid,
-          }));
+            uniqname: assertExists(r.uniqname, `Missing uniqname for roster entry with email ${JSON.stringify(r)}`),
+            student_email: r.email ?? r.uniqname + "@umich.edu",
+            name: r.name,
+            window_uuid: r.window_uuid,
 
+            // If it's undefined, empty string, or 0, we default to undefined (no multiplier),
+            // otherwise parse as a float. If that fails, NaN is als falsy and we default to undfined.
+            duration_multiplier: (r.duration_multiplier && parseFloat(r.duration_multiplier)) || undefined
+          }));
+          
           await exam_inst.updateRoster(cleaned_roster);
 
           return res.sendStatus(201);
