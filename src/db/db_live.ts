@@ -4,7 +4,7 @@ import { assert } from "../util/util";
 import { query } from "./db";
 import * as crypto from "crypto";
 import { DB_Live_Exam_Assignments, DB_Live_Submissions } from "knex/types/tables";
-import { WindowInfo } from "../rest_types";
+import { StudentFacingExamInfo, WindowInfo } from "../rest_types";
 
 // TODO remove the name "live" from instances
 export async function db_createLiveExamInstance(
@@ -45,6 +45,12 @@ export async function db_updateLiveExamAssignment(
   return (await query("live_exam_assignments").where({exam_uuid: exam_uuid}).update(fields).returning("*"))[0];
 }
 
+export async function db_startLiveExamAssignment(exam_uuid: string) {
+  return (await query("live_exam_assignments").where({exam_uuid: exam_uuid}).update({
+    start_time: new Date()
+  }).returning("*"))[0];
+}
+
 
 export async function db_getLiveExamInstancesByExamId(exam_id: string) {
   return await query("live_exam_instances").where({exam_id: exam_id}).select("*");
@@ -58,11 +64,61 @@ export async function db_getLiveExamAssignmentsByInstance(exam_instance_uuid: st
   return await query("live_exam_assignments").where({exam_instance_uuid: exam_instance_uuid}).select("*");
 }
 
-export async function db_getLiveExamAssignmentsByEmail(email: string) {
-  return await query("live_exam_assignments")
-    .join('live_exam_instances', 'live_exam_instances.exam_instance_uuid', '=', 'live_exam_assignments.exam_instance_uuid')
-    .where({student_email: email}).select("*");
+export async function db_getLiveExamAssignmentsByEmail(student_email: string) {
+  return await query("live_exam_assignments").where({student_email: student_email}).select("*");
 }
+
+export async function db_getStudentExamInfoByUuid(exam_uuid: string) {
+  const orig_assn = await query("live_exam_assignments").where({exam_uuid: exam_uuid}).select("*").first();
+  if (!orig_assn) {
+    return undefined;
+  }
+  return db_helper_getStudentExamInfo(orig_assn);
+}
+
+async function db_helper_getStudentExamInfo(orig_assn: DB_Live_Exam_Assignments) {
+  const exam_instance = await db_getLiveExamInstanceByUuid(orig_assn.exam_instance_uuid);
+  assert(exam_instance !== undefined);
+
+  const window = orig_assn.window_uuid && await db_getWindowByUuid(orig_assn.window_uuid);
+  const submission = await db_getLiveExamSubmissionByUuid(orig_assn.exam_uuid);
+  
+  const result: StudentFacingExamInfo = {
+    assigned_exam: {
+      exam_uuid: orig_assn.exam_uuid,
+      uniqname: orig_assn.uniqname,
+      name: orig_assn.name,
+      student_email: orig_assn.student_email,
+      force_open: orig_assn.force_open,
+      start_time: orig_assn.start_time,
+    },
+    exam_instance: {
+      name: exam_instance.name,
+      duration_seconds: exam_instance.duration_seconds,
+      exam_id: exam_instance.exam_id,
+    },
+    window: window ? {
+      name: window.name,
+      open_time: window.open_time,
+      close_time: window.close_time,
+    } : undefined,
+    submission: submission ? {
+      created_at: submission.created_at,
+      updated_at: submission.updated_at,
+    } : undefined,
+  };
+  return result;
+}
+  
+
+export async function db_getStudentExamsInfoByEmail(student_email: string) {
+  const orig_assignments = await query("live_exam_assignments").where({student_email: student_email}).select("*");
+  return await Promise.all(orig_assignments.map(
+    async orig_assn => db_helper_getStudentExamInfo(orig_assn)
+  ));
+}
+
+
 
 export async function db_getLiveExamAssignmentsByUniqname(uniqname: string) {
   return await query("live_exam_assignments")
@@ -111,10 +167,14 @@ export async function db_saveLiveExamSubmission(
   }
 }
 
+export async function db_getWindowByUuid(window_uuid: string) {
+  return await query("live_windows").where({window_uuid: window_uuid}).select("*").first();
+}
+
 export async function db_getExamInstanceWindows(exam_instance_uuid: string) {
   return await query("live_windows").where({exam_instance_uuid: exam_instance_uuid}).select("*");
 }
 
-export async function db_createExamInstanceWindowsWithUuids(windows: readonly WindowInfo[]) {
-  return await query("live_windows").insert(windows).returning("*");
+export async function db_createOrUpdateExamInstanceWindowsWithUuids(windows: readonly WindowInfo[]) {
+  return await query("live_windows").insert(windows).returning("*").onConflict("window_uuid").merge();
 }

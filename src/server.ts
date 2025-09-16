@@ -15,6 +15,7 @@ import { users_router } from './routes/users';
 import { participation_router } from './routes/participation';
 import { student_router } from './routes/student';
 import { assigned_exams } from './routes/assigned_exams';
+import { live_exams_router } from './routes/live';
 
 export let EXAMMA_RAY_GRADING_SERVER: ExammaRayServer;
 
@@ -56,7 +57,7 @@ async function main() {
     cookieParser(),
     passport.initialize(),
     passport.authenticate('jwt-cookie', { session: false }),
-    // any authenticated user can access live exam files
+    live_exams_router, // if unauthorized here, will not call next() and not go to express.static below
     express.static("live")
   );
 

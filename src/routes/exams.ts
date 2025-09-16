@@ -4,7 +4,7 @@ import { Request, Response, Router } from "express";
 import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import multer from "multer";
 import { requireAdmin } from "../auth/jwt_auth";
-import { db_getExams, db_getExamSubmissions } from "../db/db_exams";
+import { db_getExams, db_getExamSubmissions, db_getOrCreateExam } from "../db/db_exams";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
 import { db_getLiveExamInstancesByExamId } from "../db/db_live";
@@ -74,7 +74,14 @@ exams_router
         await writeFile(`data/${exam_id}/exam-spec.json`, stringifyExamComponentSpecification(new_exam_spec), "utf8");
         await writeFile(`data/${exam_id}/roster.csv`, "uniqname,name", "utf8");
 
-        EXAMMA_RAY_GRADING_SERVER.loadExamServer(new_exam_spec);
+        await db_getOrCreateExam(exam_id);
+
+        await EXAMMA_RAY_GRADING_SERVER.loadExamServer(new_exam_spec);
+
+        await EXAMMA_RAY_GRADING_SERVER.getExamServer(exam_id)!.createExamInstance(
+          "EECS 280 Fall 2025 Quiz 2",
+          1500
+        );
   
         return res.sendStatus(201);
       }
@@ -135,7 +142,7 @@ exams_router
     validation: [
       validateParamExammaRayId("exam_id")
     ],
-    authorization: requireAdmin,
+    authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
       const exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"]);
       if (!exam_server) {
@@ -362,7 +369,7 @@ exams_router
     }
   }))
   .post(createRoute({
-    authorization: NO_AUTHORIZATION, // requireSuperUser,
+    authorization: requireAdmin, // requireSuperUser,
     preprocessing: jsonBodyParser,
     validation: [
       validateParamExammaRayId("exam_id"),
@@ -592,7 +599,7 @@ exams_router
   //     }
   //   ]
   // }));
-    .put(createRoute({
+  .put(createRoute({
     preprocessing: NO_PREPROCESSING,
     validation: [
       validateParamExammaRayId("exam_id"),

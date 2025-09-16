@@ -9,6 +9,7 @@ import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, SubmissionInfo, WindowI
 import { assert } from "../util/util";
 import { ExammaRayClient } from "./Application";
 import { LiveSubmissionViewer } from "./LiveSubmissionViewer";
+import randomColor from "randomcolor";
 
 async function getExamInfo(client: ExammaRayClient, exam_id: string): Promise<ExamInfo> {
   return (await axios({
@@ -56,6 +57,8 @@ export class DashboardExammaRayGraderApplication {
 
   private exam_windows: WindowInfo[] = [];
   private exam_widows_by_uuid: Map<string, WindowInfo> = new Map();
+
+  private assigned_exams_by_uuid: Map<string, ExamAssignmentInfo> = new Map();
 
   private live_submission_viewer: LiveSubmissionViewer;
 
@@ -261,6 +264,25 @@ export class DashboardExammaRayGraderApplication {
       $("#specification-exam-spec-file-input").val("");
       $("#specification-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
     });
+
+
+    $("#student-settings-submit-button").on("click", async () => {
+      await axios({
+        url: `/api/assigned_exams/${$("#student-settings-modal").data("exam-uuid")}`,
+        method: "PUT",
+        data: {
+          exam_id: this.exam_info.exam_id,
+          exam_instance_uuid: this.exam_instance_info.exam_instance_uuid,
+          exam_window: $("#student-settings-window-input").val(),
+        },
+        headers: {
+          'Authorization': 'bearer ' + this.client.getBearerToken(),
+        },
+      });
+      
+      $("#student-settings-modal").modal("hide");
+    });
+
 
     $("#live-submission-viewer-view-button").on("click", async () => {
       
@@ -468,6 +490,8 @@ export class DashboardExammaRayGraderApplication {
         }
       })).data as ExamAssignmentInfo[];
 
+      this.assigned_exams_by_uuid = new Map(assigned_exams.map(a => [a.exam_uuid, a]));
+
       const submissions = (await axios({
         url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/submissions`,
         method: "GET",
@@ -488,18 +512,43 @@ export class DashboardExammaRayGraderApplication {
       // });
       // const roster = <StudentInfo[]>roster_response.data;
 
-      $(".examma-ray-students-list").html(Object.values(assigned_exams).sort((a,b) => a.uniqname.localeCompare(b.uniqname)).map(assn => `<li>
-        ${assn.uniqname}
-        ${submissions_by_uuid[assn.exam_uuid]
-          ? `
-            <a class="btn btn-sm btn-primary" href="out/${this.exam.exam_id}/submitted/${assn.uniqname}-${this.exam.exam_id}.html">Submission</a>
-            <a class="btn btn-sm btn-danger examma-ray-delete-submission-button" data-submission-uuid="${submissions_by_uuid[assn.exam_uuid]}">Delete</a>
-            <span class="text-muted">(${new Date(submissions_by_uuid[assn.exam_uuid].updated_at).toLocaleString()})</span>
-          `
-          : "[no submission]"
-        }
-        ${assn.window_uuid ? `<span class="badge badge-info">${this.exam_widows_by_uuid.get(assn.window_uuid)?.name ?? assn.window_uuid}</span>` : ""}
-      </li>`).join(""));
+      // ${submissions_by_uuid[assn.exam_uuid]
+      //   ? `
+      //     <a class="btn btn-sm btn-primary" href="out/${this.exam.exam_id}/submitted/${assn.uniqname}-${this.exam.exam_id}.html">Submission</a>
+      //     <a class="btn btn-sm btn-danger examma-ray-delete-submission-button" data-submission-uuid="${submissions_by_uuid[assn.exam_uuid]}">Delete</a>
+      //     <span class="text-muted">(${new Date(submissions_by_uuid[assn.exam_uuid].updated_at).toLocaleString()})</span>
+      //   `
+      //   : "[no submission]"
+      // }
+      const assn_and_windows = Object.values(assigned_exams)
+        .map(assn => Object.assign({}, assn, assn.window_uuid ? this.exam_widows_by_uuid.get(assn.window_uuid) : undefined))
+        .sort((a,b) => {
+          if (a?.open_time && b?.open_time) {
+            return new Date(a.open_time).getTime() - new Date(b.open_time).getTime();
+          }
+          else if (a?.open_time) {
+            return -1;
+          }
+          else if (b?.open_time) {
+            return 1;
+          }
+          else {
+            return a.uniqname.localeCompare(b.uniqname);
+          }
+        });
+        
+        $(".examma-ray-students-list").html(assn_and_windows.map(assn => {
+          const assn_window = assn.window_uuid && this.exam_widows_by_uuid.get(assn.window_uuid);
+          return `<li>
+            ${assn.uniqname}
+            <button type="button" class="btn btn-sm btn-warning student-settings-modal-open" data-exam-uuid="${assn.exam_uuid}"><i class="bi bi-pencil"></i> Edit Student</button>
+            ${submissions_by_uuid[assn.exam_uuid]
+              ? `<span class="text-muted">Submitted ${new Date(submissions_by_uuid[assn.exam_uuid].updated_at).toLocaleString()}</span>`
+              : '<span class="text-muted">[no submission]</span>'
+            }
+            ${assn_window ? `<span class="badge" style="background-color: ${randomColor({luminosity: "light", seed: assn_window.name ?? assn_window.window_uuid})}">${assn_window.name ?? assn.window_uuid}</span>` : ""}
+          </li>`
+        }).join(""));
 
       const self = this;
       $(".examma-ray-students-list .examma-ray-delete-submission-button").on("click", async function() {
@@ -513,6 +562,22 @@ export class DashboardExammaRayGraderApplication {
         });
 
         self.sendPing();
+      });
+      
+      $(".examma-ray-students-list .student-settings-modal-open").on("click", async function() {
+
+        $("#student-settings-modal").data("exam-uuid", $(this).data("exam-uuid"));
+        const assn = self.assigned_exams_by_uuid.get($("#student-settings-modal").data("exam-uuid"));
+        assert(assn);
+        $("#student-settings-uniqname-input").val(assn.uniqname);
+        $("#student-settings-email-input").val(assn.student_email);
+        self.exam_windows.forEach(w => {
+          $("#student-settings-window-input").append(`
+            <option value="${w.window_uuid}" ${assn.window_uuid === w.window_uuid ? "selected" : ""}>${w.name}</option>
+          `);
+        });
+        $("#student-settings-modal").modal("show");
+
       });
 
       $("#examma-ray-question-grading-list").html(

@@ -1,21 +1,49 @@
 import { Request, Response, Router } from "express";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getLiveExamInstanceByUuid, db_getLiveExamSubmissionByUuid } from "../db/db_live";
-import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, validateParamExammaRayId, validateParamUuid } from "./common";
+import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getLiveExamInstanceByUuid, db_getLiveExamSubmissionByUuid, db_getWindowByUuid, db_updateLiveExamAssignment } from "../db/db_live";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
+import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 
 
 export const assigned_exams = Router();
 
-assigned_exams.route("/:exam_uuid/uniqnames/:uniqname")
-  .get(createRoute({
-    preprocessing: NO_PREPROCESSING,
+// assigned_exams.route("/:exam_uuid/uniqnames/:uniqname")
+//   .get(createRoute({
+//     preprocessing: NO_PREPROCESSING,
+//     validation: [
+//       validateParamUuid("exam_uuid"),
+//       validateParamExammaRayId("uniqname"),
+//     ],
+//     authorization: NO_AUTHORIZATION,
+    
+//     handler: async (req: Request, res: Response) => {
+//       return res.status(200).json(await db_getLiveExamAssignmentsByUniqname(req.params["uniqname"]));
+//     },
+//   }));
+
+assigned_exams.route("/:exam_uuid")
+  .put(createRoute({
+    preprocessing: jsonBodyParser,
     validation: [
       validateParamUuid("exam_uuid"),
-      validateParamExammaRayId("uniqname"),
+      validateBody("exam_id").isLength({min: 1, max: 100}),
+      validateBody("exam_instance_uuid").isUUID().optional(),
+      validateBody("exam_window").isUUID().optional(),
     ],
     authorization: NO_AUTHORIZATION,
     
     handler: async (req: Request, res: Response) => {
-      return res.status(200).json(await db_getLiveExamAssignmentsByUniqname(req.params["uniqname"]));
+      const exam_uuid = req.params["exam_uuid"];
+      const exam_window : string | undefined = req.body.exam_window;
+
+      const exam_inst = EXAMMA_RAY_GRADING_SERVER
+        .getExamServer(req.body["exam_id"])
+        ?.getExamInstanceByUuid(req.body["exam_instance_uuid"]);
+
+      if (!exam_inst) {
+        return res.status(400).send("Invalid exam_id or exam_instance_uuid");
+      }
+
+      exam_inst.updateAssignedExamByUuid(exam_uuid, { window_uuid: exam_window });
     },
   }));
 

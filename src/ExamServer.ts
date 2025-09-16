@@ -7,7 +7,7 @@ import { Worker } from "worker_threads";
 import { RunGradingRequest } from "./dashboard";
 import { db_deleteManualGradingByExam, db_deleteManualGradingBySubmission } from "./db/db_code_grader";
 import { db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExamSubmissionByUuid } from "./db/db_exams";
-import { db_createExamInstanceWindowsWithUuids, db_createLiveExamAssignment, db_createLiveExamInstance, db_getExamInstanceWindows, db_getLiveExamAssignmentsByInstance, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId, db_getLiveExamSubmissions, db_updateLiveExamAssignment } from "./db/db_live";
+import { db_createOrUpdateExamInstanceWindowsWithUuids, db_createLiveExamAssignment, db_createLiveExamInstance, db_getExamInstanceWindows, db_getLiveExamAssignmentsByInstance, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId, db_getLiveExamSubmissions, db_updateLiveExamAssignment } from "./db/db_live";
 import { ActiveExamGraders } from "./manual_grading";
 import { QuestionGradingServer } from "./QuestionGradingServer";
 import { runGenerateWorker, runGradeWorker } from "./run/run";
@@ -43,8 +43,8 @@ export class ExamInstanceServer {
   private readonly assigned_exams_by_uniqname: Map<string, Readonly<ExamAssignmentInfo>>;
 
   private readonly windows_by_uuid: Map<string, Readonly<WindowInfo>> = new Map();
-  private readonly windows_sorted_start_asc: Readonly<WindowInfo>[];
-  private readonly windows_sorted_end_asc: Readonly<WindowInfo>[];
+  private windows_sorted_open_asc: Readonly<WindowInfo>[];
+  private windows_sorted_close_asc: Readonly<WindowInfo>[];
 
   private modification_lock: Promise<void> = Promise.resolve();
 
@@ -56,8 +56,8 @@ export class ExamInstanceServer {
     this.randomization_seed = db_instance.randomization_seed;
     this.assigned_exams = db_assignments;
     this.assigned_exams_by_uniqname = new Map(db_assignments.map(assgn => [assgn.uniqname, assgn]));
-    this.windows_sorted_start_asc = db_windows.slice().sort((a, b) => a.open_time.getTime() - b.open_time.getTime());
-    this.windows_sorted_end_asc = db_windows.slice().sort((a, b) => a.close_time.getTime() - b.close_time.getTime());
+    this.windows_sorted_open_asc = db_windows.slice().sort((a, b) => a.open_time.getTime() - b.open_time.getTime());
+    this.windows_sorted_close_asc = db_windows.slice().sort((a, b) => a.close_time.getTime() - b.close_time.getTime());
     this.windows_by_uuid = new Map(db_windows.map(w => [w.window_uuid, w]));
     
     this.epoch = uuidv4();
@@ -97,7 +97,7 @@ export class ExamInstanceServer {
   }
 
   public getWindows() {
-    return this.windows_sorted_start_asc;
+    return this.windows_sorted_open_asc;
   }
 
   public async addWindows(windows: readonly Omit<WindowInfo, "exam_instance_uuid">[]) {
@@ -107,14 +107,12 @@ export class ExamInstanceServer {
       exam_instance_uuid: this.exam_instance_uuid,
     }));
 
-    await db_createExamInstanceWindowsWithUuids(windows_with_exam_instance_uuid);
+    await db_createOrUpdateExamInstanceWindowsWithUuids(windows_with_exam_instance_uuid);
 
     // Wait until they're definitely in the DB, then add all in one atomic/synchronous go here.
     windows_with_exam_instance_uuid.forEach(w => this.windows_by_uuid.set(w.window_uuid, w));
-    this.windows_sorted_start_asc.push(...windows_with_exam_instance_uuid);
-    this.windows_sorted_start_asc.sort((a, b) => a.open_time.getTime() - b.open_time.getTime());
-    this.windows_sorted_end_asc.push(...windows_with_exam_instance_uuid);
-    this.windows_sorted_end_asc.sort((a, b) => a.close_time.getTime() - b.close_time.getTime());
+    this.windows_sorted_open_asc = Array.from(this.windows_by_uuid.values()).sort((a, b) => a.open_time.getTime() - b.open_time.getTime());
+    this.windows_sorted_close_asc = Array.from(this.windows_by_uuid.values()).sort((a, b) => a.close_time.getTime() - b.close_time.getTime());
     this.nextEpoch();
   }
 
@@ -168,10 +166,12 @@ export class ExamInstanceServer {
       student.uniqname,
       student.name,
       MAKE_UMICH_EMAIL(student.uniqname),
+      student.window_uuid,
     )));
 
     new_assns.forEach(assn => {
       asMutable(this.assigned_exams).push(assn);
+      this.assigned_exams_by_uniqname.set(assn.uniqname, assn);
     });
 
     // just run generation async, don't await it
@@ -186,6 +186,17 @@ export class ExamInstanceServer {
 
   public getAssignedExamByUniqname(uniqname: string) : ExamAssignmentInfo | undefined {
     return this.assigned_exams_by_uniqname.get(uniqname);
+  }
+
+  public async updateAssignedExamByUuid(exam_uuid: string, fields: Partial<Pick<DB_Live_Exam_Assignments, "name" | "student_email" | "window_uuid" | "force_open">>) {
+    const assn = this.assigned_exams.find(a => a.exam_uuid === exam_uuid);
+    if (!assn) {
+      throw new Error(`No such assigned exam ${exam_uuid}`);
+    }
+    const updated_assn = await db_updateLiveExamAssignment(exam_uuid, fields);
+    Object.assign(assn, fields);
+    this.nextEpoch();
+    return updated_assn;
   }
 
   public async getSubmissions() {
@@ -205,7 +216,7 @@ export class ExamInstanceServer {
     return this.tasks.workerTask(worker, "generate", `Preparing to generate ${students.length} exams...`);
   }
 
-  public async regenerateALLExams() {
+  public async regenerateAllExams() {
     return this.generateExams(this.getRoster());
   }
 
@@ -296,10 +307,12 @@ export class ExamServer {
     name: string, duration_seconds: number,
     uuidv5_namespace?: string, randomization_seed?: string) {
 
+    console.log("creating exam instance...".bgBlue);
     const db_instance = await db_createLiveExamInstance(
       this.exam.exam_id, name, duration_seconds,
       uuidv5_namespace, randomization_seed
     );
+    console.log(db_instance)
     const exam_instance = await ExamInstanceServer.create(db_instance.exam_instance_uuid);
     asMutable(this.exam_instances).push(exam_instance);
     asMutable(this.exam_instances_by_uuid).set(exam_instance.exam_instance_uuid, exam_instance);

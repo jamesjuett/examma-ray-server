@@ -63,7 +63,7 @@ run_router.route("/generate/:exam_id/instances/:exam_instance_uuid").post(create
       return;
     }
 
-    exam_inst.regenerateALLExams();
+    exam_inst.regenerateAllExams();
     res.status(200).json("Exam generation started...");
   }
 }));

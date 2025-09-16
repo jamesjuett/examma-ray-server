@@ -342,7 +342,43 @@
     </div>
   </div>
 
-  
+  <div class="modal fade" id="student-settings-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="student-settings-modal-label">Student Settings</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form>
+            <div class="form-group">
+              <label for="student-settings-uniqname-input">Uniqname</label>
+              <input id="student-settings-uniqname-input" class="form-control" type="text" size="20" maxlength="100" style="font-family: monospace"
+                autocomplete="off" autocorrect="off" spellcheck="false" readonly
+              >
+            </div>
+            <div class="form-group">
+              <label for="student-settings-email-input">Email</label>
+              <input id="student-settings-email-input" class="form-control" type="email" size="30" maxlength="100"
+                autocomplete="off" autocorrect="off" spellcheck="false" readonly
+              >
+            </div>
+            <div class="form-group">
+              <label for="student-settings-window-input">Exam Window</label>
+              <select id="student-settings-window-input" class="form-control">
+              </select>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button type="button" id="student-settings-submit-button" class="btn btn-primary">Save changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
   
 
   <div class="modal fade" id="delete-exam-modal" tabindex="-1" role="dialog" aria-labelledby="delete-exam-modal-label" aria-hidden="true">

@@ -124,6 +124,7 @@ declare module "knex/types/tables" {
     student_email: string; // email that is allowed to take exam
     window_uuid?: string;
     force_open: boolean;
+    start_time?: Date; // timestamp
   }
 
   interface DB_Live_Submissions {
@@ -278,8 +279,8 @@ declare module "knex/types/tables" {
       //   All required, except window_uuid is optional (nullable)
       Omit<DB_Live_Exam_Assignments, "window_uuid"> & Partial<Pick<DB_Live_Exam_Assignments, "window_uuid">>,
       // Update Type
-      //   Only allowed to update window_uuid, name, force open
-      Partial<Pick<DB_Live_Exam_Assignments, "window_uuid" | "name" | "force_open">>
+      //   Only allowed to update window_uuid, name, force open, start_time
+      Partial<Pick<DB_Live_Exam_Assignments, "window_uuid" | "name" | "force_open" | "start_time">>
     >;
 
     live_submissions: Knex.CompositeTableType<
