@@ -649,6 +649,12 @@ exams_router
             // otherwise parse as a float. If that fails, NaN is als falsy and we default to undfined.
             duration_multiplier: (r.duration_multiplier && parseFloat(r.duration_multiplier)) || undefined
           }));
+
+          // convert uniqname and email strings to lowercase
+          cleaned_roster.forEach(r => {
+            r.uniqname = r.uniqname.toLowerCase();
+            r.student_email = r.student_email.toLowerCase();
+          });
           
           await exam_inst.updateRoster(cleaned_roster);
 
