@@ -643,7 +643,7 @@ exams_router
             uniqname: assertExists(r.uniqname, `Missing uniqname for roster entry with email ${JSON.stringify(r)}`),
             student_email: r.email ?? r.uniqname + "@umich.edu",
             name: r.name,
-            window_uuid: r.window_uuid,
+            window_uuid: r.window_uuid || undefined,
 
             // If it's undefined, empty string, or 0, we default to undefined (no multiplier),
             // otherwise parse as a float. If that fails, NaN is als falsy and we default to undfined.
