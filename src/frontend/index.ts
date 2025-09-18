@@ -1,7 +1,7 @@
 import axios from "axios";
 import { DB_Exams, DB_Live_Exam_Assignments, DB_Live_Exam_Instances } from "knex/types/tables";
 import { ExammaRayClient } from "./Application";
-import { ExamAssignmentInfo, ExamInstanceInfo, StudentFacingExamInfo } from "../rest_types";
+import { ExamAssignmentInfo, ExamInstanceInfo, StudentExamsResponse, StudentFacingExamInfo } from "../rest_types";
 
 export class IndexExammaRayApplication {
 
@@ -32,11 +32,13 @@ export class IndexExammaRayApplication {
           headers: {
             'Authorization': 'bearer ' + this.client.getBearerToken()
           }
-        })).data as StudentFacingExamInfo[];
+        })).data as StudentExamsResponse;
   
+        const server_now = response.now;
+        
         $("#examma-ray-live-exams-list").empty();
 
-        response.forEach(exam_info => {
+        response.exams.forEach(exam_info => {
           const assigned_exam = exam_info.assigned_exam;
           const exam_instance = exam_info.exam_instance;
           const exam_window = exam_info.window;
@@ -57,19 +59,19 @@ export class IndexExammaRayApplication {
                     ? `Open: ${new Date(exam_window.open_time).toLocaleString()}<br />Close: ${new Date(exam_window.close_time).toLocaleString()}`
                     : "Open: <span class=\"text-danger\">No window assigned</span><br />Close: <span class=\"text-danger\">No window assigned</span>"}
                   </p>
-                  ${renderExamButton(exam_info)}
+                  ${renderExamButton(server_now, exam_info)}
                   
                 </div>
               </div>
             </div>
           `)
         });
-
-        const next_open_close = response
+        
+        const next_open_close = response.exams
           .flatMap(e => [e.window?.open_time, e.window?.close_time])
           .filter(t => t !== undefined)
           .map(t => new Date(t))
-          .filter(t => t.getTime() > (new Date()).getTime()) // future only
+          .filter(t => t.getTime() > server_now) // future only
           .sort((a, b) => a.getTime() - b.getTime())[0];
 
         if (this.next_open_close_timeout !== undefined) {
@@ -80,7 +82,7 @@ export class IndexExammaRayApplication {
           this.next_open_close_timeout = window.setTimeout(() => {
             this.reloadExams();
             delete this.next_open_close_timeout
-          }, next_open_close.getTime() - (new Date()).getTime() + 1000);
+          }, next_open_close.getTime() - server_now + 1000);
         }
 
       }
@@ -95,7 +97,7 @@ export class IndexExammaRayApplication {
   }
 }
 
-function renderExamButton(exam_info: StudentFacingExamInfo) {
+function renderExamButton(server_now: number, exam_info: StudentFacingExamInfo) {
   if (exam_info.window === undefined) {
     return `<button class="btn btn-secondary" disabled><i class="bi bi-lock-fill"></i> Not Available</button>`;
   }
@@ -111,11 +113,10 @@ function renderExamButton(exam_info: StudentFacingExamInfo) {
   }
 
   // If outside window
-  const now = new Date();
-  if (now.getTime() < new Date(exam_info.window.open_time).getTime()) {
+  if (server_now < new Date(exam_info.window.open_time).getTime()) {
     return `<button class="btn btn-secondary" disabled><i class="bi bi-lock-fill"></i> Not Yet Open</button>`;
   }
-  else if (now.getTime() > new Date(exam_info.window.close_time).getTime()) {
+  else if (server_now > new Date(exam_info.window.close_time).getTime()) {
     if (exam_info.submission !== undefined) {
       return `<button class="btn btn-success" disabled><i class="bi bi-check-lg"></i> Submitted</button>`;
     }
@@ -127,7 +128,7 @@ function renderExamButton(exam_info: StudentFacingExamInfo) {
   // If duration has elapsed
   const duration_ms = exam_info.exam_instance.duration_seconds * exam_info.assigned_exam.duration_multiplier * 1000;
   const start_time = exam_info.assigned_exam.start_time ? new Date(exam_info.assigned_exam.start_time) : undefined;
-  if (start_time && start_time.getTime() + duration_ms < now.getTime()) {
+  if (start_time && start_time.getTime() + duration_ms < server_now) {
     if (exam_info.submission !== undefined) {
       return `<button class="btn btn-success" disabled><i class="bi bi-check-lg"></i> Submitted</button>`;
     }

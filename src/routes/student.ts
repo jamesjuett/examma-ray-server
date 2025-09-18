@@ -1,9 +1,10 @@
 import { Request, Response, Router } from "express";
 import { getJwtUserInfo } from "../auth/jwt_auth";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByEmail, db_getLiveExamInstanceByUuid, db_getStudentExamInfoByUuid, db_getStudentExamsInfoByEmail, db_getWindowByUuid, db_saveLiveExamSubmission } from "../db/db_live";
+import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getStudentExamsInfoByEmail, db_getWindowByUuid, db_saveLiveExamSubmission } from "../db/db_live";
 import { db_getUserByEmail } from "../db/db_user";
 import { ExamSessionInfo } from "../rest_types";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamUuid } from "./common";
+import { now } from "jquery";
 
 export const student_router = Router();
 student_router
@@ -14,7 +15,10 @@ student_router
     authorization: NO_AUTHORIZATION,
     handler: async (req: Request, res: Response) => {
       const userInfo = getJwtUserInfo(req);
-      return res.status(200).json(await db_getStudentExamsInfoByEmail(userInfo.email))
+      return res.status(200).json({
+        exams: await db_getStudentExamsInfoByEmail(userInfo.email),
+        now: Date.now()
+      })
     }
   }));
 
@@ -80,7 +84,7 @@ student_router.route("/exams/:exam_uuid/session")
           open_time: exam_window.open_time,
           close_time: exam_window.close_time,
         } : undefined,
-        now: new Date(),
+        now: Date.now(),
         duration_seconds: exam_instance.duration_seconds,
         force_open: exam_assn.force_open,
         duration_multiplier: exam_assn.duration_multiplier,

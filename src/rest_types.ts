@@ -49,11 +49,16 @@ export type StudentFacingExamInfo = {
   readonly submission?: Pick<SubmissionInfo, "created_at" | "updated_at">,
 };
 
+export type StudentExamsResponse = {
+  readonly exams: readonly StudentFacingExamInfo[],
+  readonly now: number, // Unix timestamp in milliseconds
+};
+
 export type ExamSessionInfo = {
   readonly exam_uuid: string,
   readonly exam_window?: Pick<WindowInfo, "name" | "open_time" | "close_time">,
   readonly start_time?: Date, // timestamp
-  readonly now: Date, // timestamp
+  readonly now: number; // Unix timestamp in milliseconds
   readonly duration_seconds: number,
   readonly force_open?: boolean,
   readonly duration_multiplier: number,
