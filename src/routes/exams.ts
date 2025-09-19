@@ -1,17 +1,14 @@
 import { parseExamSpecification, stringifyExamComponentSpecification } from "examma-ray";
-import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { Request, Response, Router } from "express";
+import { readFileSync } from "fs";
 import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import multer from "multer";
-import { requireAdmin } from "../auth/jwt_auth";
-import { db_getExams, db_getExamSubmissions, db_getOrCreateExam } from "../db/db_exams";
-import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
-import { db_getLiveExamInstancesByExamId } from "../db/db_live";
-import { readFileSync } from "fs";
-import { WindowInfo } from "../rest_types";
 import Papa from "papaparse";
-import { assert, assertExists } from "../util/util";
+import { requireAdmin } from "../auth/jwt_auth";
+import { db_getOrCreateExam } from "../db/db_exams";
+import { EXAMMA_RAY_GRADING_SERVER } from "../server";
+import { assertExists } from "../util/util";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
 
 // const upload = multer({
 //   storage: multer.diskStorage({

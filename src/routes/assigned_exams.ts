@@ -43,7 +43,8 @@ assigned_exams.route("/:exam_uuid")
         return res.status(400).send("Invalid exam_id or exam_instance_uuid");
       }
 
-      exam_inst.updateAssignedExamByUuid(exam_uuid, { window_uuid: exam_window });
+      return res.status(200).json(exam_inst.updateAssignedExamByUuid(exam_uuid, { window_uuid: exam_window }));
+      
     },
   }));
 

@@ -196,6 +196,21 @@ export class DashboardExammaRayGraderApplication {
       $("#run-generate-modal").modal("hide");
     });
     
+
+    $("#run-process-submissions-button").on("click", async () => {
+      let response = await axios({
+        url: `run/process_db_submissions/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
+        method: "POST",
+        headers: {
+          'Authorization': 'bearer ' + this.client.getBearerToken()
+        }
+      });
+
+      if (response.status !== 200) {
+        alert(response.data);
+      }
+    });
+    
     $("#run-grading-submit-button").on("click", async () => {
       const request: RunGradingRequest = {
         reports: $("#run-grading-input-reports").is(":checked"),
@@ -266,6 +281,17 @@ export class DashboardExammaRayGraderApplication {
     });
 
 
+    $("#student-settings-modal").on("show.bs.modal", () => {
+      $("#student-settings-submit-button").prop("disabled", true);
+    });
+  
+    $("#student-settings-modal input").on("input", () => {
+      $("#student-settings-submit-button").prop(
+        "disabled",
+        !($("#student-settings-duration-multiplier-input")[0] as HTMLInputElement).checkValidity()
+      );
+    });
+
     $("#student-settings-submit-button").on("click", async () => {
       await axios({
         url: `/api/assigned_exams/${$("#student-settings-modal").data("exam-uuid")}`,
@@ -274,6 +300,7 @@ export class DashboardExammaRayGraderApplication {
           exam_id: this.exam_info.exam_id,
           exam_instance_uuid: this.exam_instance_info.exam_instance_uuid,
           exam_window: $("#student-settings-window-input").val(),
+          duration_multiplier: parseFloat(""+$("#student-settings-duration-multiplier-input").val()),
         },
         headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken(),
@@ -282,6 +309,7 @@ export class DashboardExammaRayGraderApplication {
       
       $("#student-settings-modal").modal("hide");
     });
+
 
 
     $("#live-submission-viewer-view-button").on("click", async () => {
@@ -571,6 +599,7 @@ export class DashboardExammaRayGraderApplication {
         assert(assn);
         $("#student-settings-uniqname-input").val(assn.uniqname);
         $("#student-settings-email-input").val(assn.student_email);
+        $("#student-settings-duration-multiplier").val(assn.duration_multiplier);
         self.exam_windows.forEach(w => {
           $("#student-settings-window-input").append(`
             <option value="${w.window_uuid}" ${assn.window_uuid === w.window_uuid ? "selected" : ""}>${w.name}</option>

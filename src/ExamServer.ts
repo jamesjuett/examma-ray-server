@@ -367,6 +367,25 @@ export class ExamServer {
     // All question grading servers will need to reload new submission data from the DB
     await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
   }
+
+  public async processDBSubmissions(exam_instance_uuid: string) {
+    if (!this.exam_instances_by_uuid.has(exam_instance_uuid)) {
+      throw new Error(`No such exam instance ${exam_instance_uuid}`);
+    }
+    const worker = new Worker("./build/run/process_db_submissions.js", {
+      workerData: {
+        exam_id: this.exam.exam_id,
+        exam_instance_uuid: exam_instance_uuid,
+      }
+    });
+
+    await this.tasks.workerTask(worker, "submissions", `Preparing to process submissions for${this.exam.exam_id} instance ${exam_instance_uuid}...`);
+    this.nextEpoch();
+
+    // All question grading servers will need to reload new submission data from the DB
+    await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
+  
+  }
   
   public async deleteSubmissionByUuid(submission_uuid: string) {
 

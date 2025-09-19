@@ -68,6 +68,32 @@ run_router.route("/generate/:exam_id/instances/:exam_instance_uuid").post(create
   }
 }));
 
+run_router.route("/process_db_submissions/:exam_id/instances/:exam_instance_uuid").post(createRoute({
+  authorization: requireAdmin,
+  preprocessing: jsonBodyParser,
+  validation: [
+    validateParamExamId,
+    validateParamUuid("exam_instance_uuid"),
+  ],
+  handler: (req: Request, res: Response) => {
+
+    const exam_inst = EXAMMA_RAY_GRADING_SERVER
+      .getExamServer(req.params["exam_id"]);
+
+    if (!exam_inst) {
+      return res.sendStatus(404);
+    }
+
+    if (exam_inst.tasks.taskStatus["submissions"]) {
+      res.status(200).json("A submission processing task is already running. Please wait for it to finish.");
+      return;
+    }
+
+    exam_inst.processDBSubmissions(req.params["exam_instance_uuid"]);
+    res.status(200).json("Processing submissions started...");
+  }
+}));
+
 const participation_tasks = new ServerTasks<"generate_csv">();
 
 run_router.route("/participation/").post(createRoute({

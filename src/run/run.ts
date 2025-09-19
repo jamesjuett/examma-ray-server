@@ -19,6 +19,12 @@ export type WorkerData_ProcessSubmissions = {
   readonly files: readonly Express.Multer.File[],
 }
 
+export type WorkerData_ProcessDBSubmissions = {
+  readonly exam_id: string,
+  readonly exam_instance_uuid: string,
+}
+
+
 
 export type RunGradingRequest = {
   reports: boolean,
