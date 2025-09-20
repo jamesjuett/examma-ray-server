@@ -33,12 +33,19 @@ async function main() {
   const app = express();
 
   console.log("Creating routes...");
-  // Requests to output files allow authentication via a bearer
+  // Requests to /staff and /out allow authentication via a bearer
   // token stored in a cookie. These routes are used ONLY to serve
   // files via GET requests. None of these routes perform any state
   // changing actions or have side effects, so CSRF (which cookie
   // authentication would allow) is not a big concern.
   // THe relevant cookie is set with secure and sameSite=strict flags.
+  app.use('/staff',
+    cookieParser(),
+    passport.initialize(),
+    passport.authenticate('jwt-cookie', { session: false }),
+    requireStaff,
+    express.static("staff")
+  );
   app.use('/out',
     cookieParser(),
     passport.initialize(),

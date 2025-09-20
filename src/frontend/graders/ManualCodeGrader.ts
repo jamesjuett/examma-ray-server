@@ -195,7 +195,7 @@
 //       const client = await ExammaRayGraderClient.create();
 
 //       const question_response = await axios({
-//         url: `api/exams/${exam_id}/questions/${question_id}`,
+//         url: `/api/exams/${exam_id}/questions/${question_id}`,
 //         method: "GET",
 //         data: {},
 //         headers: {
@@ -247,7 +247,7 @@
 
 //     try {
 //       const ping_response = await axios({
-//         url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
+//         url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
 //         method: "POST",
 //         data: pingRequest,
 //         headers: {
@@ -442,7 +442,7 @@
 //   //   try {
 
 //   //     const rubric_response = await axios({
-//   //       url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/rubric`,
+//   //       url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/rubric`,
 //   //       method: "GET",
 //   //       data: {},
 //   //       headers: {
@@ -452,7 +452,7 @@
 //   //     const rubric = <ManualGradingRubricItem[]>rubric_response.data;
   
 //   //     const records_response = await axios({
-//   //       url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/records`,
+//   //       url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/records`,
 //   //       method: "GET",
 //   //       data: {},
 //   //       headers: {
@@ -552,7 +552,7 @@
 //   public async claimNextUngraded() {
 //     try {
 //       const response = await axios({
-//         url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/claim_next_ungraded`,
+//         url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/claim_next_ungraded`,
 //         method: "POST",
 //         data: <NextUngradedRequest>{
 //           client_uuid: this.client.client_uuid,
@@ -1501,7 +1501,7 @@
 
 // async function loadRubric(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
 //   const rubric_response = await axios({
-//     url: `api/manual_grading/${exam_id}/questions/${question_id}/rubric`,
+//     url: `/api/manual_grading/${exam_id}/questions/${question_id}/rubric`,
 //     method: "GET",
 //     data: {},
 //     headers: {
@@ -1513,7 +1513,7 @@
 
 // async function loadConfig(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
 //   const rubric_response = await axios({
-//     url: `api/manual_grading/${exam_id}/questions/${question_id}/config`,
+//     url: `/api/manual_grading/${exam_id}/questions/${question_id}/config`,
 //     method: "GET",
 //     data: {},
 //     headers: {
@@ -1525,7 +1525,7 @@
 
 // async function loadGradingRecords(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
 //   const records_response = await axios({
-//     url: `api/manual_grading/${exam_id}/questions/${question_id}/records`,
+//     url: `/api/manual_grading/${exam_id}/questions/${question_id}/records`,
 //     method: "GET",
 //     data: {},
 //     headers: {
@@ -1537,7 +1537,7 @@
 
 // async function loadSkins(client: ExammaRayGraderClient, exam_id: string, question_id: string) {
 //   const records_response = await axios({
-//     url: `api/manual_grading/${exam_id}/questions/${question_id}/skins`,
+//     url: `/api/manual_grading/${exam_id}/questions/${question_id}/skins`,
 //     method: "GET",
 //     data: {},
 //     headers: {

@@ -11,6 +11,7 @@ import { ActiveQuestionGraders, GradingGroupReassignment, isMeaningfulManualGrad
 import { asMutable, assert, assertFalse, assertNever } from "../util/util";
 import { ExammaRayClient } from "./Application";
 import "./code-grader.css";
+import { group } from "console";
 
 
 
@@ -129,6 +130,13 @@ export class ManualGraderApp {
     $(".examma-ray-autograde-button").on("click", async () => this.autograde());
 
     $("#examma-ray-next-ungraded-button").on("click", async() => this.claimNextUngraded());
+
+    $(".examma-ray-active-graders").on("click", ".examma-ray-active-grader-avatar", (e) => {
+        let jump_to = this.active_graders.graders[$(e.currentTarget).data("client-uuid")].group_uuid;
+        if (jump_to) {
+          this.openGroup(jump_to);
+        }
+      })
   }
 
   private initHotkeys() {
@@ -164,7 +172,7 @@ export class ManualGraderApp {
       const client = await ExammaRayClient.create();
 
       const question_response = await axios({
-        url: `api/exams/${exam_id}/questions/${question_id}`,
+        url: `/api/exams/${exam_id}/questions/${question_id}`,
         method: "GET",
         data: {},
         headers: {
@@ -216,7 +224,7 @@ export class ManualGraderApp {
 
     try {
       const ping_response = await axios({
-        url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
+        url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
         method: "POST",
         data: pingRequest,
         headers: {
@@ -277,14 +285,9 @@ export class ManualGraderApp {
       .map(([client_uuid, grader]) => ({client_uuid: client_uuid, ...grader}))
       .sort((g1, g2) => g1.email.localeCompare(g2.email))
       .forEach(grader => {
-      $(`<div style="display: inline-block;" data-toggle="tooltip" data-placement="bottom" title="${grader.email}">
+      $(`<div class="examma-ray-active-grader-avatar" style="display: inline-block;" data-toggle="tooltip" data-placement="bottom" title="${grader.email}" data-client-uuid="${grader.client_uuid}">
         ${avatar(grader.email, { size: ACTIVE_GRADER_AVATAR_SIZE })}
-      </div>`).appendTo(avatarsElem).on("click", () => {
-        let jump_to = this.active_graders.graders[grader.client_uuid].group_uuid;
-        if (jump_to) {
-          this.openGroup(jump_to);
-        }
-      });
+      </div>`).appendTo(avatarsElem);
     });
     $(".examma-ray-active-graders div").tooltip();
   }
@@ -411,7 +414,7 @@ export class ManualGraderApp {
   //   try {
 
   //     const rubric_response = await axios({
-  //       url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/rubric`,
+  //       url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/rubric`,
   //       method: "GET",
   //       data: {},
   //       headers: {
@@ -421,7 +424,7 @@ export class ManualGraderApp {
   //     const rubric = <ManualGradingRubricItem[]>rubric_response.data;
   
   //     const records_response = await axios({
-  //       url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/records`,
+  //       url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/records`,
   //       method: "GET",
   //       data: {},
   //       headers: {
@@ -515,7 +518,7 @@ export class ManualGraderApp {
   public async claimNextUngraded() {
     try {
       const response = await axios({
-        url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/claim_next_ungraded`,
+        url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/claim_next_ungraded`,
         method: "POST",
         data: <NextUngradedRequest>{
           client_uuid: this.client.client_uuid,
@@ -1139,29 +1142,31 @@ class GroupThumbnailsPanel {
   }
 
   private initComponents() {
-    
-    const self = this;
 
-    $("#examma-ray-submissions-uniqname-filter").on("input", function() {
-      self.setSubmissionsUniqnameFilter($(this).val()?.toString() ?? "")
+    $("#examma-ray-submissions-uniqname-filter").on("input", (e) => {
+      this.setSubmissionsUniqnameFilter($(e.currentTarget).val()?.toString() ?? "")
     });
 
-    $(".examma-ray-submissions-filter-button").on("click", function() {
+    $(".examma-ray-submissions-filter-button").on("click", (e) => {
       $(".examma-ray-submissions-filter-button").removeClass("btn-primary").addClass("btn-default");
-      $(this).removeClass("btn-default").addClass("btn-primary");
-      self.setSubmissionsFilterCriterion($(this).data("filter-criterion"))
+      $(e.currentTarget).removeClass("btn-default").addClass("btn-primary");
+      this.setSubmissionsFilterCriterion($(e.currentTarget).data("filter-criterion"))
     });
   
-    $(".examma-ray-submissions-sort-button").on("click", function() {
+    $(".examma-ray-submissions-sort-button").on("click", (e) => {
       $(".examma-ray-submissions-sort-button").removeClass("btn-primary").addClass("btn-default");
-      $(this).removeClass("btn-default").addClass("btn-primary");
-      self.setSubmissionsSortCriterion($(this).data("sort-criterion"))
+      $(e.currentTarget).removeClass("btn-default").addClass("btn-primary");
+      this.setSubmissionsSortCriterion($(e.currentTarget).data("sort-criterion"))
     });
   
-    $(".examma-ray-submissions-sort-ordering-button").on("click", function() {
+    $(".examma-ray-submissions-sort-ordering-button").on("click", (e) => {
       $(".examma-ray-submissions-sort-ordering-button").removeClass("btn-primary").addClass("btn-default");
-      $(this).removeClass("btn-default").addClass("btn-primary");
-      self.setSubmissionsSortOrdering($(this).data("sort-ordering"));
+      $(e.currentTarget).removeClass("btn-default").addClass("btn-primary");
+      this.setSubmissionsSortOrdering($(e.currentTarget).data("sort-ordering"));
+    });
+
+    $(".examma-ray-group-thumbnails").on("click", ".examma-ray-grading-group-thumbnail", (e) => {
+      this.app.openGroup($(e.currentTarget).data("group-uuid"));
     });
   }
 
@@ -1345,14 +1350,11 @@ class GroupThumbnailOutlet {
     this.group = group;
 
     elem.addClass("panel panel-default examma-ray-grading-group-thumbnail");
+    elem.data("group-uuid", group.group_uuid);
     this.createContent();
     this.badgesElem = this.elem.find(".group-thumbnail-badges");
     this.avatarsElem = this.elem.find(".group-thumbnail-avatars");
     this.refreshBadges();
-    
-    elem.on("click", () => {
-      this.app.openGroup(group.group_uuid);
-    });
   }
 
   public dispose() {
@@ -1426,7 +1428,7 @@ class GroupThumbnailOutlet {
 
 async function loadRubric(client: ExammaRayClient, exam_id: string, question_id: string) {
   const rubric_response = await axios({
-    url: `api/manual_grading/${exam_id}/questions/${question_id}/rubric`,
+    url: `/api/manual_grading/${exam_id}/questions/${question_id}/rubric`,
     method: "GET",
     data: {},
     headers: {
@@ -1438,7 +1440,7 @@ async function loadRubric(client: ExammaRayClient, exam_id: string, question_id:
 
 async function loadConfig(client: ExammaRayClient, exam_id: string, question_id: string) {
   const rubric_response = await axios({
-    url: `api/manual_grading/${exam_id}/questions/${question_id}/config`,
+    url: `/api/manual_grading/${exam_id}/questions/${question_id}/config`,
     method: "GET",
     data: {},
     headers: {
@@ -1450,7 +1452,7 @@ async function loadConfig(client: ExammaRayClient, exam_id: string, question_id:
 
 async function loadGradingRecords(client: ExammaRayClient, exam_id: string, question_id: string) {
   const records_response = await axios({
-    url: `api/manual_grading/${exam_id}/questions/${question_id}/records`,
+    url: `/api/manual_grading/${exam_id}/questions/${question_id}/records`,
     method: "GET",
     data: {},
     headers: {
@@ -1462,7 +1464,7 @@ async function loadGradingRecords(client: ExammaRayClient, exam_id: string, ques
 
 async function loadSkins(client: ExammaRayClient, exam_id: string, question_id: string) {
   const records_response = await axios({
-    url: `api/manual_grading/${exam_id}/questions/${question_id}/skins`,
+    url: `/api/manual_grading/${exam_id}/questions/${question_id}/skins`,
     method: "GET",
     data: {},
     headers: {

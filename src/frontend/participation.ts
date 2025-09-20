@@ -23,7 +23,7 @@ export class StaffExammaRayGraderApplication {
       try {
   
         let response = await axios({
-          url: `api/exams`,
+          url: `/api/exams`,
           method: "GET",
           data: {},
           headers: {
@@ -67,7 +67,7 @@ async function main() {
     const formData = new FormData();
     formData.append("exam_spec", files[0]);
     await axios({
-      url: `api/exams`,
+      url: `/api/exams`,
       method: "POST",
       data: formData,
       headers: {
@@ -81,7 +81,7 @@ async function main() {
   $("#run-generate-participation-csv-button").on("click", async () => {
     alert("hi");
     let response = await axios({
-      url: `run/participation`,
+      url: `/run/participation`,
       method: "POST",
       headers: {
         'Authorization': 'bearer ' + app.client.getBearerToken()

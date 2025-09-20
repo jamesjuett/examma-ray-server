@@ -30,7 +30,7 @@ export class LiveSubmissionViewer {
     asMutable(this).live_exam = live_exam;
 
     const manifest_response = await axios({
-      url: `api/assigned_exams/${live_exam.exam_uuid}/manifest`,
+      url: `/api/assigned_exams/${live_exam.exam_uuid}/manifest`,
       method: "GET",
       headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken()
@@ -45,7 +45,7 @@ export class LiveSubmissionViewer {
     }
     
     const submission_response = await axios({
-      url: `api/assigned_exams/${this.live_exam.exam_uuid}/submission`,
+      url: `/api/assigned_exams/${this.live_exam.exam_uuid}/submission`,
       method: "GET",
       headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken()

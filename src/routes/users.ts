@@ -1,5 +1,5 @@
 import { Request, Response, Router } from "express";
-import { getJwtUserInfo } from "../auth/jwt_auth";
+import { getJwtUserInfo, isAdmin, isStaff } from "../auth/jwt_auth";
 import { db_getUserByEmail } from "../db/db_user";
 import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION } from "./common";
 
@@ -19,7 +19,10 @@ users_router.route("/me")
       let user = await db_getUserByEmail(userInfo.email);
       if (user) {
         res.status(200);
-        res.json(user);
+        res.json(Object.assign(user,{
+          is_staff: isStaff(user.email),
+          is_admin: isAdmin(user.email)
+        }));
       }
       else {
         res.status(404);

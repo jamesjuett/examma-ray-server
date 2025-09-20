@@ -182,7 +182,7 @@ export class DashboardExammaRayGraderApplication {
 
     $("#run-generate-submit-button").on("click", async () => {
       let response = await axios({
-        url: `run/generate/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
+        url: `/run/generate/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
         method: "POST",
         headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken()
@@ -199,7 +199,7 @@ export class DashboardExammaRayGraderApplication {
 
     $("#run-process-submissions-button").on("click", async () => {
       let response = await axios({
-        url: `run/process_db_submissions/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
+        url: `/run/process_db_submissions/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
         method: "POST",
         headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken()
@@ -220,7 +220,7 @@ export class DashboardExammaRayGraderApplication {
       };
 
       let response = await axios({
-        url: `run/grade/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
+        url: `/run/grade/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
         method: "POST",
         data: request,
         headers: {
@@ -285,7 +285,7 @@ export class DashboardExammaRayGraderApplication {
       $("#student-settings-submit-button").prop("disabled", true);
     });
   
-    $("#student-settings-modal input").on("input", () => {
+    $("#student-settings-modal form").on("input", ":input", () => {
       $("#student-settings-submit-button").prop(
         "disabled",
         !($("#student-settings-duration-multiplier-input")[0] as HTMLInputElement).checkValidity()
@@ -592,7 +592,7 @@ export class DashboardExammaRayGraderApplication {
         self.sendPing();
       });
       
-      $(".examma-ray-students-list .student-settings-modal-open").on("click", async function() {
+      $(".examma-ray-students-list").on("click", ".student-settings-modal-open", async function() {
 
         $("#student-settings-modal").data("exam-uuid", $(this).data("exam-uuid"));
         const assn = self.assigned_exams_by_uuid.get($("#student-settings-modal").data("exam-uuid"));

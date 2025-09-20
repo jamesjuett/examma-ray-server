@@ -11,6 +11,12 @@ export class IndexExammaRayApplication {
 
   private constructor(client: ExammaRayClient) {
     this.client = client;
+    if (this.client.currentUser) {
+      $("#log-in-message").hide();
+      if (this.client.currentUser.is_staff) {
+        $(".staff-only").show();
+      }
+    }
   }
 
   public static async create() {

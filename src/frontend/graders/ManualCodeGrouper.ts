@@ -186,7 +186,7 @@
 //       const client = await ExammaRayGraderClient.create();
 
 //       const question_response = await axios({
-//         url: `api/exams/${exam_id}/questions/${question_id}`,
+//         url: `/api/exams/${exam_id}/questions/${question_id}`,
 //         method: "GET",
 //         data: {},
 //         headers: {
@@ -235,7 +235,7 @@
 //     this.local_changes.length = 0; // clear the array
 
 //     const ping_response = await axios({
-//       url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
+//       url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/ping`,
 //       method: "POST",
 //       data: pingRequest,
 //       headers: {
@@ -456,7 +456,7 @@
 //     try {
 
 //       const rubric_response = await axios({
-//         url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/rubric`,
+//         url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/rubric`,
 //         method: "GET",
 //         data: {},
 //         headers: {
@@ -466,7 +466,7 @@
 //       const rubric = <ManualGradingRubricItem[]>rubric_response.data;
   
 //       const records_response = await axios({
-//         url: `api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/records`,
+//         url: `/api/manual_grading/${this.exam_id}/questions/${this.question.question_id}/records`,
 //         method: "GET",
 //         data: {},
 //         headers: {
@@ -1042,7 +1042,7 @@
 
 // async function loadRubric(client: ExammaRayGraderClient, exam_id: string, question_id: string, ) {
 //   const rubric_response = await axios({
-//     url: `api/manual_grading/${exam_id}/questions/${question_id}/rubric`,
+//     url: `/api/manual_grading/${exam_id}/questions/${question_id}/rubric`,
 //     method: "GET",
 //     data: {},
 //     headers: {
@@ -1054,7 +1054,7 @@
 
 // async function loadGradingRecords(client: ExammaRayGraderClient, exam_id: string, question_id: string, ) {
 //   const records_response = await axios({
-//     url: `api/manual_grading/${exam_id}/questions/${question_id}/records`,
+//     url: `/api/manual_grading/${exam_id}/questions/${question_id}/records`,
 //     method: "GET",
 //     data: {},
 //     headers: {

@@ -101,3 +101,13 @@ function requireAuthorization(group: Set<string>) {
 
 export const requireStaff = requireAuthorization(STAFF);
 export const requireAdmin = requireAuthorization(ADMIN);
+
+
+
+export function isStaff(email: string) {
+  return STAFF.has(email);
+}
+
+export function isAdmin(email: string) {
+  return ADMIN.has(email);
+}

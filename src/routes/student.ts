@@ -1,5 +1,5 @@
 import { Request, Response, Router } from "express";
-import { getJwtUserInfo } from "../auth/jwt_auth";
+import { getJwtUserInfo, isAdmin, isStaff } from "../auth/jwt_auth";
 import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getStudentExamsInfoByEmail, db_getWindowByUuid, db_saveLiveExamSubmission } from "../db/db_live";
 import { db_getUserByEmail } from "../db/db_user";
 import { ExamSessionInfo } from "../rest_types";
@@ -32,7 +32,10 @@ student_router.route("/users/me")
       let user = await db_getUserByEmail(userInfo.email);
       if (user) {
         res.status(200);
-        res.json(user);
+        res.json(Object.assign(user,{
+          is_staff: isStaff(user.email),
+          is_admin: isAdmin(user.email)
+        }));
       }
       else {
         res.status(404);

@@ -3,15 +3,15 @@ const path = require('path');
 module.exports = {
   mode: "production",
   entry: {
-    'index': './src/frontend/index',
-    'staff': './src/frontend/staff',
-    'participation': './src/frontend/participation',
-    'dashboard': './src/frontend/dashboard',
-    'manual-code-grader': './src/frontend/manual-code-grader',
-    'manual-generic-grader': './src/frontend/manual-generic-grader',
+    'public/js/index': './src/frontend/index',
+    'staff/js/staff': './src/frontend/staff',
+    'staff/js/participation': './src/frontend/participation',
+    'staff/js/dashboard': './src/frontend/dashboard',
+    'staff/js/manual-code-grader': './src/frontend/manual-code-grader',
+    'staff/js/manual-generic-grader': './src/frontend/manual-generic-grader',
   },
   output: {
-    path: path.join(__dirname, '/public/js/'),
+    path: path.join(__dirname, '/'),
     filename: '[name].js',
     libraryTarget: 'umd',
     library: 'ExammaRay',
