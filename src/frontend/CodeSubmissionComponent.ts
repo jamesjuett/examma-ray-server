@@ -204,15 +204,23 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
       }
 
       let matchingGroup = equivalenceGroups.find(group => {
-
+        const first_group_sub = group.submissions[0];
         // Only group blank submissions with other blank submissions
-        if ( (group.submissions[0].submission === "") !== (sub.submission === "")) {
+        if ( (first_group_sub.submission === "") !== (sub.submission === "")) {
           return false;
         }
         
+        if (!group.repProgram) {
+          try {
+            group.repProgram = new SimpleProgram(this.applyHarness(first_group_sub));
+          }
+          catch(e) {
+
+          }
+        }
         let rep = group.repProgram;
         if (!rep) { return false; }
-        let repFunc = getFunc(rep, this.getGroupingFunctionName(group.submissions[0]));
+        let repFunc = getFunc(rep, this.getGroupingFunctionName(first_group_sub));
         return repFunc && getFunc(p, this.getGroupingFunctionName(sub))!.isSemanticallyEquivalent(repFunc, {});
       });
       return matchingGroup;
@@ -280,6 +288,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
         }
       }
 
+      // check a local variable in main() to see if it is truthy
       const localValRegex = /AG-MAIN-LOCAL\(([a-zA-Z_]+[a-zA-Z0-9_]*), *([a-zA-Z]+)\)/i;
       let localValMatch = ri.description.match(localValRegex);
       if(localValMatch) {

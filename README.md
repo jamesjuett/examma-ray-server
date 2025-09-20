@@ -32,7 +32,7 @@ Be careful about using seeds. Running them will delete existing data in the data
 Make sure to include the line `import "../db_types"` at the top of any new seed file (after it is auto-generated) so that you get typescript support.
 
 ### Backup/Restore
-sudo docker exec 450387fc6053 pg_dump -U exammaray -F t exammaray > ~/db_backup_9_18.tar
+docker exec 450387fc6053 pg_dump -U exammaray -F t exammaray > ~/db_backup_9_18.tar
 
 pg_restore -c --host 127.0.0.1 -U exammaray -d exammaray -v "db_backup_9_18.tar" -W
 

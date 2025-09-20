@@ -1,4 +1,4 @@
-import { BLANK_SUBMISSION, fill_response, parse_submission } from "examma-ray/dist/response/responses";
+import { BLANK_SUBMISSION, fill_response, parse_submission, validate_submission } from "examma-ray/dist/response/responses";
 import { Program } from "lobster-vis/dist/js/core/compilation/Program";
 import { v4 as uuidv4 } from "uuid";
 import { ManualGradingGroupRecord, ManualGradingSubmission } from "../manual_grading";
@@ -52,10 +52,15 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
 
     studentSubmissionElem.html(this.app.question.renderResponse(uuidv4(), skin));
     const parsed = parse_submission(this.app.question.response.kind, sub.submission);
+    if (parsed.validity === "malformed") {
+      studentSubmissionElem.append("<br /><span class='text-danger'>[[MALFORMED SUBMISSION]]</span>");
+      return;
+    }
+    const validated = validate_submission(this.app.question.response, parsed);
     fill_response(
       studentSubmissionElem,
       this.app.question.response.kind,
-      parsed.validity === "viable" ? parsed : BLANK_SUBMISSION()
+      validated.validity === "viable" ? validated : BLANK_SUBMISSION()
     );
 
     if (sampleSolution) {

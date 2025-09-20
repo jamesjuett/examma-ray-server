@@ -14,7 +14,7 @@ import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_
 import { RATE_LIMITED_POST_MESSAGE } from "./common";
 import { WorkerData_Grade } from "./run";
 import { db_getLiveExamSubmissionByUuid } from "../db/db_live";
-import { isTransparentExamManifest } from "examma-ray/dist/core/submissions";
+import { ExamSubmission, isTransparentExamManifest } from "examma-ray/dist/core/submissions";
 import { assert } from "../util/util";
 
 const workerData: WorkerData_Grade = workerDataUntyped;
@@ -99,7 +99,7 @@ async function main() {
         console.log(`No submission found for ${exam_assn.uniqname} (${exam_assn.exam_uuid})`);
         return undefined;
       }
-      const submission = parseExamSubmission(db_submission.submission);
+      const submission = db_submission.submission as unknown as ExamSubmission;
       return fillManifest(manifest, submission);
     }
     catch(e) {

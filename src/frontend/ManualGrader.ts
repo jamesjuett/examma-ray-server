@@ -556,8 +556,6 @@ export class ManualGraderApp {
 
     // let equivalenceGroups : (ManualGradingGroupRecord & { repProgram?: Program })[] = [];
 
-    // Create a set of single-submission groups with the first from each original group
-    // THAT HAS A GRADING RESULT while all remaining submissions go into a list.
     let submissionsToPlace : ManualGradingSubmission[] = [];
     let newGroups : (ManualGradingGroupRecord & { repProgram?: Program })[] = [];
     Object.values(this.grading_records.groups).forEach(group => {
