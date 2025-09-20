@@ -108,6 +108,9 @@ async function main() {
   // (does not require prior authentication)
   app.use("/auth", auth_router);
 
+  // Serve static files out of public
+  app.use(express.static("public"));
+
   // Swagger API docs
   // app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
