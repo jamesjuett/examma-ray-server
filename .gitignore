@@ -112,6 +112,7 @@ secrets/*
 certs/
 public/*
 !public/.gitkeep
+staff/js/*
 data/
 out/
 uploads/
