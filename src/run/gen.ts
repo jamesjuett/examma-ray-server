@@ -23,6 +23,7 @@ async function main() {
         v5_namespace: workerData.uuidv5_namespace,
       },
       frontend_js_path: "js",
+      assets_bundle_dir: `data/${exam_id}/assets/`,
       seed: workerData.randomization_seed,
     },
     RATE_LIMITED_POST_MESSAGE(),

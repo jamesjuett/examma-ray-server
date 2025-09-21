@@ -129,9 +129,9 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
     if (this.app.question.isKind("fill_in_the_blank")) {
       let parsed = parse_submission("fill_in_the_blank", sub.submission);
       if (parsed.validity !== "malformed") {
-        parsed = validate_submission(this.app.question.response, parsed);
-        if (parsed.validity === "viable") {
-          parsed.encoding.forEach((blankSub, i) => {
+        const validated = validate_submission(this.app.question.response, parsed);
+        if (validated.validity === "viable") {
+          validated.encoding.forEach((blankSub, i) => {
             code = code.replace(`{{submission[${i}]}}`, blankSub);
           });
         }

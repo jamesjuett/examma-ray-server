@@ -395,6 +395,7 @@ export class ManualGraderApp {
       if (this.currentGroup) {
         this.groupGrader.onGroupSubmissionsChanged(remote_grader_email);
       }
+      this.updateGradingProgressBar();
     }
     else {
       return assertNever(op);

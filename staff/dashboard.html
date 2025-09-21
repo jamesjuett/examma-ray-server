@@ -175,6 +175,7 @@
           <button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#upload-roster-modal">Upload Exam Roster</button>
           <button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#run-generate-modal">Generate Exams</button>
           <button id = "run-process-submissions-button" type="button" class="btn btn-sm btn-success" >Process Submissions</button>
+          <button type="button" class="btn btn-sm btn-success" data-toggle="modal" data-target="#exam-content-modal">Exam Content</button>
         </div>
 
         <h3>Students</h3>
@@ -300,7 +301,55 @@
     </div>
   </div>
 
-
+  <!-- Exam Content Modal -->
+  <!-- Allows updating exam spec file and uploading assets bundle -->
+  <div class="modal fade" id="exam-content-modal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><b>Exam Content</b></h5> 
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>
+            <b>Exam Specification</b><br />
+            You may upload a new exam specification file to modify the structure or content of the exam.
+            If the exam has already been given, changes may still be made to question descriptions, sample solutions,
+            grader specifications, etc. but should NOT be made to the structure of the exam.
+          </p>
+          <div class="form-group-horizontal row">
+            <div class="col-auto">
+              <button type="button" class="btn btn-sm btn-success" id="exam-content-exam-spec-button" disabled><i class="bi bi-file-check"></i> Uploaded</button>
+            </div>
+            <div class="col-auto">
+              <input class="form-control-file" id="exam-content-exam-spec-file-input" type="file" name="spec" />
+            </div>
+          </div>
+          <hr />
+          <p>
+            <b>Assets Bundle</b><br />
+            You may upload a zip file containing any assets (images, data files, etc.) needed for the exam.
+            The zip file should contain the files at the top level (i.e. not within a folder).
+            If an assets bundle has already been uploaded, it will be used in place of any assets included in the exam specification.
+            If you upload a new assets bundle, it will replace any existing bundle.
+          </p>
+          <div class="form-group-horizontal row">
+            <div class="col-auto">
+              <button type="button" class="btn btn-sm btn-success" id="exam-content-assets-bundle-button" disabled><i class="bi bi-file-check"></i> Uploaded</button>
+            </div>
+            <div class="col-auto">
+              <input class="form-control-file" id="exam-content-assets-bundle-file-input" type="file" name="assets" />
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
   
   <div class="modal fade" id="change_uuidv5_namespace-modal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog" role="document">

@@ -338,6 +338,10 @@ export class ExamServer {
     );
   }
 
+  public async updateAssets() {
+    // Nothing to do for now
+  }
+
   public async gradeAllExams(run_request: RunGradingRequest) {
     
     console.log(run_request.reports ? "Grading...".bgBlue : "Generating grading reports...".bgBlue);

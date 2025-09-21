@@ -249,35 +249,65 @@ export class DashboardExammaRayGraderApplication {
       $("#exam-deleted-modal").modal({show: true, backdrop: "static"});
     });
 
-    $("#specification-exam-spec-file-input").on("change", () => {
+    $("#exam-content-exam-spec-file-input").on("change", () => {
       
-      let files = (<HTMLInputElement>$("#specification-exam-spec-file-input")[0]).files;
+      let files = (<HTMLInputElement>$("#exam-content-exam-spec-file-input")[0]).files;
       if (files && files.length > 0) {
         this.considerSpecFile(files[0]);
       }
       else {
-        $("#specification-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
+        $("#exam-content-exam-spec-button").prop("disabled", true).removeClass("btn-warning btn-danger").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
       }
     });
 
-    $("#specification-exam-spec-button").on("click", async () => {
-      const formData = new FormData();
-      let files = (<HTMLInputElement>$("#specification-exam-spec-file-input")[0]).files;
+    $("#exam-content-exam-spec-button").on("click", async () => {
+      let files = (<HTMLInputElement>$("#exam-content-exam-spec-file-input")[0]).files;
       if (!files || !files[0]) {
         return;
       }
+      const formData = new FormData();
       formData.append("exam_spec", files[0]);
       await axios({
-        url: `/api/exams`,
-        method: "POST",
+        url: `/api/exams/${this.exam_info.exam_id}/spec`,
+        method: "PUT",
         data: formData,
         headers: {
           'Authorization': 'bearer ' + this.client.getBearerToken(),
         },
       });
       
-      $("#specification-exam-spec-file-input").val("");
-      $("#specification-exam-spec-button").prop("disabled", true).removeClass("btn-warning").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
+      $("#exam-content-exam-spec-file-input").val("");
+      $("#exam-content-exam-spec-button").prop("disabled", true).removeClass("btn-warning btn-danger").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
+    });
+
+    $("#exam-content-assets-bundle-file-input").on("change", () => {
+      let files = (<HTMLInputElement>$("#exam-content-assets-bundle-file-input")[0]).files;
+      if (files && files.length > 0) {
+        this.considerAssetsBundleFile(files[0]);
+      }
+      else {
+        $("#exam-content-assets-bundle-button").prop("disabled", true).removeClass("btn-warning btn-danger").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
+      }
+    });
+
+    $("#exam-content-assets-bundle-button").on("click", async () => {
+      let files = (<HTMLInputElement>$("#exam-content-assets-bundle-file-input")[0]).files;
+      if (!files || !files[0]) {
+        return;
+      }
+      const formData = new FormData();
+      formData.append("assets_bundle", files[0]);
+      await axios({
+        url: `/api/exams/${this.exam_info.exam_id}/assets`,
+        method: "PUT",
+        data: formData,
+        headers: {
+          'Authorization': 'bearer ' + this.client.getBearerToken(),
+        },
+      });
+
+      $("#exam-content-assets-bundle-file-input").val("");
+      $("#exam-content-assets-bundle-button").prop("disabled", true).removeClass("btn-warning btn-danger").addClass("btn-success").html('<i class="bi bi-file-check"></i> Uploaded');
     });
 
 
@@ -350,6 +380,7 @@ export class DashboardExammaRayGraderApplication {
     reader.readAsText(file);
     reader.onload = () => {
       
+      $("#exam-content-exam-spec-button").prop("disabled", true).removeClass("btn-success btn-warning").addClass("btn-danger").html('<i class="bi bi-file-x"></i> Invalid File');
       const original_exam = this.exam;
       const new_exam = Exam.create(parseExamSpecification(<string>reader.result));
       if (original_exam) {
@@ -381,12 +412,22 @@ export class DashboardExammaRayGraderApplication {
         })
       }
 
-      $("#specification-exam-spec-button").prop("disabled", false).removeClass("btn-success").addClass("btn-warning").html('<i class="bi bi-file-arrow-up"></i> Upload');
+      $("#exam-content-exam-spec-button").prop("disabled", false).removeClass("btn-success btn-danger").addClass("btn-warning").html('<i class="bi bi-file-arrow-up"></i> Upload');
     };
     reader.onerror = () => {
       alert(reader.error);
     }
   }
+
+  private considerAssetsBundleFile(file: File) {
+    if (file.name.endsWith(".zip")) {
+      $("#exam-content-assets-bundle-button").prop("disabled", false).removeClass("btn-danger btn-success").addClass("btn-warning").html('<i class="bi bi-file-arrow-up"></i> Upload');
+    }
+    else {
+      $("#exam-content-assets-bundle-button").prop("disabled", true).removeClass("btn-success btn-warning").addClass("btn-danger").html('<i class="bi bi-file-x"></i> Invalid File');
+    }
+  }
+
 
   private async checkTaskStatus() {
 

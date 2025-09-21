@@ -1,7 +1,7 @@
 import { parseExamSpecification, stringifyExamComponentSpecification } from "examma-ray";
 import { Request, Response, Router } from "express";
 import { readFileSync } from "fs";
-import { mkdir, readFile, rm, writeFile } from "fs/promises";
+import { access, mkdir, readFile, rename, rm, stat, writeFile } from "fs/promises";
 import multer from "multer";
 import Papa from "papaparse";
 import { requireAdmin } from "../auth/jwt_auth";
@@ -9,6 +9,7 @@ import { db_getOrCreateExam } from "../db/db_exams";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { assertExists } from "../util/util";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamExammaRayId, validateParamUuid } from "./common";
+import unzipper from "unzipper";
 
 // const upload = multer({
 //   storage: multer.diskStorage({
@@ -148,9 +149,104 @@ exams_router
       }
       res.status(200).send(stringifyExamComponentSpecification(exam_server.exam.spec));
     }
+  }))
+  .put(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: requireAdmin,
+    handler: [
+      upload.single("exam_spec"),
+      async (req: Request, res: Response) => {
+
+        if (!req.file) {
+          return res.sendStatus(400);
+        }
+
+        const uploaded_filepath = `uploads/${req.file?.filename}`;
+
+        try {
+          const new_exam_spec = parseExamSpecification(await readFile(uploaded_filepath, "utf8"));
+          
+          if (new_exam_spec.exam_id !== req.params["exam_id"]) {
+            return res.status(400).send("Exam ID in URL does not match exam ID in uploaded spec");
+          }
+  
+          const existing_exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(new_exam_spec.exam_id);
+          if (!existing_exam_server) {
+            return res.sendStatus(404);
+          }
+  
+          await writeFile(`data/${new_exam_spec.exam_id}/exam-spec.json`, stringifyExamComponentSpecification(new_exam_spec), "utf8");
+          
+          await existing_exam_server.updateSpec(new_exam_spec);
+
+          return res.sendStatus(204);
+        }
+        finally {
+          await rm(uploaded_filepath, { force: true });
+        }
+      }
+    ]
   }));
 
 
+exams_router
+  .route("/:exam_id/assets")
+  .put(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamExammaRayId("exam_id")
+    ],
+    authorization: requireAdmin,
+    handler: [
+      upload.single("assets_bundle"),
+      async (req: Request, res: Response) => {
+
+        if (!req.file) {
+          return res.sendStatus(400);
+        }
+
+        const uploaded_filepath = `uploads/${req.file?.filename}`;
+        
+        try {
+          if (!req.file.originalname.toLowerCase().endsWith(".zip")) {
+            return res.status(400).send("Uploaded file must be a .zip file");
+          }
+
+          const exam_id = req.params["exam_id"];
+          const exam_server = EXAMMA_RAY_GRADING_SERVER.getExamServer(exam_id);
+          if (!exam_server) {
+            return res.sendStatus(404);
+          }
+
+          // extract zip to data/<exam_id>/assets
+          await rm(`data/${exam_id}/assets/`, { recursive: true, force: true });
+          await mkdir(`data/${exam_id}/assets/`, { recursive: true });
+          const dir = await unzipper.Open.file(uploaded_filepath);
+          await dir.extract({ path: `data/${exam_id}/assets/` });
+
+          // if the user uploaded a zip containing a top-level "assets" directory,
+          // we'll end up with a nested "assets/assets" directory. If so, fit it.
+          try {
+            await access(`data/${exam_id}/assets/assets`);
+            await rename(`data/${exam_id}/assets/assets`, `data/${exam_id}/assets_temp`);
+            await rename(`data/${exam_id}/assets_temp`, `data/${exam_id}/assets`);
+          }
+          catch(e) { }
+
+          // Notify the exam server to reload assets
+          await exam_server.updateAssets();
+
+          return res.sendStatus(204);
+        }
+        finally {
+          await rm(uploaded_filepath, { force: true });
+        }
+      }
+    ]
+  }));
 
 exams_router
   .route("/:exam_id/questions/:question_id")
