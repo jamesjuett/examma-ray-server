@@ -27,10 +27,8 @@ services:
     volumes:
       - ./data:/usr/src/app/data
       - ./out:/usr/src/app/out
-      - ./staff:/usr/src/app/staff
       - ./live:/usr/src/app/live
       - ./uploads:/usr/src/app/uploads
-      - ./public:/usr/src/app/public
     networks:
         - http
         - db
