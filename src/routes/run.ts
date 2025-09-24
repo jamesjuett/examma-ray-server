@@ -63,7 +63,7 @@ run_router.route("/generate/:exam_id/instances/:exam_instance_uuid").post(create
       return;
     }
 
-    exam_inst.regenerateAllExams();
+    exam_inst.regenerateAllExams(); // just run generation async, don't await it
     res.status(200).json("Exam generation started...");
   }
 }));

@@ -70,7 +70,6 @@ exams_router
         await mkdir(`data/${exam_id}/error-submissions`);
   
         await writeFile(`data/${exam_id}/exam-spec.json`, stringifyExamComponentSpecification(new_exam_spec), "utf8");
-        await writeFile(`data/${exam_id}/roster.csv`, "uniqname,name", "utf8");
 
         await db_getOrCreateExam(exam_id);
 

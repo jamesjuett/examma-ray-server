@@ -1,7 +1,7 @@
 import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { createStudentExamUuid } from "examma-ray/dist/core/assigned_exams";
 import { rm } from "fs/promises";
-import { DB_Live_Exam_Assignments, DB_Live_Exam_Instances, DB_Live_Windows } from "knex/types/tables";
+import { DB_Live_Exam_Assignment_Update, DB_Live_Exam_Assignments, DB_Live_Exam_Instances, DB_Live_Windows } from "knex/types/tables";
 import { v4 as uuidv4 } from "uuid";
 import { Worker } from "worker_threads";
 import { RunGradingRequest } from "./dashboard";
@@ -124,10 +124,12 @@ export class ExamInstanceServer {
   }
 
   public async updateRoster(roster: (Pick<ExamAssignmentInfo, "uniqname"> & Partial<Pick<ExamAssignmentInfo, "uniqname" | "name" | "window_uuid" | "force_open" | "duration_multiplier">>)[]) {
-    this.modification_lock = new Promise(async (resolve) => {
-      await this.modification_lock;
+    const old_lock = this.modification_lock;
+    const new_lock = new Promise<void>(async (resolve) => {
+      await old_lock;
       resolve(this.updateRosterImpl(roster));
     });
+    this.modification_lock = new_lock;
     return this.modification_lock;
   }
 
@@ -180,9 +182,10 @@ export class ExamInstanceServer {
       this.assigned_exams_by_uniqname.set(assn.uniqname, assn);
     });
 
-    // just run generation async, don't await it
-    // this.generateExams(new_students.map(s => ({uniqname: s.uniqname, name: s.name ?? s.uniqname})));
-    this.regenerateAllExams(); // TODO: Temporary fix is to run generation for all, since the ExamGenerator.writeAll() knocks out all files
+    this.generateExams(new_assns.map(db_student => ({
+      uniqname: db_student.uniqname,
+      name: db_student.name ?? db_student.uniqname,
+    }))); // just run generation async, don't await it
 
     this.nextEpoch();
   }
@@ -195,7 +198,7 @@ export class ExamInstanceServer {
     return this.assigned_exams_by_uniqname.get(uniqname);
   }
 
-  public async updateAssignedExamByUuid(exam_uuid: string, fields: Partial<Pick<DB_Live_Exam_Assignments, "name" | "student_email" | "window_uuid" | "force_open" | "duration_multiplier">>) {
+  public async updateAssignedExamByUuid(exam_uuid: string, fields: DB_Live_Exam_Assignment_Update) {
     const assn = this.assigned_exams.find(a => a.exam_uuid === exam_uuid);
     if (!assn) {
       throw new Error(`No such assigned exam ${exam_uuid}`);
@@ -204,6 +207,14 @@ export class ExamInstanceServer {
     Object.assign(assn, fields);
     this.nextEpoch();
     return updated_assn;
+  }
+
+  public async resetAssignedExamTimerByExamUuid(exam_uuid: string) {
+    return this.updateAssignedExamByUuid(exam_uuid, { start_time: undefined });
+  }
+
+  public async setForceOpenByExamUuid(exam_uuid: string, force_open: boolean) {
+    return this.updateAssignedExamByUuid(exam_uuid, { force_open: force_open });
   }
 
   public async getSubmissions() {
@@ -336,6 +347,8 @@ export class ExamServer {
         async (question) => this.questionGradingServers[question.question_id] ??= await QuestionGradingServer.getOrCreate(question.question_id)
       )
     );
+    await Promise.all(this.exam_instances.map(ei => ei.regenerateAllExams()));
+    this.nextEpoch();
   }
 
   public async updateAssets() {

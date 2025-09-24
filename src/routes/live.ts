@@ -1,5 +1,5 @@
 import express, { Request, Response, Router } from "express";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getLiveExamInstanceByUuid, db_getLiveExamSubmissionByUuid, db_getWindowByUuid, db_startLiveExamAssignment } from "../db/db_live";
+import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getLiveExamInstanceByUuid, db_getLiveExamSubmissionByUuid, db_getWindowByUuid, db_setStartTimeToNow } from "../db/db_live";
 import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, validateParamExammaRayId, validateParamUuid } from "./common";
 import { getJwtUserInfo } from "../auth/jwt_auth";
 import e from "express";
@@ -70,7 +70,7 @@ live_exams_router.route("/:exam_id/exams/:exam_uuid.html")
       
       // start the exam in the database if not already started
       if (!exam_info.start_time) {
-        await db_startLiveExamAssignment(exam_uuid);
+        await db_setStartTimeToNow(exam_uuid);
       }
 
       return res.sendFile(`${exam_instance.exam_id}/exams/${exam_info.uniqname}-${exam_info.exam_uuid}.html`, { root: "live" });

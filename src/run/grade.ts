@@ -83,7 +83,10 @@ async function main() {
 
   const EXAM_GRADER = await WebExamGrader.create(
     EXAM,
-    { uuid_options: { strategy: "uuidv5", v5_namespace: uuidv5_namespace } },
+    {
+      uuid_options: { strategy: "uuidv5", v5_namespace: uuidv5_namespace },
+      assets_bundle_dir: `data/${exam_id}/assets/`,
+    },
     {},
     EXCEPTIONS,
     RATE_LIMITED_POST_MESSAGE()

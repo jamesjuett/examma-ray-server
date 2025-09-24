@@ -1,6 +1,6 @@
 import { Request, Response, Router } from "express";
 import { getJwtUserInfo, isAdmin, isStaff } from "../auth/jwt_auth";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getStudentExamsInfoByEmail, db_getWindowByUuid, db_saveLiveExamSubmission } from "../db/db_live";
+import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getStudentExamsInfoByEmail, db_getWindowByUuid, db_saveLiveExamSubmission, db_setStartTimeToNow } from "../db/db_live";
 import { db_getUserByEmail } from "../db/db_user";
 import { ExamSessionInfo } from "../rest_types";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamUuid } from "./common";
@@ -58,7 +58,7 @@ student_router.route("/exams/:exam_uuid/session")
       const userInfo = getJwtUserInfo(req);
       const exam_uuid = req.params["exam_uuid"];
 
-      const exam_assn = await db_getLiveExamAssignmentByExamUuid(exam_uuid);
+      let exam_assn = await db_getLiveExamAssignmentByExamUuid(exam_uuid);
       if (!exam_assn) {
         console.log(`Live exam ERROR: No such exam ${exam_uuid} attempted by ${userInfo.email}`);
         return res.sendStatus(404);
@@ -75,6 +75,13 @@ student_router.route("/exams/:exam_uuid/session")
         return res.sendStatus(404);
       }
 
+      // If there was no start time (generally should only happen if time is reset by staff while
+      // a student is already on the exam page, otherwise it would be set when they open the exam),
+      // then we go ahead and set it to now.
+      if (!exam_assn.start_time) {
+        exam_assn = await db_setStartTimeToNow(exam_uuid);
+      }
+      
       const exam_window = exam_assn.window_uuid
         ? await db_getWindowByUuid(exam_assn.window_uuid)
         : undefined;

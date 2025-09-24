@@ -26,8 +26,10 @@ assigned_exams.route("/:exam_uuid")
     validation: [
       validateParamUuid("exam_uuid"),
       validateBody("exam_id").isLength({min: 1, max: 100}),
-      validateBody("exam_instance_uuid").isUUID().optional(),
+      validateBody("exam_instance_uuid").isUUID(),
+      validateBody("name").isLength({min: 1, max: 200}).optional(),
       validateBody("exam_window").isUUID().optional(),
+      validateBody("duration_multiplier").isFloat({min: 0}).optional(),
     ],
     authorization: NO_AUTHORIZATION,
     
@@ -43,8 +45,65 @@ assigned_exams.route("/:exam_uuid")
         return res.status(400).send("Invalid exam_id or exam_instance_uuid");
       }
 
-      return res.status(200).json(exam_inst.updateAssignedExamByUuid(exam_uuid, { window_uuid: exam_window }));
+      return res.status(200).json(exam_inst.updateAssignedExamByUuid(exam_uuid, {
+        name: req.body.name,
+        window_uuid: exam_window,
+        duration_multiplier: req.body.duration_multiplier,
+      }));
       
+    },
+  }));
+
+assigned_exams.route("/:exam_uuid/reset_time")
+  .post(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamUuid("exam_uuid"),
+      validateBody("exam_id").isLength({min: 1, max: 100}),
+      validateBody("exam_instance_uuid").isUUID(),
+    ],
+    authorization: NO_AUTHORIZATION,
+    
+    handler: async (req: Request, res: Response) => {
+      const exam_uuid = req.params["exam_uuid"];
+      const exam_window : string | undefined = req.body.exam_window;
+
+      const exam_inst = EXAMMA_RAY_GRADING_SERVER
+        .getExamServer(req.body["exam_id"])
+        ?.getExamInstanceByUuid(req.body["exam_instance_uuid"]);
+
+      if (!exam_inst) {
+        return res.status(400).send("Invalid exam_id or exam_instance_uuid");
+      }
+
+      return res.status(200).json(exam_inst.resetAssignedExamTimerByExamUuid(exam_uuid));
+    },
+  }));
+
+assigned_exams.route("/:exam_uuid/force_open")
+  .put(createRoute({
+    preprocessing: NO_PREPROCESSING,
+    validation: [
+      validateParamUuid("exam_uuid"),
+      validateBody("exam_id").isLength({min: 1, max: 100}),
+      validateBody("exam_instance_uuid").isUUID(),
+      validateBody("force_open").isBoolean(),
+    ],
+    authorization: NO_AUTHORIZATION,
+    
+    handler: async (req: Request, res: Response) => {
+      const exam_uuid = req.params["exam_uuid"];
+      const exam_window : string | undefined = req.body.exam_window;
+
+      const exam_inst = EXAMMA_RAY_GRADING_SERVER
+        .getExamServer(req.body["exam_id"])
+        ?.getExamInstanceByUuid(req.body["exam_instance_uuid"]);
+
+      if (!exam_inst) {
+        return res.status(400).send("Invalid exam_id or exam_instance_uuid");
+      }
+
+      return res.status(200).json(exam_inst.setForceOpenByExamUuid(exam_uuid, req.body.force_open));
     },
   }));
 

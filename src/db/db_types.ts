@@ -128,9 +128,9 @@ declare module "knex/types/tables" {
     duration_multiplier: number; // float, defaults to 1.0
   }
   // Insert: All required, except window_uuid is optional (nullable)
-  export type DB_Live_Exam_Assignment_Insert = Omit<DB_Live_Exam_Assignments, "force_open" | "window_uuid" | "duration_multiplier"> & Partial<Pick<DB_Live_Exam_Assignments, "force_open" | "window_uuid" | "duration_multiplier">>;
-  // Update: Only allowed to update window_uuid, name, force open, start_time
-  export type DB_Live_Exam_Assignment_Update = Partial<Pick<DB_Live_Exam_Assignments, "name" | "window_uuid" | "force_open" | "start_time" | "duration_multiplier">>;
+  export type DB_Live_Exam_Assignment_Insert = Omit<DB_Live_Exam_Assignments, "duration_multiplier" | "force_open" | "window_uuid"> & Partial<Pick<DB_Live_Exam_Assignments, "duration_multiplier" | "force_open" | "window_uuid">>;
+  // Update: Only allowed to update window_uuid, name, force open, start_time, duration_multiplier
+  export type DB_Live_Exam_Assignment_Update = Partial<Pick<DB_Live_Exam_Assignments, "name" | "window_uuid" | "duration_multiplier" | "force_open" | "start_time">>;
 
 
   interface DB_Live_Submissions {

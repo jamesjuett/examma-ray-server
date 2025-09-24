@@ -31,7 +31,7 @@ async function main() {
   
   exam_generator.assignExams(workerData.students),
   
-  exam_generator.writeAll(new OriginalExamRenderer(), "live", "data");
+  exam_generator.writeAll(new OriginalExamRenderer(), "live", "data", false);
 
   // const EXAM_PREVIEW = new ExamPreview(EXAM);
   // EXAM_PREVIEW.writeAll("out/preview");
