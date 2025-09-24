@@ -109,7 +109,7 @@ export class ExamDashboardApplication {
     $("#examma-ray-exam-instances-dropdown").append("<div class='dropdown-divider'></div>");
     const create_link = $('<a class="dropdown-item"><i class="bi bi-plus"></i> Create New Instance</a>').appendTo($("#examma-ray-exam-instances-dropdown"));
 
-    $("#examma-ray-grading-overview-link").attr("href", `out/${this.exam_info.exam_id}/${this.exam_instance_info.exam_instance_uuid}/graded/overview.html`);
+    $("#examma-ray-grading-overview-link").attr("href", `/out/${this.exam_info.exam_id}/graded/overview.html`);
 
 
     

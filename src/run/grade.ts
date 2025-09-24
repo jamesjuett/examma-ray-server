@@ -128,7 +128,7 @@ async function main() {
   
   if (grade_request.reports) {
     try {
-      EXAM_GRADER.writeReports();
+      EXAM_GRADER.writeReports(`live/${exam_id}/graded/`);
     }
     catch(e) {
       console.log(e);
