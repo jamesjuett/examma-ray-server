@@ -112,7 +112,7 @@ export class IndexExammaRayApplication {
 function renderExamButton(server_now: number, exam_info: StudentFacingExamInfo) {
 
   if (exam_info.assigned_exam.graded) {
-    return `<a href="/live/${exam_info.exam_instance.exam_id}/graded/${exam_info.assigned_exam.exam_uuid}.html" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Graded</a>`;
+    return `<a href="/live/${exam_info.exam_instance.exam_id}/graded/${exam_info.assigned_exam.exam_uuid}.html" class="btn btn-primary"><i class="bi bi-file-text"></i> View Graded Report</a>`;
   }
   
   if (exam_info.window === undefined) {
