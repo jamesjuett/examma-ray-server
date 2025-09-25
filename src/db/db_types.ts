@@ -126,9 +126,14 @@ declare module "knex/types/tables" {
     force_open: boolean;
     start_time?: Date; // timestamp
     duration_multiplier: number; // float, defaults to 1.0
+    graded: boolean;
   }
-  // Insert: All required, except window_uuid is optional (nullable)
-  export type DB_Live_Exam_Assignment_Insert = Omit<DB_Live_Exam_Assignments, "duration_multiplier" | "force_open" | "window_uuid"> & Partial<Pick<DB_Live_Exam_Assignments, "duration_multiplier" | "force_open" | "window_uuid">>;
+  // Insert: All required, except:
+  //         duration_multiplier (defaults to 1.0)
+  //         force_open (defaults to false)
+  //         window_uuid (nullable)
+  //         graded (defaults to false)
+  export type DB_Live_Exam_Assignment_Insert = Omit<DB_Live_Exam_Assignments, "window_uuid" | "duration_multiplier" | "force_open" | "graded"> & Partial<Pick<DB_Live_Exam_Assignments, "window_uuid" | "duration_multiplier" | "force_open" | "graded">>;
   // Update: Only allowed to update window_uuid, name, force open, start_time, duration_multiplier
   export type DB_Live_Exam_Assignment_Update = Partial<Pick<DB_Live_Exam_Assignments, "name" | "window_uuid" | "duration_multiplier" | "force_open" | "start_time">>;
 

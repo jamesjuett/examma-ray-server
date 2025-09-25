@@ -3,6 +3,12 @@ import { DB_Exams, DB_Live_Exam_Assignments, DB_Live_Exam_Instances } from "knex
 import { ExammaRayClient } from "./Application";
 import { ExamAssignmentInfo, ExamInstanceInfo, StudentExamsResponse, StudentFacingExamInfo } from "../rest_types";
 
+const date_time_format_options: Intl.DateTimeFormatOptions = {
+  weekday: 'short',
+  year: 'numeric', month: "short", day: '2-digit',
+  hour: '2-digit', minute: '2-digit'
+};
+
 export class IndexExammaRayApplication {
 
   public readonly client: ExammaRayClient;
@@ -62,7 +68,7 @@ export class IndexExammaRayApplication {
                   </h6>
                   <p class="card-text">
                   ${exam_window
-                    ? `Open: ${new Date(exam_window.open_time).toLocaleString()}<br />Close: ${new Date(exam_window.close_time).toLocaleString()}`
+                    ? `Open: ${new Date(exam_window.open_time).toLocaleString([], date_time_format_options)}<br />Close: ${new Date(exam_window.close_time).toLocaleString([], date_time_format_options)}`
                     : "Open: <span class=\"text-danger\">No window assigned</span><br />Close: <span class=\"text-danger\">No window assigned</span>"}
                   </p>
                   ${renderExamButton(server_now, exam_info)}
@@ -104,8 +110,18 @@ export class IndexExammaRayApplication {
 }
 
 function renderExamButton(server_now: number, exam_info: StudentFacingExamInfo) {
+
+  if (exam_info.assigned_exam.graded) {
+    return `<a href="/live/${exam_info.exam_instance.exam_id}/graded/${exam_info.assigned_exam.exam_uuid}.html" class="btn btn-primary"><i class="bi bi-check2-circle"></i> Graded</a>`;
+  }
+  
   if (exam_info.window === undefined) {
-    return `<button class="btn btn-secondary" disabled><i class="bi bi-lock-fill"></i> Not Available</button>`;
+    if (exam_info.submission !== undefined) {
+      return `<button class="btn btn-success" disabled><i class="bi bi-check-lg"></i> Submitted</button>`;
+    }
+    else {
+      return `<button class="btn btn-secondary" disabled><i class="bi bi-lock-fill"></i> Not Available</button>`;
+    }
   }
 
   // If forced open

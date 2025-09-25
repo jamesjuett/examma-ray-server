@@ -95,7 +95,7 @@ async function main() {
 
   console.log(`DONE processing submissions!`);
   console.log(`Rendering submitted exams...`);
-  EXAM_GRADER.writeSubmissions();
+  EXAM_GRADER.writeSubmissions(`out/${exam_id}/submissions/`);
   
   await query.destroy();
   

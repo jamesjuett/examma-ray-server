@@ -24,6 +24,7 @@ export type ExamAssignmentInfo = {
   readonly force_open: boolean,
   readonly start_time?: Date, // timestamp
   readonly duration_multiplier: number, // float, defaults to 1.0
+  readonly graded: boolean,
 };
 
 export type SubmissionInfo = {
@@ -43,7 +44,7 @@ export type WindowInfo = {
 
 // student-facing type
 export type StudentFacingExamInfo = {
-  readonly assigned_exam: Pick<ExamAssignmentInfo, "exam_uuid" | "uniqname" | "name" | "student_email" | "force_open" | "start_time" | "duration_multiplier">,
+  readonly assigned_exam: Pick<ExamAssignmentInfo, "exam_uuid" | "uniqname" | "name" | "student_email" | "force_open" | "start_time" | "duration_multiplier" | "graded">,
   readonly exam_instance: Pick<ExamInstanceInfo, "exam_id" | "name" | "duration_seconds">,
   readonly window?: Pick<WindowInfo, "name" | "open_time" | "close_time">,
   readonly submission?: Pick<SubmissionInfo, "created_at" | "updated_at">,

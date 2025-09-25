@@ -84,6 +84,7 @@ async function db_helper_getStudentExamInfo(orig_assn: DB_Live_Exam_Assignments)
       force_open: orig_assn.force_open,
       start_time: orig_assn.start_time,
       duration_multiplier: orig_assn.duration_multiplier,
+      graded: orig_assn.graded,
     },
     exam_instance: {
       name: exam_instance.name,

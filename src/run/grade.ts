@@ -25,14 +25,14 @@ class WebExamGrader extends ExamGrader {
     [index: string]: CodeWritingGraderData
   };
 
-  private constructor(exam: Exam, options: Partial<ExamGraderOptions> = {}, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[], onStatus?: (status: string) => void, grading_data: {
+  private constructor(exam: Exam, options: ExamGraderOptions, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[], onStatus?: (status: string) => void, grading_data: {
     [index: string]: CodeWritingGraderData
   } = {}) {
     super(exam, options, graders, exceptions, onStatus);
     this.grading_data = grading_data;
   }
 
-  public static async create(exam: Exam, options: Partial<ExamGraderOptions> = {}, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[], onStatus?: (status: string) => void) {
+  public static async create(exam: Exam, options: ExamGraderOptions, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[], onStatus?: (status: string) => void) {
     let grading_data : { [index: string]: CodeWritingGraderData } = {};
     for(let question of exam.allQuestions) {
       // if (question.kind === "code_editor") {
