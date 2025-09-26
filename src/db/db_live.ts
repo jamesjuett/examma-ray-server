@@ -136,7 +136,7 @@ export async function db_getLiveExamSubmissions(exam_instance_uuid: string) {
     ]) as Pick<DB_Live_Submissions, "exam_uuid" | "updated_by_email" | "created_at" | "updated_at">[];
 }
 
-export async function db_getLiveExamSubmissionsWithSubmissionJSON(exam_instance_uuid: string) {
+export async function db_getLiveExamAssignmentAndSubmission(exam_instance_uuid: string) {
   return await query("live_submissions")
     .join('live_exam_assignments', 'live_exam_assignments.exam_uuid', '=', 'live_submissions.exam_uuid')
     .where({exam_instance_uuid: exam_instance_uuid})

@@ -12,7 +12,7 @@ import { db_addExamSubmission, db_getExamSubmissionByUuid } from "../db/db_exams
 import { db_insertManualGradingQuestionSkinIfNotExists } from "../db/db_rubrics";
 import { RATE_LIMITED_POST_MESSAGE } from "./common";
 import { WorkerData_ProcessDBSubmissions } from "./run";
-import { db_getLiveExamSubmissionByUuid, db_getLiveExamSubmissionsWithSubmissionJSON } from "../db/db_live";
+import { db_getLiveExamSubmissionByUuid, db_getLiveExamAssignmentAndSubmission } from "../db/db_live";
 import { DB_Live_Exam_Assignments, DB_Live_Submissions } from "knex/types/tables";
 
 const workerData: WorkerData_ProcessDBSubmissions = workerDataUntyped;
@@ -76,7 +76,7 @@ async function main() {
   
   const EXAM_GRADER = new ExamGrader(exam, {}, {}, {}, RATE_LIMITED_POST_MESSAGE());
 
-  const db_submissions = await db_getLiveExamSubmissionsWithSubmissionJSON(workerData.exam_instance_uuid);
+  const db_submissions = await db_getLiveExamAssignmentAndSubmission(workerData.exam_instance_uuid);
 
   // get submissions from the database
   await Promise.all(db_submissions.map(async sub => {
@@ -84,7 +84,21 @@ async function main() {
     if (!(sub as DB_Live_Submissions & DB_Live_Exam_Assignments).submission) {
       return;
     }
+    
     const full_sub = sub as DB_Live_Submissions & DB_Live_Exam_Assignments;
+
+    // some submissions accidentally got stores as stringified JSON, so parse if needed
+    if (typeof full_sub.submission === "string") {
+      console.log(`Parsing stringified JSON submission for ${full_sub.uniqname} (${full_sub.exam_uuid})`);
+
+      // now fix it in the database - should actually be sufficient to just store the string, since
+      // knex will convert it back to JSONB
+      await query("live_submissions").where({exam_uuid: full_sub.exam_uuid}).update({
+        submission: full_sub.submission
+      });
+
+      full_sub.submission = JSON.parse(full_sub.submission);
+    }
 
     const submission = await addSubmission(exam, full_sub);
 

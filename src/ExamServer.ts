@@ -347,19 +347,21 @@ export class ExamServer {
         async (question) => this.questionGradingServers[question.question_id] ??= await QuestionGradingServer.getOrCreate(question.question_id)
       )
     );
-    await Promise.all(this.exam_instances.map(ei => ei.regenerateAllExams()));
+    // just run generation async, don't await it
+    Promise.all(this.exam_instances.map(ei => ei.regenerateAllExams()));
+
     this.nextEpoch();
   }
 
   public async updateAssets() {
-    // Nothing to do for now
+    // just run generation async, don't await it
+    Promise.all(this.exam_instances.map(ei => ei.regenerateAllExams()));
   }
 
   public async gradeAllExams(run_request: RunGradingRequest) {
     
     console.log(run_request.reports ? "Grading...".bgBlue : "Generating grading reports...".bgBlue);
 
-    // Grade all 
   }
 
   public async getLiveSubmissionByExamUuid(exam_uuid: string) {

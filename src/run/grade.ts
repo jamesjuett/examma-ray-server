@@ -102,7 +102,22 @@ async function main() {
         console.log(`No submission found for ${exam_assn.uniqname} (${exam_assn.exam_uuid})`);
         return undefined;
       }
+
+      // some submissions accidentally got stores as stringified JSON, so parse if needed
+      if (typeof db_submission.submission === "string") {
+        console.log(`Parsing stringified JSON submission for ${exam_assn.uniqname} (${exam_assn.exam_uuid})`);
+
+        // now fix it in the database - should actually be sufficient to just store the string, since
+        // knex will convert it back to JSONB
+        await query("live_submissions").where({exam_uuid: exam_assn.exam_uuid}).update({
+          submission: db_submission.submission
+        });
+
+        db_submission.submission = JSON.parse(db_submission.submission);
+      }
+
       const submission = db_submission.submission as unknown as ExamSubmission;
+      console.log(`Loaded submission for ${exam_assn.uniqname}: ${typeof submission}`);
       return fillManifest(manifest, submission);
     }
     catch(e) {
