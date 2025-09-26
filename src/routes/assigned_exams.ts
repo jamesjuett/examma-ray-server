@@ -55,8 +55,8 @@ assigned_exams.route("/:exam_uuid")
   }));
 
 assigned_exams.route("/:exam_uuid/reset_time")
-  .post(createRoute({
-    preprocessing: NO_PREPROCESSING,
+  .put(createRoute({
+    preprocessing: jsonBodyParser,
     validation: [
       validateParamUuid("exam_uuid"),
       validateBody("exam_id").isLength({min: 1, max: 100}),

@@ -111,6 +111,14 @@ export class StudentEditor {
       this.setEditingStudent(this.editingStudent);
     });
 
+    $("#edit-student-reset-time-modal").on("show.bs.modal", () => {
+      if (!this.editingStudent) {
+        return;
+      }
+      $("#edit-student-reset-time-modal-name-label").text(this.editingStudent.name ? `${this.editingStudent.name} (${this.editingStudent.uniqname})` : this.editingStudent.uniqname);
+      $("#edit-student-reset-time-modal-exam-label").text(`${dashboard.exam_instance_info.name}`);
+    });
+
     $("#edit-student-reset-time-button").on("click", async (e) => {
 
       if (!this.editingStudent) {
@@ -178,7 +186,7 @@ export class StudentEditor {
       $("#edit-student-duration-multiplier-input").val(student.duration_multiplier).prop("disabled", false);
       // submit button enabled only when student info changes
       // $("#edit-student-delete-submission-button").prop("disabled", false); // leave this out for now
-      $("#edit-student-reset-time-button").prop("disabled", false);
+      $("#edit-student-reset-time-open-modal").prop("disabled", false);
       this.updateEditStudentButtonUpToDate();
     }
     else {
@@ -186,7 +194,7 @@ export class StudentEditor {
       $("#edit-student-window-select").val("").prop("disabled", true);
       $("#edit-student-duration-multiplier-input").val("").prop("disabled", true);
       $("#edit-student-delete-submission-button").prop("disabled", true);
-      $("#edit-student-reset-time-modal-button").prop("disabled", true);
+      $("#edit-student-reset-time-open-modal").prop("disabled", true);
       this.updateEditStudentButtonNoStudent();
     }
   }

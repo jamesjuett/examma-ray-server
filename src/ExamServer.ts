@@ -29,11 +29,12 @@ export type ExamTaskStatus = ServerTasks<ExamTask>["taskStatus"];
 
 export class ExamInstanceServer {
   // all the fields from DB_Live_Exam_Instances
-  public readonly exam_instance_uuid: string
-  public readonly exam_id: string
-  public readonly duration_seconds: number
-  public readonly uuidv5_namespace: string
-  public readonly randomization_seed: string
+  public readonly exam_instance_uuid: string;
+  public readonly exam_id: string;
+  public readonly name: string;
+  public readonly duration_seconds: number;
+  public readonly uuidv5_namespace: string;
+  public readonly randomization_seed: string;
 
   public readonly epoch: string;
   
@@ -51,6 +52,7 @@ export class ExamInstanceServer {
   private constructor(db_instance: DB_Live_Exam_Instances, db_assignments: readonly ExamAssignmentInfo[], db_windows: readonly DB_Live_Windows[]) {
     this.exam_instance_uuid = db_instance.exam_instance_uuid;
     this.exam_id = db_instance.exam_id;
+    this.name = db_instance.name;
     this.duration_seconds = db_instance.duration_seconds;
     this.uuidv5_namespace = db_instance.uuidv5_namespace;
     this.randomization_seed = db_instance.randomization_seed;
@@ -83,7 +85,7 @@ export class ExamInstanceServer {
   public getInfo() : ExamInstanceInfo {
     return {
       exam_instance_uuid: this.exam_instance_uuid,
-      name: this.exam_id,
+      name: this.name,
       exam_id: this.exam_id,
       duration_seconds: this.duration_seconds,
       uuidv5_namespace: this.uuidv5_namespace,
@@ -210,7 +212,7 @@ export class ExamInstanceServer {
   }
 
   public async resetAssignedExamTimerByExamUuid(exam_uuid: string) {
-    return this.updateAssignedExamByUuid(exam_uuid, { start_time: undefined });
+    return this.updateAssignedExamByUuid(exam_uuid, { start_time: null });
   }
 
   public async setForceOpenByExamUuid(exam_uuid: string, force_open: boolean) {

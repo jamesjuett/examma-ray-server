@@ -124,7 +124,7 @@ declare module "knex/types/tables" {
     student_email: string; // email that is allowed to take exam
     window_uuid?: string;
     force_open: boolean;
-    start_time?: Date; // timestamp
+    start_time?: Date | null; // timestamp
     duration_multiplier: number; // float, defaults to 1.0
     graded: boolean;
   }

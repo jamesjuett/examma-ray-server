@@ -22,7 +22,7 @@ export type ExamAssignmentInfo = {
   readonly student_email: string,
   readonly window_uuid?: string,
   readonly force_open: boolean,
-  readonly start_time?: Date, // timestamp
+  readonly start_time?: Date | null, // timestamp
   readonly duration_multiplier: number, // float, defaults to 1.0
   readonly graded: boolean,
 };
@@ -58,7 +58,7 @@ export type StudentExamsResponse = {
 export type ExamSessionInfo = {
   readonly exam_uuid: string,
   readonly exam_window?: Pick<WindowInfo, "name" | "open_time" | "close_time">,
-  readonly start_time?: Date, // timestamp
+  readonly start_time?: Date | null, // timestamp
   readonly now: number; // Unix timestamp in milliseconds
   readonly duration_seconds: number,
   readonly force_open?: boolean,

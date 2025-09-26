@@ -33,7 +33,6 @@ export async function db_updateLiveExamAssignment(
   exam_uuid: string,
   fields: DB_Live_Exam_Assignment_Update
 ) {
-    console.log(fields)
   return (await query("live_exam_assignments").where({exam_uuid: exam_uuid}).update(fields).returning("*"))[0];
 }
 
