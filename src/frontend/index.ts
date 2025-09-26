@@ -111,7 +111,7 @@ export class IndexExammaRayApplication {
 
 function renderExamButton(server_now: number, exam_info: StudentFacingExamInfo) {
 
-  if (exam_info.assigned_exam.graded) {
+  if (exam_info.assigned_exam.graded && exam_info.submission !== undefined) {
     return `<a href="/live/${exam_info.exam_instance.exam_id}/graded/${exam_info.assigned_exam.exam_uuid}.html" class="btn btn-primary"><i class="bi bi-file-text"></i> View Graded Report</a>`;
   }
   
