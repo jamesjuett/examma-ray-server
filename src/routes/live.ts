@@ -1,7 +1,7 @@
 import express, { Request, Response, Router } from "express";
 import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getLiveExamInstanceByUuid, db_getLiveExamSubmissionByUuid, db_getWindowByUuid, db_setStartTimeToNow } from "../db/db_live";
 import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, validateParamExammaRayId, validateParamUuid } from "./common";
-import { getJwtUserInfo } from "../auth/jwt_auth";
+import { getJwtUserInfo, isSuper } from "../auth/jwt_auth";
 import e from "express";
 
 
@@ -29,7 +29,7 @@ live_exams_router.route("/:exam_id/exams/:exam_uuid.html")
       }
 
       // If it exists, is the user authorized to access it?
-      if (exam_info.student_email !== userInfo.email) {
+      if (exam_info.student_email !== userInfo.email && !isSuper(userInfo.email)) {
         console.log(`Live exam FORBIDDEN: ${userInfo.email} not authorized to access exam ${exam_uuid} for ${exam_info.uniqname} (${exam_info.student_email})`);
         return res.sendStatus(404); // 404 and not 403 - don't reveal existence
       }

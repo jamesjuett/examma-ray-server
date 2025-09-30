@@ -113,3 +113,7 @@ export function isStaff(email: string) {
 export function isAdmin(email: string) {
   return ADMIN.has(email);
 }
+
+export function isSuper(email: string) {
+  return SUPER.has(email);
+}
