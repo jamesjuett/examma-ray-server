@@ -8,6 +8,7 @@ module.exports = {
     'staff/js/courses': './src/frontend/courses',
     'staff/js/participation': './src/frontend/participation',
     'staff/js/dashboard': './src/frontend/dashboard',
+    'staff/js/live_submission': './src/frontend/live_submission',
     'staff/js/manual-code-grader': './src/frontend/manual-code-grader',
     'staff/js/manual-generic-grader': './src/frontend/manual-generic-grader',
   },

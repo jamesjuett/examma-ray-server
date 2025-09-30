@@ -8,7 +8,6 @@ import { ExamTaskStatus } from "../ExamServer";
 import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, SubmissionInfo, WindowInfo } from "../rest_types";
 import { asMutable, assert } from "../util/util";
 import { ExammaRayClient } from "./Application";
-import { LiveSubmissionViewer } from "./LiveSubmissionViewer";
 import randomColor from "randomcolor";
 import { event } from "jquery";
 import { format } from "path";
@@ -67,7 +66,6 @@ export class ExamDashboardApplication {
   
   private instance_epoch: string = "";
   
-  private liveSubmissionViewer: LiveSubmissionViewer;
   public studentEditor: StudentEditor;
 
   private constructor(client: ExammaRayClient, exam_info: ExamInfo, exam_instance_info: ExamInstanceInfo, exam: Exam) {
@@ -75,7 +73,6 @@ export class ExamDashboardApplication {
     this.exam_instance_info = exam_instance_info;
     this.exam_info = exam_info;
     this.exam = exam;
-    this.liveSubmissionViewer = new LiveSubmissionViewer(this.client, this.exam, $("#live-submission-viewer-elem"));
     this.studentEditor = new StudentEditor(this, $("#student-editor-elem"));
 
     this.initComponents();
@@ -280,24 +277,7 @@ export class ExamDashboardApplication {
 
 
 
-    $("#live-submission-viewer-view-button").on("click", async () => {
-      
-      try {
-        const uniqname = $("#live-submission-viewer-uniqname-input").val();
-        const assn = (await axios({
-          url: `/api/exams/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}/assigned_exams_by_uniqname/${uniqname}`,
-          method: "GET",
-          headers: {
-              'Authorization': 'bearer ' + this.client.getBearerToken()
-          }
-        })).data as ExamAssignmentInfo;
-
-        this.liveSubmissionViewer.setStudent(assn);
-      }
-      catch(e: unknown) {
-        alert("Error loading student submission :(");
-      }
-    });
+    
 
 
     if (window.location.hash) {
@@ -310,6 +290,8 @@ export class ExamDashboardApplication {
     $('#dashboard-navigation a').on("click", function() {
       window.location.hash = (<HTMLAnchorElement>this).hash.substring(1);
     });
+
+    $("#live-submission-viewer-link").attr("href", `/staff/live_submission.html?exam-id=${this.exam_info.exam_id}&exam-instance-uuid=${this.exam_instance_info.exam_instance_uuid}`)
 
   }
 

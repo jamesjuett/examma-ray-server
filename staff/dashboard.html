@@ -61,11 +61,6 @@
               </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="live-submission-viewer-tab" data-toggle="pill" href="#live-submission-viewer" role="tab" aria-controls="roster" aria-selected="false">
-                <i class="bi bi-lightning"></i> Submissions
-              </a>
-            </li>
-            <li class="nav-item">
               <a class="nav-link" id="grading-tab" data-toggle="pill" href="#grading" role="tab" aria-controls="grading" aria-selected="true">
                 <i class="bi bi-journal-check"></i> Grading
               </a>
@@ -241,21 +236,13 @@
                 </div>
               </div>
             </div>
+            <div class="col-sm-6">
+              <a id="live-submission-viewer-link" class="btn btn-primary" href="/staff/live_submission.html" target="_blank">Live Submission Viewer</a>
+            </div>
           </div>
         </div>
         <ul class="examma-ray-students-list">
         </ul>
-      </div>
-
-      <div class="tab-pane container-fluid" id="live-submission-viewer" role="tabpanel" aria-labelledby="live-submission-viewer-tab">
-        <div>
-          <input id="live-submission-viewer-uniqname-input" class="form-control" type="text" size="20" maxlength="100" style="font-family: monospace"
-            autocomplete="off" autocorrect="off" spellcheck="false"
-          >
-          <button id="live-submission-viewer-view-button" class="btn btn-primary">View</button>
-        </div>
-        <div id="live-submission-viewer-elem"></div>
-        
       </div>
     </div>
 
