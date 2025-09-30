@@ -45,7 +45,9 @@ export function generateJwt(email: string) {
 }
 
 
-
+const SUPER = new Set<string>([
+  "jjuett@umich.edu",
+]);
 
 const ADMIN = new Set<string>([
   "jjuett@umich.edu",
@@ -101,7 +103,7 @@ function requireAuthorization(group: Set<string>) {
 
 export const requireStaff = requireAuthorization(STAFF);
 export const requireAdmin = requireAuthorization(ADMIN);
-
+export const requireSuper = requireAuthorization(SUPER);
 
 
 export function isStaff(email: string) {

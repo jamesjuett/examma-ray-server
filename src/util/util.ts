@@ -8,6 +8,10 @@ export function asMutable<T>(obj: T) : T {
     return obj;
 }
 
+export type Exact<A, B> = A extends B
+  ? B extends A ? A : never
+  : never;
+
 export function assert(condition: any, message: string = "") : asserts condition {
   if (!condition) {
     throw Error("Assert failed: " + message);

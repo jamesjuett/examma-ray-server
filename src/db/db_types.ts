@@ -146,6 +146,64 @@ declare module "knex/types/tables" {
     submission: string; // jsonb
   }
 
+  interface DB_Courses {
+    course_pk: number; // primary key, auto-incrementing
+    subject_code: string; // e.g. "EECS"
+    course_number: string; // e.g. "280" (may include letters e.g. "280X")
+    term: string; // e.g. "fall", "winter", "spring", "summer"
+    year: number; // e.g. 2025
+    title: string; // e.g. "Programming and Introductory Data Structures"
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+  }
+
+  interface DB_Course_Users {
+    course_pk: number; // foreign key to courses.course_pk
+    email: string; // google email of user
+    // primary key is (course_pk, email)
+    role: "student" | "staff" | "admin";
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+  }
+
+  interface DB_Course_Sections {
+    section_pk: number; // primary key, auto-incrementing
+    course_pk: number; // foreign key to courses.course_pk
+    section_id: string; // e.g. "lab01", "lab02", "lecture001", etc. Must be unique within a course.
+    section_name: string; // e.g. "Lab Section 04"
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+  }
+
+  interface DB_User_Sections {
+    email: string; // google email of user
+    section_pk: number; // foreign key to course_sections.section_pk
+    // primary key is (email, section_pk)
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+  }
+
+  interface DB_Course_Schedules {
+    schedule_pk: number; // primary key, auto-incrementing
+    course_pk: number; // foreign key to courses.course_pk
+    name: string; // e.g. "Weekly Lab Schedule"
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+  }
+
+  interface DB_Schedule_Offset_Items {
+    offset_item_pk: number; // primary key, auto-incrementing
+    schedule_pk: number; // foreign key to course_schedules.schedule_pk
+    section_pk?: number; // foreign key to course_sections.section_pk. If null, applies to all sections in course.
+    // schedule_pk and section_pk combination must be unique.
+    day_offset: number; // how far from first day schedule is applied (0 = first day of schedule)
+    hour: number; // absolute hour of the day, 0-23
+    minute: number; // absolute minute of the hour, 0-59
+    second: number; // absolute second of the minute, 0-59
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+  }
+
   
   type ExceptID<T> = Knex.CompositeTableType<T, Omit<T, "id"> & {id?: undefined}, Partial<Omit<T, "id">> & {id?: undefined}>;
 
@@ -303,6 +361,74 @@ declare module "knex/types/tables" {
       //   Only allowed to update updated_by_email, updated_at, and submission
       Partial<Pick<DB_Live_Submissions, "updated_by_email" | "updated_at" | "submission">>
     >;
+
+    courses: Knex.CompositeTableType<
+      // Base Type
+      DB_Courses,
+      // Insert Type
+      //   All required except course_pk, created_at and updated_at (set automatically)
+      Omit<DB_Courses, "course_pk" | "created_at" | "updated_at">,
+      // Update Type
+      //   Only allowed to update subject_code, course_number, title, term, year
+      Partial<Pick<DB_Courses, "subject_code" | "course_number" | "title" | "term" | "year">>
+    >;
+
+    course_users: Knex.CompositeTableType<
+      // Base Type
+      DB_Course_Users,
+      // Insert Type
+      //   All required except created_at and updated_at (set automatically)
+      Omit<DB_Course_Users, "created_at" | "updated_at">,
+      // Update Type
+      //   No updates allowed (at least for now)
+      never
+    >;
+
+    course_sections: Knex.CompositeTableType<
+      // Base Type
+      DB_Course_Sections,
+      // Insert Type
+      //   All required except section_pk, created_at and updated_at (set automatically)
+      Omit<DB_Course_Sections, "section_pk" | "created_at" | "updated_at">,
+      // Update Type
+      //   Only allowed to update section_id and section_name
+      Partial<Pick<DB_Course_Sections, "section_id" | "section_name">>
+    >;
+
+    user_sections: Knex.CompositeTableType<
+      // Base Type
+      DB_User_Sections,
+      // Insert Type
+      //   All required except created_at and updated_at (set automatically)
+      Omit<DB_User_Sections, "created_at" | "updated_at">,
+      // Update Type
+      //   No updates allowed insert new or delete to adjust sections
+      never
+    >;
+
+    course_schedules: Knex.CompositeTableType<
+      // Base Type
+      DB_Course_Schedules,
+      // Insert Type
+      //   All required except schedule_pk, created_at and updated_at (set automatically)
+      Omit<DB_Course_Schedules, "schedule_pk" | "created_at" | "updated_at">,
+      // Update Type
+      //   Only allowed to update name
+      Partial<Pick<DB_Course_Schedules, "name">>
+    >;
+
+    schedule_offset_items: Knex.CompositeTableType<
+      // Base Type
+      DB_Schedule_Offset_Items,
+      // Insert Type
+      //   All required except offset_item_pk, created_at and updated_at (set automatically)
+      Omit<DB_Schedule_Offset_Items, "offset_item_pk" | "created_at" | "updated_at">,
+      // Update Type
+      //   Only allowed to update section_pk, day_offset, hour, minute, second
+      Partial<Pick<DB_Schedule_Offset_Items, "section_pk" | "day_offset" | "hour" | "minute" | "second">>
+    >;
+
+    
   }
 }
 

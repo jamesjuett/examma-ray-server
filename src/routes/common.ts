@@ -5,6 +5,17 @@ import { param as validateParam, ValidationChain, validationResult } from 'expre
 export const jsonBodyParser = express.json({limit: "10MB"});
 export const urlencodedBodyParser = express.urlencoded({ extended: false });
 
+// NOTE: validate then sanitize is more strict
+//       than sanitize then validate
+//       e.g. for client sending a string "123a"
+//       validate then sanitize will fail validation
+//       sanitize then validate will pass validation
+//       (because it will be sanitized to "123" via implicit conversion)
+// NOTE: Sanitize on its own is no good, since e.g. it might give a NaN
+//       rather than failing validation and rejecting input.
+// OVERALL: May want to only validate, then manually parse in subsequent handler
+//          for improved type safety (i.e. treat the param/body as string/any
+//          and then parseInt/parseFloat/Date/other as needed).
 export { body as validateBody, param as validateParam } from 'express-validator';
 
 function requireAllValid(req: Request, res: Response, next: NextFunction) {

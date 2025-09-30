@@ -42,7 +42,19 @@ export type WindowInfo = {
   readonly close_time: Date, // timestamp
 };
 
-// student-facing type
+export type CourseInfo = {
+  readonly course_pk: number,
+  readonly subject_code: string,
+  readonly course_number: string,
+  readonly term: string,
+  readonly year: number,
+  readonly title: string,
+  readonly created_at: Date, // timestamp
+  readonly updated_at: Date, // timestamp
+};
+
+
+// student-facing types below
 export type StudentFacingExamInfo = {
   readonly assigned_exam: Pick<ExamAssignmentInfo, "exam_uuid" | "uniqname" | "name" | "student_email" | "force_open" | "start_time" | "duration_multiplier" | "graded">,
   readonly exam_instance: Pick<ExamInstanceInfo, "exam_id" | "name" | "duration_seconds">,
@@ -55,7 +67,7 @@ export type StudentExamsResponse = {
   readonly now: number, // Unix timestamp in milliseconds
 };
 
-export type ExamSessionInfo = {
+export type StudentFacingExamSessionInfo = {
   readonly exam_uuid: string,
   readonly exam_window?: Pick<WindowInfo, "name" | "open_time" | "close_time">,
   readonly start_time?: Date | null, // timestamp

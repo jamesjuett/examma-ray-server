@@ -26,7 +26,7 @@ import { AsynchronousSimulationRunner } from "lobster-vis/dist/js/core/runtime/s
 
 import hotkeys from "hotkeys-js";
 import { ManualGradingSubmissionComponent, ManualGraderApp } from "./ManualGrader";
-import { parse_submission, validate_submission } from "examma-ray/dist/response/responses";
+import { parse_submission, validate_submission } from "examma-ray/dist/response/handlers";
 import {  } from "examma-ray/dist/response/common";
 import { AutoObject } from "lobster-vis/dist/js/core/runtime/objects";
 import { CompleteObjectType } from "lobster-vis/dist/js/core/compilation/types";

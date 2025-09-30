@@ -1,10 +1,11 @@
-import { BLANK_SUBMISSION, fill_response, parse_submission, validate_submission } from "examma-ray/dist/response/responses";
+import { fill_response, parse_submission, validate_submission } from "examma-ray/dist/response/handlers";
 import { Program } from "lobster-vis/dist/js/core/compilation/Program";
 import { v4 as uuidv4 } from "uuid";
 import { ManualGradingGroupRecord, ManualGradingSubmission } from "../manual_grading";
 import { ManualGraderApp, ManualGradingSubmissionComponent } from "./ManualGrader";
 
 import "examma-ray/dist/frontend/frontend.css";
+import { BLANK_SUBMISSION } from "examma-ray/dist/response/responses";
 
 // Because this grader is based on Lobster, it only works for C++ code
 // Perhaps in the future it will be generalized to other languages and

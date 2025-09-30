@@ -2,7 +2,7 @@ import { Request, Response, Router } from "express";
 import { getJwtUserInfo, isAdmin, isStaff } from "../auth/jwt_auth";
 import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getStudentExamsInfoByEmail, db_getWindowByUuid, db_saveLiveExamSubmission, db_setStartTimeToNow } from "../db/db_live";
 import { db_getUserByEmail } from "../db/db_user";
-import { ExamSessionInfo } from "../rest_types";
+import { StudentFacingExamSessionInfo } from "../rest_types";
 import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamUuid } from "./common";
 import { now } from "jquery";
 
@@ -86,7 +86,7 @@ student_router.route("/exams/:exam_uuid/session")
         ? await db_getWindowByUuid(exam_assn.window_uuid)
         : undefined;
 
-      const result : ExamSessionInfo = {
+      const result : StudentFacingExamSessionInfo = {
         exam_uuid: exam_assn.exam_uuid,
         start_time: exam_assn.start_time,
         exam_window: exam_window ? {
@@ -99,7 +99,6 @@ student_router.route("/exams/:exam_uuid/session")
         force_open: exam_assn.force_open,
         duration_multiplier: exam_assn.duration_multiplier,
       };
-
 
       console.log(`Live exam SESSION checked: ${userInfo.email} taking exam ${exam_uuid} for ${exam_assn.uniqname} (${exam_assn.student_email})`);
       

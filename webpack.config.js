@@ -5,6 +5,7 @@ module.exports = {
   entry: {
     'public/js/index': './src/frontend/index',
     'staff/js/staff': './src/frontend/staff',
+    'staff/js/courses': './src/frontend/courses',
     'staff/js/participation': './src/frontend/participation',
     'staff/js/dashboard': './src/frontend/dashboard',
     'staff/js/manual-code-grader': './src/frontend/manual-code-grader',

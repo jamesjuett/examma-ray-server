@@ -79,21 +79,6 @@ async function main() {
     app.reloadExams();
   });
 
-  $("#run-generate-participation-csv-button").on("click", async () => {
-    alert("hi");
-    let response = await axios({
-      url: `/run/participation`,
-      method: "POST",
-      headers: {
-        'Authorization': 'bearer ' + app.client.getBearerToken()
-      }
-    });
-
-    if (response.status !== 200) {
-      alert(response.data);
-    }
-  });
-
 }
 
 if (typeof $ === "function") {
