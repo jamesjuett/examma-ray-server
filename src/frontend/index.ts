@@ -94,7 +94,10 @@ export class IndexExammaRayApplication {
           this.next_open_close_timeout = window.setTimeout(() => {
             this.reloadExams();
             delete this.next_open_close_timeout
-          }, next_open_close.getTime() - server_now + 1000);
+          }, Math.min( // Taking the min is important here, since if the time is too far in the future, setTimeout has weird overflow behavior
+            next_open_close.getTime() - server_now + 1000,
+            60 * 60 * 1000 // 1 hour
+          ));
         }
 
       }
