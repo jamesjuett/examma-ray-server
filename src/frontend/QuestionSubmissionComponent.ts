@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { ManualGradingGroupRecord, ManualGradingSubmission } from "../manual_grading";
 import { ManualGraderApp, ManualGradingSubmissionComponent } from "./ManualGrader";
 
-import "examma-ray/dist/frontend/frontend.css";
+import "examma-ray/dist/frontend/frontend-solution";
 import { BLANK_SUBMISSION } from "examma-ray/dist/response/responses";
 
 // Because this grader is based on Lobster, it only works for C++ code
@@ -51,18 +51,20 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
     const studentSubmissionElem = this.responseElem.find("td").first();
     const sampleSolutionElem = this.responseElem.find("td").last();
 
-    studentSubmissionElem.html(this.app.question.renderResponse(uuidv4(), skin));
     const parsed = parse_submission(this.app.question.response.kind, sub.submission);
     if (parsed.validity === "malformed") {
       studentSubmissionElem.append("<br /><span class='text-danger'>[[MALFORMED SUBMISSION]]</span>");
       return;
     }
     const validated = validate_submission(this.app.question.response, parsed);
-    fill_response(
-      studentSubmissionElem,
-      this.app.question.response.kind,
-      validated.validity === "viable" ? validated : BLANK_SUBMISSION()
-    );
+    if (validated.validity === "viable") {
+      studentSubmissionElem.html(this.app.question.renderResponseSolution(uuidv4(), validated, skin));
+    }
+    // fill_response(
+    //   studentSubmissionElem,
+    //   this.app.question.response.kind,
+    //   validated.validity === "viable" ? validated : BLANK_SUBMISSION()
+    // );
 
     if (sampleSolution) {
       sampleSolutionElem.html(this.app.question.renderResponseSolution("NONE", sampleSolution, skin));
