@@ -182,3 +182,7 @@ body {
   border-bottom-left-radius: 5px;
   border-bottom-right-radius: 5px;
 }
+
+.examma-ray-fitb-droppable pre {
+  padding: 0px;
+}

@@ -6,6 +6,8 @@ import { ManualGraderApp, ManualGradingSubmissionComponent } from "./ManualGrade
 
 import "examma-ray/dist/frontend/frontend-solution";
 import { BLANK_SUBMISSION } from "examma-ray/dist/response/responses";
+import { SubmittedExamRenderer } from "examma-ray/dist/core/exam_renderer";
+import { AssignedQuestion } from "examma-ray";
 
 // Because this grader is based on Lobster, it only works for C++ code
 // Perhaps in the future it will be generalized to other languages and
@@ -16,7 +18,7 @@ const CODE_LANGUAGE = "cpp";
 export class QuestionSubmissionComponent implements ManualGradingSubmissionComponent {
 
   private readonly app: ManualGraderApp;
-
+  private readonly renderer = new SubmittedExamRenderer();
   private readonly responseElem;
   
   public constructor(app: ManualGraderApp) {
@@ -44,33 +46,48 @@ export class QuestionSubmissionComponent implements ManualGradingSubmissionCompo
     const sampleSolution = this.app.question.sampleSolution;
     const skin = this.app.skins[sub.skin_id];
 
-    this.responseElem.html(`<table>
-      <tr><th>Student Submission</th><th>${sampleSolution ? "Sample Solution" : "Sample Solution (None Provided)"}</th></tr>
-      <tr><td></td><td></td></tr>
-    </table>`);
-    const studentSubmissionElem = this.responseElem.find("td").first();
-    const sampleSolutionElem = this.responseElem.find("td").last();
+    // this.responseElem.html(`<table>
+    //   <tr><th>Student Submission</th><th>${sampleSolution ? "Sample Solution" : "Sample Solution (None Provided)"}</th></tr>
+    //   <tr><td></td><td></td></tr>
+    // </table>`);
+    // const studentSubmissionElem = this.responseElem.find("td").first();
+    // const sampleSolutionElem = this.responseElem.find("td").last();
 
     const parsed = parse_submission(this.app.question.response.kind, sub.submission);
     if (parsed.validity === "malformed") {
-      studentSubmissionElem.append("<br /><span class='text-danger'>[[MALFORMED SUBMISSION]]</span>");
+      this.responseElem.html("<span class='text-danger'>[[MALFORMED SUBMISSION]]</span>");
       return;
     }
     const validated = validate_submission(this.app.question.response, parsed);
-    if (validated.validity === "viable") {
-      studentSubmissionElem.html(this.app.question.renderResponseSolution(uuidv4(), validated, skin));
-    }
+    // if (validated.validity === "viable") {
+    //   this.responseElem.html(this.app.question.renderResponseSolution(uuidv4(), validated, skin));
+    // }
     // fill_response(
     //   studentSubmissionElem,
     //   this.app.question.response.kind,
     //   validated.validity === "viable" ? validated : BLANK_SUBMISSION()
     // );
 
-    if (sampleSolution) {
-      sampleSolutionElem.html(this.app.question.renderResponseSolution("NONE", sampleSolution, skin));
-    }
-
-    this.responseElem.append(this.app.question.renderDescription(this.app.skins[sub.skin_id]));
+    // if (sampleSolution) {
+    //   sampleSolutionElem.html(this.app.question.renderResponseSolution("NONE", sampleSolution, skin));
+    // }
+    const uuid = uuidv4();
+    this.responseElem.html(`
+      <div id="question-${uuid}" data-question-uuid="${uuid}" data-question-display-index="1" class="examma-ray-question card-group">
+        <div id="question-anchor-${uuid}" class="examma-ray-question-anchor"></div>
+        <div class="card">
+          <div class="card-header">
+            ${this.app.question.title}
+          </div>
+          <div class="card-body">
+            <div class="examma-ray-question-description">
+              ${this.app.question.renderDescription(this.app.skins[sub.skin_id])}
+            </div>
+            ${this.app.question.renderResponseSolution(uuid, validated.validity === "viable" ? validated : BLANK_SUBMISSION(), skin)}
+          </div>
+        </div>
+      </div>
+    `);
   }
   
 

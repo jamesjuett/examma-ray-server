@@ -1,13 +1,9 @@
 import { Request, Response, Router } from "express";
-import { query } from "../db/db";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam, validateParamExammaRayId } from "./common";
-import { Worker } from "worker_threads";
-import { readFileSync } from "fs";
-import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { db_getManualGradingRecords, db_getManualGradingRubric } from "../db/db_rubrics";
-import { ManualCodeGraderConfiguration, ManualGradingPingRequest, ManualGradingRubricItem, NextUngradedRequest, NextUngradedResponse } from "../manual_grading";
 import { getJwtUserInfo } from "../auth/jwt_auth";
 import { db_getCodeGraderConfig } from "../db/db_code_grader";
+import { ManualCodeGraderConfiguration, ManualGradingPingRequest, NextUngradedRequest, NextUngradedResponse } from "../manual_grading";
+import { EXAMMA_RAY_GRADING_SERVER } from "../server";
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, validateBody, validateParam, validateParamExammaRayId } from "./common";
 const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyQuestionId = validateBody("question_id").trim().isLength({min: 1, max: 100});
 const validateBodyGroupId = validateBody("group_id").trim().isLength({min: 1, max: 100});

@@ -159,11 +159,17 @@ export class ManualGraderApp {
   private updateGradingProgressBar() {
     let groups = Object.values(this.grading_records.groups);
     let n_graded = groups.filter(g => g!.finished).length;
-    this.gradingProgressBarElem.html(`${n_graded} / ${groups.length}`);
+    $("#examma-ray-grading-progress-left-text").html(`${n_graded} / ${groups.length} groups`);
+    $("#examma-ray-grading-progress-right-text").html(`${n_graded} / ${groups.length} groups`);
     this.gradingProgressBarElem.css("width", `${n_graded / groups.length * 100}%`);
-    // if (n_graded/groups.length < 0.15) {
-    //   this.gradingProgressBarElem.append(`<span class="float: right;">${groups.length} groups</span>`)
-    // }
+    if (n_graded/groups.length < 0.5) {
+      $("#examma-ray-grading-progress-left-text").show();
+      $("#examma-ray-grading-progress-right-text").hide();
+    }
+    else {
+      $("#examma-ray-grading-progress-left-text").hide();
+      $("#examma-ray-grading-progress-right-text").show();
+    }
   }
 
   public static async create(submissionComponent: new (app: ManualGraderApp) => ManualGradingSubmissionComponent, exam_id: string, question_id: string) {
