@@ -34,6 +34,11 @@ services:
     networks:
         - http
         - db
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   db:
     image: postgres
@@ -50,6 +55,11 @@ services:
       - examma-ray-db:/var/lib/postgresql/data
     networks:
       - db
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   caddy:
     image: caddy:2.4.6
@@ -62,6 +72,11 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
         
 volumes:
   examma-ray-db:
