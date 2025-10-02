@@ -280,7 +280,7 @@ export class ExamServer {
     this.exam_instances = exam_instances;
     this.exam_instances_by_uuid = new Map(exam_instances.map(ei => [ei.exam_instance_uuid, ei]));
     this.epoch = uuidv4();
-    question_servers.forEach(qs => this.questionGradingServers[qs.question_id] = qs);
+    question_servers.forEach(qs => this.questionGradingServers[qs.manual_grader_uuid] = qs);
     this.tasks = new ServerTasks();
   }
 
@@ -454,7 +454,7 @@ export class ExamServer {
 
   public getActiveGraders() {
     let active_graders: ActiveExamGraders = {};
-    Object.values(this.questionGradingServers).forEach(qgs => active_graders[qgs!.question_id] = qgs!.active_graders)
+    Object.values(this.questionGradingServers).forEach(qgs => active_graders[qgs!.manual_grader_uuid] = qgs!.active_graders)
     return active_graders;
   }
 }

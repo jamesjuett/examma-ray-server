@@ -3,110 +3,23 @@ import { getJwtUserInfo } from "../auth/jwt_auth";
 import { db_getCodeGraderConfig } from "../db/db_code_grader";
 import { ManualCodeGraderConfiguration, ManualGradingPingRequest, NextUngradedRequest, NextUngradedResponse } from "../manual_grading";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, validateBody, validateParam, validateParamExammaRayId } from "./common";
-const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
-const validateBodyQuestionId = validateBody("question_id").trim().isLength({min: 1, max: 100});
-const validateBodyGroupId = validateBody("group_id").trim().isLength({min: 1, max: 100});
-const validateBodyClientUuid = validateBody("client_uuid").isUUID();
-// const validateParamTerm = validateParam("term").isIn(["fall", "winter", "spring", "summer"]);
-// const validateParamYear = validateParam("year").isInt();
+import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, validateBody, validateParamExammaRayId } from "./common";
 
-// const validateBodyShortName = validateBody("short_name").trim().isLength({min: 1, max: 20});
-// const validateBodyFullName = validateBody("full_name").trim().isLength({min: 1, max: 100});
-// const validateBodyTerm = validateBody("term").isIn(["fall", "winter", "spring", "summer"]);
-// const validateBodyYear = validateBody("year").isInt();
-
-// const validateBodyCourse = [
-//   validateBodyShortName,
-//   validateBodyFullName,
-//   validateBodyTerm,
-//   validateBodyYear
-// ];
-
-
-
-// async function requireCourseAdmin(req: Request, res: Response, next: NextFunction) {
-//   let user_id = getJwtUserInfo(req).id;
-//   let course_id = parseInt(req.params["id"]);
-
-//   if (await isCourseAdmin(user_id, course_id)) {
-//     return next();
-//   }
-//   else {
-//     // Not authorized
-//     res.sendStatus(403);
-//   }
-
-// }
-
-// export const getCoursesRoute = createRoute({
-//   preprocessing: NO_PREPROCESSING,
-//   validation: NO_VALIDATION,
-//   authorization: NO_AUTHORIZATION,
-//   handler: async (req: Request, res: Response) => {
-//     res.status(200);
-//     res.json(await query("courses").select());
-//   }
-// });
-
-
-// export const getCourseByIdRoute = createRoute({
-//   preprocessing: NO_PREPROCESSING,
-//   validation: validateParamId,
-//   authorization: NO_AUTHORIZATION,
-//   handler: async (req: Request, res: Response) => {
-//     let course = await getCourse(parseInt(req.params["id"]));
-//     if (course) {
-//       res.status(200);
-//       res.json(course);
-//     }
-//     else {
-//       res.status(404);
-//       res.send("This course does not exist.");
-//     }
-//   }
-// });
-
-// export const getCourseByShortNameTermYearRoute = createRoute({
-//   preprocessing: NO_PREPROCESSING,
-//   validation: [
-//     validateParamShortName,
-//     validateParamTerm,
-//     validateParamYear,
-//   ],
-//   authorization: NO_AUTHORIZATION,
-//   handler: async (req: Request, res: Response) => {
-//     let course = getCourseByShortNameTermYear(
-//       req.params["short_name"],
-//       req.params["term"],
-//       parseInt(req.params["year"])
-//     );
-      
-//     if (course) {
-//       res.status(200);
-//       res.json(course);
-//     }
-//     else {
-//       res.status(404);
-//       res.send("This course does not exist.");
-//     }
-//   }
-// });
 
 
 export const manual_grading_router = Router();
 
-    
+
 manual_grading_router
-  .route("/:exam_id/questions/:question_id/rubric")
+  .route("/:exam_id/questions/:manual_grader_uuid/rubric")
     .get(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: NO_PREPROCESSING,
       validation: [
-        validateParamQuestionId
+        validateParamExammaRayId("manual_grader_uuid"),
       ],
       handler: async (req: Request, res: Response) => {
-        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["manual_grader_uuid"]);
         if (qs) {
           return res.status(200).json(qs.rubric);
         }
@@ -117,15 +30,15 @@ manual_grading_router
     }));
     
 manual_grading_router
-  .route("/:question_id/config")
+  .route("/:manual_grader_uuid/config")
     .get(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: NO_PREPROCESSING,
       validation: [
-        validateParamQuestionId
+        validateParamExammaRayId("manual_grader_uuid"),
       ],
       handler: async (req: Request, res: Response) => {
-        const result: ManualCodeGraderConfiguration | undefined = await db_getCodeGraderConfig(req.params["question_id"])
+        const result: ManualCodeGraderConfiguration | undefined = await db_getCodeGraderConfig(req.params["manual_grader_uuid"])
         if (result) {
           return res.status(200).json(result);
         }
@@ -136,21 +49,21 @@ manual_grading_router
     }));
 
 manual_grading_router
-  .route("/:exam_id/questions/:question_id/ping")
+  .route("/:exam_id/questions/:manual_grader_uuid/ping")
     .post(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: jsonBodyParser,
       validation: [
         validateParamExammaRayId("exam_id"),
-        validateParamExammaRayId("question_id"),
-        validateBodyGroupId.optional(),
-        validateBodyClientUuid,
+        validateParamExammaRayId("manual_grader_uuid"),
+        validateBody("group_uuid").isUUID().optional(),
+        validateBody("client_uuid").isUUID(),
         validateBody("my_grading_epoch").isInt().optional()
       ],
       handler: async (req: Request, res: Response) => {
         let userInfo = getJwtUserInfo(req);
         let pr = <ManualGradingPingRequest>req.body;
-        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["manual_grader_uuid"]);
         if (qs) {
           return res.status(200).json(await qs.processManualGradingPing(userInfo.email, pr));
         }
@@ -161,19 +74,19 @@ manual_grading_router
     }));
 
 manual_grading_router
-  .route("/:exam_id/questions/:question_id/claim_next_ungraded")
+  .route("/:exam_id/questions/:manual_grader_uuid/claim_next_ungraded")
     .post(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: jsonBodyParser,
       validation: [
         validateParamExammaRayId("exam_id"),
-        validateParamExammaRayId("question_id"),
-        validateBodyClientUuid,
+        validateParamExammaRayId("manual_grader_uuid"),
+        validateBody("client_uuid").isUUID(),
       ],
       handler: async (req: Request, res: Response) => {
         let userInfo = getJwtUserInfo(req);
         let next_ungraded_request = <NextUngradedRequest>req.body;
-        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["manual_grader_uuid"]);
         if (qs) {
           return res.status(200).json(<NextUngradedResponse>{
             group_uuid: qs.claimNextUngradedGroup(userInfo.email, next_ungraded_request.client_uuid, next_ungraded_request.desired)
@@ -186,16 +99,16 @@ manual_grading_router
     }));
 
 manual_grading_router
-  .route("/:exam_id/questions/:question_id/records")
+  .route("/:exam_id/questions/:manual_grader_uuid/records")
     .get(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: NO_PREPROCESSING,
       validation: [
         validateParamExammaRayId("exam_id"),
-        validateParamExammaRayId("question_id"),
+        validateParamExammaRayId("manual_grader_uuid"),
       ],
       handler: async (req: Request, res: Response) => {
-        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["manual_grader_uuid"]);
         if (qs) {
           return res.status(200).json(qs.grading_record);
         }
@@ -207,16 +120,16 @@ manual_grading_router
 
 
 manual_grading_router
-  .route("/:exam_id/questions/:question_id/skins")
+  .route("/:exam_id/questions/:manual_grader_uuid/skins")
     .get(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: NO_PREPROCESSING,
       validation: [
         validateParamExammaRayId("exam_id"),
-        validateParamExammaRayId("question_id"),
+        validateParamExammaRayId("manual_grader_uuid"),
       ],
       handler: async (req: Request, res: Response) => {
-        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["manual_grader_uuid"]);
         if (qs) {
           return res.status(200).json(qs.skins);
         }
@@ -228,16 +141,16 @@ manual_grading_router
 
 
 manual_grading_router
-  .route("/:exam_id/questions/:question_id/config")
+  .route("/:exam_id/questions/:manual_grader_uuid/config")
     .get(createRoute({
       authorization: NO_AUTHORIZATION, // requireSuperUser,
       preprocessing: NO_PREPROCESSING,
       validation: [
         validateParamExammaRayId("exam_id"),
-        validateParamExammaRayId("question_id"),
+        validateParamExammaRayId("manual_grader_uuid"),
       ],
       handler: async (req: Request, res: Response) => {
-        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["question_id"]);
+        let qs = EXAMMA_RAY_GRADING_SERVER.getExamServer(req.params["exam_id"])?.getGradingServer(req.params["manual_grader_uuid"]);
         if (qs) {
           return res.status(200).json(qs.config);
         }

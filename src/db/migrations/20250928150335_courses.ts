@@ -86,11 +86,11 @@ export async function up(knex: Knex): Promise<void> {
 
 export async function down(knex: Knex): Promise<void> {
 
+  await updated_at_trigger_down(knex.schema, "schedule_offset_items");
   await knex.schema.dropTableIfExists("schedule_offset_items");
-  await updated_at_trigger_down(knex.schema, "schedule_items");
 
-  await knex.schema.dropTableIfExists("course_schedules");
   await updated_at_trigger_down(knex.schema, "course_schedules");
+  await knex.schema.dropTableIfExists("course_schedules");
 
   await updated_at_trigger_down(knex.schema, "user_sections");
   await knex.schema.dropTableIfExists("user_sections");

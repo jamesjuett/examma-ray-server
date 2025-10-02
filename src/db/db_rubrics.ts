@@ -3,44 +3,44 @@ import { Tables } from "knex/types/tables";
 import { ManualGradingGroupRecord, ManualGradingQuestionRecords, ManualGradingRubricItem, ManualGradingRubricItemStatus } from "../manual_grading";
 import { query } from "./db";
 
-export async function db_getManualGradingQuestion(question_id: string) {
-  return await query("manual_grading_questions").where({question_id: question_id}).select().first();
+export async function db_getManualGradingQuestion(manual_grader_uuid: string) {
+  return await query("manual_grading_questions").where({manual_grader_uuid: manual_grader_uuid}).select().first();
 }
 
 export async function db_setManualGradingQuestion(
-  question_id: string,
+  manual_grader_uuid: string,
   grading_epoch: number) {
 
   // Create and get a copy of the new rubric item
   return await query("manual_grading_questions").insert({
-    question_id: question_id,
+    manual_grader_uuid: manual_grader_uuid,
     grading_epoch: grading_epoch
-  }).onConflict("question_id").merge();
+  }).onConflict("manual_grader_uuid").merge();
 }
 
 
 // SKINS
 
-export async function db_getManualGradingQuestionSkins(question_id: string) {
+export async function db_getManualGradingQuestionSkins(manual_grader_uuid: string) {
   return await query("manual_grading_question_skins").where({
-    question_id: question_id,
+    manual_grader_uuid: manual_grader_uuid,
   }).select();
 }
 
-export async function db_getManualGradingQuestionSkin(question_id: string, skin_id: string) {
+export async function db_getManualGradingQuestionSkin(manual_grader_uuid: string, skin_id: string) {
   return await query("manual_grading_question_skins").where({
-    question_id: question_id,
+    manual_grader_uuid: manual_grader_uuid,
     skin_id: skin_id
   }).select().first();
 }
 
-export async function db_insertManualGradingQuestionSkinIfNotExists(question_id: string, skin: ExamComponentSkin) {
+export async function db_insertManualGradingQuestionSkinIfNotExists(manual_grader_uuid: string, skin: ExamComponentSkin) {
   return await query("manual_grading_question_skins").insert({
-    question_id: question_id,
+    manual_grader_uuid: manual_grader_uuid,
     skin_id: skin.skin_id,
     non_composite_skin_id: skin.non_composite_skin_id,
     replacements: skin.replacements
-  }).onConflict(["question_id", "skin_id"]).ignore().returning("*");
+  }).onConflict(["manual_grader_uuid", "skin_id"]).ignore().returning("*");
 }
 
 
@@ -48,8 +48,8 @@ export async function db_insertManualGradingQuestionSkinIfNotExists(question_id:
 
 
 
-export async function db_getManualGradingRubric(question_id: string) {
-  return await query("manual_grading_rubrics").where({question_id: question_id}).select();
+export async function db_getManualGradingRubric(manual_grader_uuid: string) {
+  return await query("manual_grading_rubrics").where({manual_grader_uuid: manual_grader_uuid}).select();
 }
 
 export async function db_getGroupSubmissions(group_uuid: string) {
@@ -58,20 +58,20 @@ export async function db_getGroupSubmissions(group_uuid: string) {
   }).select("*");
 }
 
-export async function db_getManualGradingRubricItem(question_id: string, rubric_item_uuid: string) {
+export async function db_getManualGradingRubricItem(manual_grader_uuid: string, rubric_item_uuid: string) {
 
   // Create and get a copy of the new rubric item
   return await query("manual_grading_rubrics").where({
-    question_id: question_id,
+    manual_grader_uuid: manual_grader_uuid,
     rubric_item_uuid: rubric_item_uuid
   }).select().first();
 }
 
-export async function db_createManualGradingRubricItem(question_id: string, rubric_item_uuid: string, rubric_item: ManualGradingRubricItem) {
+export async function db_createManualGradingRubricItem(manual_grader_uuid: string, rubric_item_uuid: string, rubric_item: ManualGradingRubricItem) {
 
   // Create and get a copy of the new rubric item
   return await query("manual_grading_rubrics").insert({
-    question_id: question_id,
+    manual_grader_uuid: manual_grader_uuid,
     rubric_item_uuid: rubric_item_uuid,
     points: rubric_item.points,
     title: rubric_item.title,
@@ -81,10 +81,10 @@ export async function db_createManualGradingRubricItem(question_id: string, rubr
   }).returning("*");
 }
 
-export async function db_updateManualGradingRubricItem(question_id: string, rubric_item_uuid: string, updates: Partial<ManualGradingRubricItem>) {
+export async function db_updateManualGradingRubricItem(manual_grader_uuid: string, rubric_item_uuid: string, updates: Partial<ManualGradingRubricItem>) {
 
   return await query("manual_grading_rubrics").where({
-    question_id: question_id,
+    manual_grader_uuid: manual_grader_uuid,
     rubric_item_uuid: rubric_item_uuid
   }).update({
     points: updates.points,
@@ -136,31 +136,31 @@ export async function db_setManualGradingGroupFinished(
 }
 
 
-export async function db_getManualGradingRecords(question_id: string) : Promise<ManualGradingQuestionRecords> {
+export async function db_getManualGradingRecords(manual_grader_uuid: string) : Promise<ManualGradingQuestionRecords> {
 
   
   const question = await query("manual_grading_questions")
     .where({
-      question_id: question_id
+      manual_grader_uuid: manual_grader_uuid
     })
     .select("*").first();
   
   const groups = await query("manual_grading_groups")
     .where({
-      question_id: question_id
+      manual_grader_uuid: manual_grader_uuid
     })
     .select("*");
   
   const submissions = await query("manual_grading_submissions")
     .where({
-      question_id: question_id
+      manual_grader_uuid: manual_grader_uuid
     })
     .select("*");
 
   const records = await query("manual_grading_records")
     .join('manual_grading_groups', 'manual_grading_groups.group_uuid', '=', 'manual_grading_records.group_uuid')
     .where({
-      question_id: question_id
+      manual_grader_uuid: manual_grader_uuid
     })
     .select("manual_grading_records.group_uuid", "rubric_item_uuid", "status", "notes");
 
@@ -183,7 +183,7 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
       skin_id: sub.skin_id,
       exam_id: sub.exam_id,
       group_uuid: sub.group_uuid,
-      question_id: sub.question_id
+      manual_grader_uuid: sub.manual_grader_uuid
     });
   });
   records.forEach(r => {
@@ -204,7 +204,7 @@ export async function db_getManualGradingRecords(question_id: string) : Promise<
   });
 
   return {
-    question_id: question_id,
+    manual_grader_uuid: manual_grader_uuid,
     groups: group_records_by_id,
     grading_epoch: question?.grading_epoch ?? 0
   }

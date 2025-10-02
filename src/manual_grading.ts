@@ -1,7 +1,7 @@
 import { ExamComponentSkin } from "examma-ray";
 
 export type ManualCodeGraderConfiguration = {
-  question_id: string,
+  manual_grader_uuid: string,
   test_harness: string,
   grouping_function: string,
   // replacements: {[index: string]: string}
@@ -10,7 +10,7 @@ export type ManualCodeGraderConfiguration = {
 
 export type ManualGradingSubmission = {
   submission_uuid: string,
-  question_id: string,
+  manual_grader_uuid: string,
   exam_id: string,
   uniqname: string,
   submission: string,
@@ -59,7 +59,7 @@ export type ManualGradingQuestionRecords = {
   // name?: string,
   // exam_id: string,
   grading_epoch: number,
-  question_id: string,
+  manual_grader_uuid: string,
   groups: {
     [index: string]: ManualGradingGroupRecord | undefined
   }
@@ -75,7 +75,7 @@ export type ManualGradingSkins = {
 export type ManualGradingPingRequest = {
   client_uuid: string,
   exam_id: string,
-  question_id: string,
+  manual_grader_uuid: string,
   group_uuid?: string,
   my_grading_epoch: number
   my_operations: readonly ManualGradingOperation[]
@@ -83,7 +83,7 @@ export type ManualGradingPingRequest = {
 
 export type ManualGradingPingResponse = {
 
-  question_id: string,
+  manual_grader_uuid: string,
 
   /**
    * What grading epoch are we on

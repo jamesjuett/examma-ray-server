@@ -11,7 +11,7 @@ const GRADER_IDLE_THRESHOLD = 4000; // ms
 
 export class QuestionGradingServer {
   
-  public readonly question_id: string;
+  public readonly manual_grader_uuid: string;
   public readonly config: ManualCodeGraderConfiguration;
   public readonly rubric: ManualGradingRubricItem[];
 
@@ -34,39 +34,39 @@ export class QuestionGradingServer {
     [index: string] : QuestionGradingServer | undefined
   } = { };
 
-  public static async getOrCreate(question_id: string) {
+  public static async getOrCreate(manual_grader_uuid: string) {
 
-    const existing = this.INSTANCES[question_id];
+    const existing = this.INSTANCES[manual_grader_uuid];
     if (existing) {
-      console.log("reusing existing question grading server for " + question_id);
+      console.log("reusing existing question grading server for " + manual_grader_uuid);
       return existing;
     }
 
-    console.log("creating question grading server for " + question_id);
+    console.log("creating question grading server for " + manual_grader_uuid);
 
-    let question = await db_getManualGradingQuestion(question_id);
+    let question = await db_getManualGradingQuestion(manual_grader_uuid);
     if (!question) {
-      await db_setManualGradingQuestion(question_id, 0);
+      await db_setManualGradingQuestion(manual_grader_uuid, 0);
     }
 
-    let grader_config = await db_getCodeGraderConfig(question_id);
+    let grader_config = await db_getCodeGraderConfig(manual_grader_uuid);
     if (!grader_config) {
-      await db_createCodeGraderConfig(question_id, DEFAULT_TEST_HARNESS, DEFAULT_GROUPING_FUNCTION);
-      grader_config = await db_getCodeGraderConfig(question_id);
+      await db_createCodeGraderConfig(manual_grader_uuid, DEFAULT_TEST_HARNESS, DEFAULT_GROUPING_FUNCTION);
+      grader_config = await db_getCodeGraderConfig(manual_grader_uuid);
     }
     assert(grader_config);
 
     return new QuestionGradingServer(
-      question_id,
-      await db_getManualGradingRubric(question_id),
+      manual_grader_uuid,
+      await db_getManualGradingRubric(manual_grader_uuid),
       grader_config,
-      await loadSkins(question_id),
-      await db_getManualGradingRecords(question_id)
+      await loadSkins(manual_grader_uuid),
+      await db_getManualGradingRecords(manual_grader_uuid)
     );
   }
 
-  private constructor(question_id: string, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, skins: ManualGradingSkins, grading_record: ManualGradingQuestionRecords) {
-    this.question_id = question_id;
+  private constructor(manual_grader_uuid: string, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, skins: ManualGradingSkins, grading_record: ManualGradingQuestionRecords) {
+    this.manual_grader_uuid = manual_grader_uuid;
     this.history_starting_epoch = grading_record.grading_epoch;
     this.rubric = rubric;
     this.config = config;
@@ -118,7 +118,7 @@ export class QuestionGradingServer {
       for(let i = 0; i < nextTransition.ops.length; ++i) {
         await this.recordOperation(nextTransition.ops[i]);
       }
-      await db_setManualGradingQuestion(this.question_id, this.grading_record.grading_epoch);
+      await db_setManualGradingQuestion(this.manual_grader_uuid, this.grading_record.grading_epoch);
     }
     
   }
@@ -185,28 +185,28 @@ export class QuestionGradingServer {
       return db_setManualGradingGroupFinished(op.group_uuid, op.finished);
     }
     else if (op.kind === "edit_rubric_item") {
-      if (await db_getManualGradingRubricItem(this.question_id, op.rubric_item_uuid)) {
-        return db_updateManualGradingRubricItem(this.question_id, op.rubric_item_uuid, op.edits)
+      if (await db_getManualGradingRubricItem(this.manual_grader_uuid, op.rubric_item_uuid)) {
+        return db_updateManualGradingRubricItem(this.manual_grader_uuid, op.rubric_item_uuid, op.edits)
       }
       // tehcnically should never get here - rubric items can't be deleted, only hidden
       return assertFalse();
     }
     else if (op.kind === "create_rubric_item") {
-      if (await db_getManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_uuid)) {
-        return db_updateManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_uuid, op.rubric_item)
+      if (await db_getManualGradingRubricItem(this.manual_grader_uuid, op.rubric_item.rubric_item_uuid)) {
+        return db_updateManualGradingRubricItem(this.manual_grader_uuid, op.rubric_item.rubric_item_uuid, op.rubric_item)
       }
       else {
-        return db_createManualGradingRubricItem(this.question_id, op.rubric_item.rubric_item_uuid, op.rubric_item)
+        return db_createManualGradingRubricItem(this.manual_grader_uuid, op.rubric_item.rubric_item_uuid, op.rubric_item)
       }
     }
     else if (op.kind === "edit_code_grader_config") {
-      db_updateCodeGraderConfig(this.question_id, op.edits)
+      db_updateCodeGraderConfig(this.manual_grader_uuid, op.edits)
     }
     else if (op.kind === "assign_groups_operation") {
       for (let submission_uuid in op.assignment) {
         let group_uuid = op.assignment[submission_uuid]!;
         if (!await db_getGroup(group_uuid)) {
-          await db_createGroup(group_uuid, this.question_id, false);
+          await db_createGroup(group_uuid, this.manual_grader_uuid, false);
         }
         await db_setSubmissionGroup(submission_uuid, group_uuid);
       }
@@ -228,13 +228,13 @@ export class QuestionGradingServer {
     await this.transitionRecorderQueueLock;
 
     // Reload grading record
-    asMutable(this).grading_record = await db_getManualGradingRecords(this.question_id);
+    asMutable(this).grading_record = await db_getManualGradingRecords(this.manual_grader_uuid);
 
     // Reload skins (may come with new submissions added to DB)
-    asMutable(this).skins = await loadSkins(this.question_id);
+    asMutable(this).skins = await loadSkins(this.manual_grader_uuid);
 
     // New grading epoch to represent new data in the DB
-    await db_setManualGradingQuestion(this.question_id, ++this.grading_record.grading_epoch);
+    await db_setManualGradingQuestion(this.manual_grader_uuid, ++this.grading_record.grading_epoch);
 
     // Force all clients to reload
     this.clearTransitionHistory();
@@ -298,7 +298,7 @@ export class QuestionGradingServer {
     }
 
     return {
-      question_id: this.question_id,
+      manual_grader_uuid: this.manual_grader_uuid,
       active_graders: this.active_graders,
       grading_epoch: this.grading_record.grading_epoch,
       epoch_transitions: transitions
@@ -306,9 +306,9 @@ export class QuestionGradingServer {
   }
 }
 
-async function loadSkins(question_id: string) {
+async function loadSkins(manual_grader_uuid: string) {
   let skins : ManualGradingSkins = {};
-  (await db_getManualGradingQuestionSkins(question_id)).forEach(s => {
+  (await db_getManualGradingQuestionSkins(manual_grader_uuid)).forEach(s => {
     skins[s.skin_id] = {
       skin_id: s.skin_id,
       non_composite_skin_id: s.non_composite_skin_id,

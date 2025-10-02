@@ -23,26 +23,26 @@ declare module "knex/types/tables" {
   }
 
   interface DB_Manual_Grading_Code_Grader_Config {
-    question_id: string;
+    manual_grader_uuid: string;
     test_harness: string;
     grouping_function: string;
   }
 
   interface DB_Manual_Grading_Questions {
-    question_id: string;
+    manual_grader_uuid: string;
     // grouping_epoch: number;
     grading_epoch: number;
   }
 
   interface DB_Manual_Grading_Question_Skins {
-    question_id: string;
+    manual_grader_uuid: string;
     skin_id: string;
     non_composite_skin_id?: string;
     replacements: {[index: string]: string};
   }
 
   interface DB_Manual_Grading_Rubrics {
-    question_id: string;
+    manual_grader_uuid: string;
     rubric_item_uuid: string;
     points: number;
     title: string;
@@ -55,7 +55,7 @@ declare module "knex/types/tables" {
 
   interface DB_Manual_Grading_Groups {
     group_uuid: string;
-    question_id: string;
+    manual_grader_uuid: string;
     finished: boolean;
     // grouper: string;
     grader: string;
@@ -65,7 +65,7 @@ declare module "knex/types/tables" {
 
   interface DB_Manual_Grading_Submissions {
     submission_uuid: string;
-    question_id: string;
+    manual_grader_uuid: string;
     skin_id: string;
     exam_id: string;
     group_uuid: string;
@@ -239,8 +239,8 @@ declare module "knex/types/tables" {
       //   All required
       DB_Manual_Grading_Code_Grader_Config,
       // Update Type
-      //   All optional except question_id may not be updated
-      Partial<Omit<DB_Manual_Grading_Code_Grader_Config, "question_id">> & {question_id?: undefined}
+      //   All optional except manual_grader_uuid may not be updated
+      Partial<Omit<DB_Manual_Grading_Code_Grader_Config, "manual_grader_uuid">> & {manual_grader_uuid?: undefined}
     >;
 
     manual_grading_questions: Knex.CompositeTableType<
@@ -272,8 +272,8 @@ declare module "knex/types/tables" {
       //   All required, except active (default true) and sort_index (optional)
       Omit<DB_Manual_Grading_Rubrics, "active" | "sort_index"> & Partial<Pick<DB_Manual_Grading_Rubrics, "active" | "sort_index">>,
       // Update Type
-      //   All optional except question_id and rubric_item_uuid may not be updated
-      Partial<Omit<DB_Manual_Grading_Rubrics, "question_id" | "rubric_item_uuid">> & Partial<Record<"question_id" | "rubric_item_uuid", undefined>>
+      //   All optional except manual_grader_uuid and rubric_item_uuid may not be updated
+      Partial<Omit<DB_Manual_Grading_Rubrics, "manual_grader_uuid" | "rubric_item_uuid">> & Partial<Record<"manual_grader_uuid" | "rubric_item_uuid", undefined>>
     >;
 
     manual_grading_groups: Knex.CompositeTableType<

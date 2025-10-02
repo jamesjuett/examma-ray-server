@@ -69,7 +69,11 @@ export class ManualGraderApp {
 
   public submissionComponent: ManualGradingSubmissionComponent;
   
-  private constructor(client: ExammaRayClient, submissionComponent: new (app: ManualGraderApp) => ManualGradingSubmissionComponent, exam_id: string, question: Question, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration, records: ManualGradingQuestionRecords, skins: ManualGradingSkins) {
+  private constructor(
+    client: ExammaRayClient, submissionComponent: new (app: ManualGraderApp) => ManualGradingSubmissionComponent,
+    exam_id: string, question: Question, rubric: ManualGradingRubricItem[], config: ManualCodeGraderConfiguration,
+    records: ManualGradingQuestionRecords, skins: ManualGradingSkins)
+  {
     this.client = client;
     this.exam_id = exam_id;
     this.question = question;
