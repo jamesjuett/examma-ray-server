@@ -1,5 +1,5 @@
 // import minimist from "minimist";
-import { AssignedExam, Exam, ExamSubmission, fillManifest, parseExamSubmission, TransparentExamManifest, TrustedExamSubmission } from "examma-ray";
+import { AssignedExam, compositeSkinId, Exam, ExamSubmission, fillManifest, parseExamSubmission, TransparentExamManifest, TrustedExamSubmission } from "examma-ray";
 import { ExamGrader } from "examma-ray/dist/ExamGrader";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import extract from "extract-zip";
@@ -14,6 +14,7 @@ import { RATE_LIMITED_POST_MESSAGE } from "./common";
 import { WorkerData_ProcessDBSubmissions } from "./run";
 import { db_getLiveExamSubmissionByUuid, db_getLiveExamAssignmentAndSubmission } from "../db/db_live";
 import { DB_Live_Exam_Assignments, DB_Live_Submissions } from "knex/types/tables";
+import { db_insertQuestionSubmissions } from "../db/db_questions";
 
 const workerData: WorkerData_ProcessDBSubmissions = workerDataUntyped;
 
@@ -25,6 +26,28 @@ async function addSubmission(exam: Exam, db_submission: DB_Live_Submissions & DB
     const existing_submission = await db_getExamSubmissionByUuid(db_submission.exam_uuid);
 
     if (existing_submission) {
+      // TODO: REMOVE THIS
+      // for now, add question submissions
+      // Load a trusted submission for them
+      const manifest_file = `data/${exam.exam_id}/manifests/${db_submission.uniqname}-${db_submission.exam_uuid}.json`;
+      
+      const manifest = ExamUtils.loadExamManifest(manifest_file) as TransparentExamManifest;
+      
+      const parsed_sub = db_submission.submission as unknown as ExamSubmission;
+      const trusted_sub = fillManifest(manifest, parsed_sub);
+      const question_submissions = trusted_sub.sections.flatMap(s_sub => s_sub.questions.map(q_sub => ({
+        question_id: q_sub.question_id,
+        exam_id: exam.exam_id,
+        exam_instance_uuid: db_submission.exam_instance_uuid,
+        assigned_exam_uuid: db_submission.exam_uuid,
+        uniqname: trusted_sub.student.uniqname,
+        submission: {
+          ...q_sub,
+          skin_id : compositeSkinId(s_sub.skin_id, q_sub.skin_id)
+        }
+      })));
+      await db_insertQuestionSubmissions(question_submissions);
+
       console.log("skipping duplicate submission for " + db_submission.uniqname + " (" + db_submission.exam_uuid + ")");
       return;
     }
@@ -46,12 +69,26 @@ async function addSubmission(exam: Exam, db_submission: DB_Live_Submissions & DB
 
     // Add submission to database
     await db_addExamSubmission(trusted_sub);
+    
+    const question_submissions = trusted_sub.sections.flatMap(s_sub => s_sub.questions.map(q_sub => ({
+      question_id: q_sub.question_id,
+      exam_id: exam.exam_id,
+      exam_instance_uuid: db_submission.exam_instance_uuid,
+      assigned_exam_uuid: db_submission.exam_uuid,
+      uniqname: trusted_sub.student.uniqname,
+      submission: {
+        ...q_sub,
+        skin_id : compositeSkinId(s_sub.skin_id, q_sub.skin_id)
+      }
+    })));
+    await db_insertQuestionSubmissions(question_submissions);
     await assignGrading(exam, trusted_sub);
 
     return trusted_sub;
   }
-  catch (e: unknown) {
-    console.log(e);
+  catch (err: unknown) {
+    console.log(`Error processing submission for ${db_submission.uniqname} (${db_submission.exam_uuid}) for exam ${exam.exam_id} instance ${db_submission.exam_instance_uuid}:`);
+    console.log(err);
   }
 }
 

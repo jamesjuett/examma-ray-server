@@ -11,6 +11,7 @@ module.exports = {
     'staff/js/live_submission': './src/frontend/live_submission',
     'staff/js/manual-code-grader': './src/frontend/manual-code-grader',
     'staff/js/manual-generic-grader': './src/frontend/manual-generic-grader',
+    'staff/js/fitb-drop-grader': './src/frontend/fitb-drop-grader',
   },
   output: {
     path: path.join(__dirname, '/'),
@@ -49,17 +50,12 @@ module.exports = {
         },
       },
       {
-        test: /\.(woff(2)?|ttf|eot|svg)(\?v=\d+\.\d+\.\d+)?$/,
-        use: [
-          {
-            loader: 'file-loader',
-            options: {
-              name: '[name].[ext]',
-              outputPath: 'fonts/'
-            }
-          }
-        ]
-      }
+        test: /\.(woff|woff2|eot|ttf|otf)$/i,
+        type: 'asset/resource',
+        generator: {
+          filename: 'fonts/[name][ext]',
+        },
+      },
     ]
   },
   resolve: {

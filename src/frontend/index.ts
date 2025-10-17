@@ -1,5 +1,5 @@
 import axios from "axios";
-import { DB_Exams, DB_Live_Exam_Assignments, DB_Live_Exam_Instances } from "knex/types/tables";
+import { DB_Exams, DB_Live_Exam_Assignments, DB_Exam_Instances } from "knex/types/tables";
 import { ExammaRayClient } from "./Application";
 import { ExamAssignmentInfo, ExamInstanceInfo, StudentExamsResponse, StudentFacingExamInfo } from "../rest_types";
 

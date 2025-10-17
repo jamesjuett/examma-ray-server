@@ -1,7 +1,7 @@
 import { Request, Response, Router } from "express";
 import { RunGradingRequest } from "../dashboard";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam, validateParamExamId, validateParamUuid } from "./common";
+import { createRoute, jsonBodyParser_large_10MB, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam, validateParamExammaRayId, validateParamUuid } from "./common";
 import { ServerTasks } from "../ServerTasks";
 import { Worker } from "worker_threads";
 import { requireAdmin } from "../auth/jwt_auth";
@@ -10,9 +10,9 @@ export const run_router = Router();
 
 run_router.route("/grade/:exam_id/instances/:exam_instance_uuid").post(createRoute({
   authorization: NO_AUTHORIZATION,
-  preprocessing: jsonBodyParser,
+  preprocessing: jsonBodyParser_large_10MB,
   validation: [
-    validateParamExamId,
+    validateParamExammaRayId("exam_id"),
     validateParamUuid("exam_instance_uuid"),
     validateBody("reports").isBoolean({strict: true}),
     validateBody("curve").isBoolean({strict: true}),
@@ -43,9 +43,9 @@ run_router.route("/grade/:exam_id/instances/:exam_instance_uuid").post(createRou
 
 run_router.route("/generate/:exam_id/instances/:exam_instance_uuid").post(createRoute({
   authorization: NO_AUTHORIZATION,
-  preprocessing: jsonBodyParser,
+  preprocessing: jsonBodyParser_large_10MB,
   validation: [
-    validateParamExamId,
+    validateParamExammaRayId("exam_id"),
     validateParamUuid("exam_instance_uuid"),
   ],
   handler: (req: Request, res: Response) => {
@@ -70,9 +70,9 @@ run_router.route("/generate/:exam_id/instances/:exam_instance_uuid").post(create
 
 run_router.route("/process_db_submissions/:exam_id/instances/:exam_instance_uuid").post(createRoute({
   authorization: requireAdmin,
-  preprocessing: jsonBodyParser,
+  preprocessing: jsonBodyParser_large_10MB,
   validation: [
-    validateParamExamId,
+    validateParamExammaRayId("exam_id"),
     validateParamUuid("exam_instance_uuid"),
   ],
   handler: (req: Request, res: Response) => {

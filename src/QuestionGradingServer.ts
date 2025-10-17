@@ -31,16 +31,20 @@ export class QuestionGradingServer {
   private reload_lock?: Promise<void>;
 
   private static INSTANCES : {
-    [index: string] : QuestionGradingServer | undefined
+    [index: string] : QuestionGradingServer | Promise<QuestionGradingServer> | undefined
   } = { };
 
   public static async getOrCreate(question_id: string) {
-
     const existing = this.INSTANCES[question_id];
     if (existing) {
       console.log("reusing existing question grading server for " + question_id);
       return existing;
     }
+
+    return this.INSTANCES[question_id] = this.getOrCreate_impl(question_id);
+  }
+  
+  public static async getOrCreate_impl(question_id: string) {
 
     console.log("creating question grading server for " + question_id);
 

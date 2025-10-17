@@ -105,6 +105,8 @@ dist
 
 .vscode
 
+.VSCodeCounter/
+
 # examma-ray-server
 build/
 secrets/*
@@ -117,3 +119,4 @@ data/
 out/
 uploads/
 live/
+db_backup*

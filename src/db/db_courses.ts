@@ -17,8 +17,8 @@ export async function db_getRosterForCourseAndRole(course_pk: number, role: "stu
   return query("course_users").select("*").where({ course_pk: course_pk, role: role });
 }
 
-export async function db_upsertUsersToCourseRosterWithRole<T>(
-  course_pk: number, roster: Exact<T, { email: string; name: string; }>[], role: "student" | "staff" | "admin") {
+export async function db_upsertUsersToCourseRosterWithRole<T extends { email: string; name: string; }>(
+  course_pk: number, roster: Exact<{ email: string; name: string; }, T>[], role: "student" | "staff" | "admin") {
   return query("course_users")
     .insert(
       roster.map(r => ({
@@ -35,16 +35,16 @@ export async function db_getCourseSections(course_pk: number) {
   return query("course_sections").select("*").where({ course_pk });
 }
 
-export async function db_upsertCourseSections<T>(
-  sections: Exact<T, { course_pk: number, section_id: string; section_name: string; }>[]) {
+export async function db_upsertCourseSections<T extends { course_pk: number, section_id: string; section_name: string; }>(
+  sections: Exact<{ course_pk: number, section_id: string; section_name: string; }, T>[]) {
   return query("course_sections")
     .insert(sections)
     .onConflict(["course_pk", "section_id"])
     .merge();
 }
 
-export async function db_assignUsersToSections<T>(
-  section_assignments: Exact<T, { email: string; section_pk: number; }>[]) {
+export async function db_assignUsersToSections<T extends { email: string; section_pk: number; }>(
+  section_assignments: Exact<{ email: string; section_pk: number; }, T>[]) {
   return query("user_sections")
     .insert(section_assignments)
     .onConflict(["email", "section_pk"])

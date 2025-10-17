@@ -11,7 +11,6 @@ import { ActiveQuestionGraders, GradingGroupReassignment, isMeaningfulManualGrad
 import { asMutable, assert, assertFalse, assertNever } from "../util/util";
 import { ExammaRayClient } from "./Application";
 import "./code-grader.css";
-import { group } from "console";
 
 
 

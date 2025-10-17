@@ -5,7 +5,7 @@ import { ExamDiff } from "examma-ray/dist/ExamDiff";
 import queryString from "query-string";
 import { ExamPingResponse, RunGradingRequest } from "../dashboard";
 import { ExamTaskStatus } from "../ExamServer";
-import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, SubmissionInfo, WindowInfo } from "../rest_types";
+import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, ExamSubmissionInfo, WindowInfo } from "../rest_types";
 import { asMutable, assert } from "../util/util";
 import { ExammaRayClient } from "./Application";
 import randomColor from "randomcolor";
@@ -449,7 +449,7 @@ export class ExamDashboardApplication {
       //       'Authorization': 'bearer ' + this.client.getBearerToken()
       //   },
       // });
-      // const exam_instances = <DB_Live_Exam_Instances[]>exam_instance_response.data;
+      // const exam_instances = <DB_Exam_Instances[]>exam_instance_response.data;
       // if (exam_instances.length > 0) {
       //   asMutable(this).exam_instance_uuid = exam_instances[0].exam_instance_uuid;
       // }
@@ -480,9 +480,9 @@ export class ExamDashboardApplication {
         headers: {
             'Authorization': 'bearer ' + this.client.getBearerToken()
         }
-      })).data as SubmissionInfo[];
+      })).data as ExamSubmissionInfo[];
 
-      const submissions_by_uuid: {[index: string]: SubmissionInfo} = {};
+      const submissions_by_uuid: {[index: string]: ExamSubmissionInfo} = {};
       submissions.forEach(s => submissions_by_uuid[s.exam_uuid] = s);
 
       // const roster_response = await axios({

@@ -1,20 +1,21 @@
 import { Exam, ExamSpecification, StudentInfo } from "examma-ray";
 import { createStudentExamUuid } from "examma-ray/dist/core/assigned_exams";
 import { rm } from "fs/promises";
-import { DB_Live_Exam_Assignment_Update, DB_Live_Exam_Assignments, DB_Live_Exam_Instances, DB_Live_Windows } from "knex/types/tables";
+import { DB_Exam_Instances, DB_Live_Exam_Assignment_Update, DB_Live_Windows } from "knex/types/tables";
 import { v4 as uuidv4 } from "uuid";
 import { Worker } from "worker_threads";
+import { CollaborativeGradingServer } from "./collaborative_grading/CollaborativeGradingServer";
 import { RunGradingRequest } from "./dashboard";
 import { db_deleteManualGradingByExam, db_deleteManualGradingBySubmission } from "./db/db_code_grader";
+import { db_getCollaborativeGradingServersByExamInstance } from "./db/db_collaborative_grading";
 import { db_deleteExam, db_deleteExamSubmissionByUuid, db_deleteExamSubmissions, db_getExamSubmissionByUuid } from "./db/db_exams";
-import { db_createOrUpdateExamInstanceWindowsWithUuids, db_createLiveExamAssignment, db_createLiveExamInstance, db_getExamInstanceWindows, db_getLiveExamAssignmentsByInstance, db_getLiveExamInstanceByUuid, db_getLiveExamInstancesByExamId, db_getLiveExamSubmissions, db_updateLiveExamAssignment } from "./db/db_live";
+import { db_createExamInstance, db_createLiveExamAssignment, db_createOrUpdateExamInstanceWindowsWithUuids, db_getExamInstanceByUuid, db_getExamInstancesByExamId, db_getExamInstanceWindows, db_getLiveExamAssignmentsByInstance, db_getLiveExamSubmissions, db_updateLiveExamAssignment } from "./db/db_live";
 import { ActiveExamGraders } from "./manual_grading";
 import { QuestionGradingServer } from "./QuestionGradingServer";
+import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, WindowInfo } from "./rest_types";
 import { runGenerateWorker, runGradeWorker } from "./run/run";
 import { ServerTasks } from "./ServerTasks";
 import { asMutable, assertExists } from "./util/util";
-import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, WindowInfo } from "./rest_types";
-import { assert } from "console";
 
 function MAKE_UMICH_EMAIL(uniqname: string) {
   return uniqname + "@umich.edu";
@@ -28,7 +29,7 @@ export type ExamTask =
 export type ExamTaskStatus = ServerTasks<ExamTask>["taskStatus"];
 
 export class ExamInstanceServer {
-  // all the fields from DB_Live_Exam_Instances
+  // all the fields from DB_Exam_Instances
   public readonly exam_instance_uuid: string;
   public readonly exam_id: string;
   public readonly name: string;
@@ -49,7 +50,14 @@ export class ExamInstanceServer {
 
   private modification_lock: Promise<void> = Promise.resolve();
 
-  private constructor(db_instance: DB_Live_Exam_Instances, db_assignments: readonly ExamAssignmentInfo[], db_windows: readonly DB_Live_Windows[]) {
+  public readonly collaborative_grading_servers_by_question_id : ReadonlyMap<string, CollaborativeGradingServer>;
+
+  private constructor(
+    db_instance: DB_Exam_Instances,
+    db_assignments: readonly ExamAssignmentInfo[],
+    db_windows: readonly DB_Live_Windows[],
+    collaborative_grading_servers_by_question_id: ReadonlyMap<string, CollaborativeGradingServer>,
+  ) {
     this.exam_instance_uuid = db_instance.exam_instance_uuid;
     this.exam_id = db_instance.exam_id;
     this.name = db_instance.name;
@@ -61,16 +69,25 @@ export class ExamInstanceServer {
     this.windows_sorted_open_asc = db_windows.slice().sort((a, b) => a.open_time.getTime() - b.open_time.getTime());
     this.windows_sorted_close_asc = db_windows.slice().sort((a, b) => a.close_time.getTime() - b.close_time.getTime());
     this.windows_by_uuid = new Map(db_windows.map(w => [w.window_uuid, w]));
-    
+
+    this.collaborative_grading_servers_by_question_id = collaborative_grading_servers_by_question_id;
+
     this.epoch = uuidv4();
     this.tasks = new ServerTasks();
   }
 
   public static async create(exam_instance_uuid: string) {
+    const grading_server_configs = await db_getCollaborativeGradingServersByExamInstance(exam_instance_uuid);
+    const grading_servers = await Promise.all(grading_server_configs.map(
+      config => CollaborativeGradingServer.getOrLoadInstance(config.grading_server_pk)
+    ));
+
     return new ExamInstanceServer( 
-      assertExists(await db_getLiveExamInstanceByUuid(exam_instance_uuid)),
+      assertExists(await db_getExamInstanceByUuid(exam_instance_uuid)),
       await db_getLiveExamAssignmentsByInstance(exam_instance_uuid),
       await db_getExamInstanceWindows(exam_instance_uuid),
+      new Map<string, CollaborativeGradingServer>(grading_servers.map(s => [s.question_id, s])
+    )
     );
   }
 
@@ -269,9 +286,7 @@ export class ExamServer {
 
   public readonly tasks: ServerTasks<ExamTask>;
 
-  private readonly questionGradingServers: {
-    [index: string]: QuestionGradingServer | undefined
-  } = {};
+  private readonly questionGradingServers : ReadonlyMap<string, QuestionGradingServer> = new Map();
 
   private readonly listeners: ExamServerListener[] = [];
 
@@ -280,12 +295,12 @@ export class ExamServer {
     this.exam_instances = exam_instances;
     this.exam_instances_by_uuid = new Map(exam_instances.map(ei => [ei.exam_instance_uuid, ei]));
     this.epoch = uuidv4();
-    question_servers.forEach(qs => this.questionGradingServers[qs.question_id] = qs);
+    question_servers.forEach(qs => asMutable(this.questionGradingServers).set(qs.question_id, qs));
     this.tasks = new ServerTasks();
   }
 
   public static async create(exam_spec: ExamSpecification) {
-    const db_exam_instances = await db_getLiveExamInstancesByExamId(exam_spec.exam_id);
+    const db_exam_instances = await db_getExamInstancesByExamId(exam_spec.exam_id);
     const exam = Exam.create(exam_spec);
     return new ExamServer(
       exam,
@@ -328,7 +343,7 @@ export class ExamServer {
     uuidv5_namespace?: string, randomization_seed?: string) {
 
     console.log("creating exam instance...".bgBlue);
-    const db_instance = await db_createLiveExamInstance(
+    const db_instance = await db_createExamInstance(
       this.exam.exam_id, name, duration_seconds,
       uuidv5_namespace, randomization_seed
     );
@@ -346,7 +361,11 @@ export class ExamServer {
     asMutable(this).exam = Exam.create(new_exam_spec);
     await Promise.all(
       this.exam.allQuestions.map(
-        async (question) => this.questionGradingServers[question.question_id] ??= await QuestionGradingServer.getOrCreate(question.question_id)
+        async (question) => {
+          if (!this.questionGradingServers.has(question.question_id)) {
+            asMutable(this.questionGradingServers).set(question.question_id, await QuestionGradingServer.getOrCreate(question.question_id));
+          }
+        }
       )
     );
     // just run generation async, don't await it
@@ -386,7 +405,7 @@ export class ExamServer {
     this.nextEpoch();
 
     // All question grading servers will need to reload new submission data from the DB
-    await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
+    await Promise.all(this.questionGradingServers.values().map(qgs => qgs!.reloadGradingRecords()));
   }
 
   public async processDBSubmissions(exam_instance_uuid: string) {
@@ -404,7 +423,7 @@ export class ExamServer {
     this.nextEpoch();
 
     // All question grading servers will need to reload new submission data from the DB
-    await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
+    await Promise.all(this.questionGradingServers.values().map(qgs => qgs!.reloadGradingRecords()));
   
   }
   
@@ -429,7 +448,7 @@ export class ExamServer {
     this.nextEpoch();
 
     // All question grading servers will need to reload new submission data from the DB
-    await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
+    await Promise.all(this.questionGradingServers.values().map(qgs => qgs!.reloadGradingRecords()));
   }
 
   public async deleteEverything() {
@@ -441,7 +460,7 @@ export class ExamServer {
     await rm(`data/${this.exam.exam_id}/`, { force: true, recursive: true });
 
     // All question grading servers will need to reload new submission data from the DB
-    await Promise.all(Object.values(this.questionGradingServers).map(qgs => qgs!.reloadGradingRecords()));
+    await Promise.all(this.questionGradingServers.values().map(qgs => qgs!.reloadGradingRecords()));
   }
 
   public getTaskStatus() {
@@ -449,12 +468,12 @@ export class ExamServer {
   }
   
   public getGradingServer(question_id: string) {
-    return this.questionGradingServers[question_id];
+    return this.questionGradingServers.get(question_id);
   }
 
   public getActiveGraders() {
     let active_graders: ActiveExamGraders = {};
-    Object.values(this.questionGradingServers).forEach(qgs => active_graders[qgs!.question_id] = qgs!.active_graders)
+    this.questionGradingServers.values().forEach(qgs => active_graders[qgs!.question_id] = qgs!.active_graders)
     return active_graders;
   }
 }

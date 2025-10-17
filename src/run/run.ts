@@ -1,7 +1,7 @@
 import { StudentInfo } from "examma-ray";
 import { ExamGeneratorOptions } from "examma-ray/dist/ExamGenerator";
 import { ExamGraderOptions } from "examma-ray/dist/ExamGrader";
-import { DB_Live_Exam_Assignments, DB_Live_Exam_Instances } from "knex/types/tables";
+import { DB_Live_Exam_Assignments, DB_Exam_Instances } from "knex/types/tables";
 import { Worker } from "worker_threads";
 
 

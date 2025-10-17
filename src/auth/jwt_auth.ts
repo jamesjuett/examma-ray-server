@@ -1,9 +1,9 @@
-import { assert } from "console";
 import { NextFunction, Request, Response } from "express";
 import jsonwebtoken from "jsonwebtoken";
 import passport from "passport";
 import passportJwt from "passport-jwt";
 import { auth_config } from "../auth/config";
+import { assert } from "../util/util";
 
 
 export interface JwtUserInfo {

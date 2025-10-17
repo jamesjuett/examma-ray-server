@@ -1,9 +1,9 @@
 import { Request, Response, Router } from "express";
 import { getJwtUserInfo, isAdmin, isStaff } from "../auth/jwt_auth";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getStudentExamsInfoByEmail, db_getWindowByUuid, db_saveLiveExamSubmission, db_setStartTimeToNow } from "../db/db_live";
+import { db_getLiveExamAssignmentByExamUuid, db_getExamInstanceByUuid, db_getStudentExamsInfoByEmail, db_getWindowByUuid, db_saveLiveExamSubmission, db_setStartTimeToNow } from "../db/db_live";
 import { db_getUserByEmail } from "../db/db_user";
 import { StudentFacingExamSessionInfo } from "../rest_types";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamUuid } from "./common";
+import { createRoute, jsonBodyParser_small_1MB, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamUuid } from "./common";
 import { now } from "jquery";
 
 export const student_router = Router();
@@ -47,7 +47,7 @@ student_router.route("/users/me")
 student_router.route("/exams/:exam_uuid/session")
   .get(createRoute({
     preprocessing: [
-      jsonBodyParser,
+      jsonBodyParser_small_1MB,
     ],
     validation: [
       validateParamUuid("exam_uuid"),
@@ -69,7 +69,7 @@ student_router.route("/exams/:exam_uuid/session")
         return res.sendStatus(404); // 404 and not 403 - don't reveal existence
       }
       
-      const exam_instance = await db_getLiveExamInstanceByUuid(exam_assn.exam_instance_uuid);
+      const exam_instance = await db_getExamInstanceByUuid(exam_assn.exam_instance_uuid);
       if (!exam_instance) {
         console.log(`Live exam ERROR: No such exam instance ${exam_assn.exam_instance_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
         return res.sendStatus(404);
@@ -109,7 +109,7 @@ student_router.route("/exams/:exam_uuid/session")
 student_router.route("/exams/:exam_uuid/live_submission")
   .put(createRoute({
     preprocessing: [
-      jsonBodyParser,
+      jsonBodyParser_small_1MB,
     ],
     validation: [
       validateParamUuid("exam_uuid"),
@@ -132,7 +132,7 @@ student_router.route("/exams/:exam_uuid/live_submission")
         return res.sendStatus(404); // 404 and not 403 - don't reveal existence
       }
 
-      const exam_instance = await db_getLiveExamInstanceByUuid(exam_info.exam_instance_uuid);
+      const exam_instance = await db_getExamInstanceByUuid(exam_info.exam_instance_uuid);
       if (!exam_instance) {
         console.log(`Live exam ERROR: No such exam instance ${exam_info.exam_instance_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
         return res.sendStatus(404);

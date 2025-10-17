@@ -1,0 +1,41 @@
+
+.examma-ray-fitb-drop-location:has(> *:nth-child(3)) { /* a 3rd child means config element + at least 2 dropped items */
+  /* padding-top: 2em !important; */
+  /* !important is to get aruond more specific rules within certain kinds of drop locations */
+  position: relative;
+}
+
+.examma-ray-fitb-drop-location-matching-config {
+  display: none;
+  /* position: absolute; */
+  min-width: 7em;
+  width: 100%;
+  /* left: 0;
+  right: 0;
+  top: 0; */
+  height: 1.7em;
+  padding: 0.1em;
+  background-color: #cccccc;
+  white-space: initial;
+}
+
+.examma-ray-fitb-drop-location:has(> *:nth-child(3)) > .examma-ray-fitb-drop-location-matching-config {
+  display: block;
+}
+
+
+.examma-ray-fitb-drop-item-matching-config {
+  position: absolute;
+  width: 3.2em;
+  left: -3.4em;
+  top: 0;
+  height: 1.7em;
+  padding: 0.1em;
+  background-color: #cccccc;
+  white-space: initial;
+}
+
+#grader-panel .examma-ray-fitb-droppable {
+  position: relative;
+  margin-left: 3.5em;
+}

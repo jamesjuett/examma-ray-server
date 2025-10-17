@@ -1,5 +1,7 @@
 import { Knex } from "knex";
 import { ManualGradingRubricItemStatus } from "../manual_grading";
+import { FITBDropEvaluatorSpecification } from "examma-ray/dist/graders/StandardFITBDropGrader";
+import { TransparentQuestionSubmission } from "examma-ray";
 
 declare module "knex/types/tables" {
 
@@ -20,6 +22,15 @@ declare module "knex/types/tables" {
     exam_id: string;
     uniqname: string;
     name: string;
+  }
+
+  interface DB_Question_Submissions {
+    question_id: string;
+    exam_id: string;
+    exam_instance_uuid: string;
+    assigned_exam_uuid: string;
+    uniqname: string;
+    submission: TransparentQuestionSubmission; // jsonb
   }
 
   interface DB_Manual_Grading_Code_Grader_Config {
@@ -99,7 +110,7 @@ declare module "knex/types/tables" {
     submission: string; // jsonb
   }
 
-  interface DB_Live_Exam_Instances {
+  interface DB_Exam_Instances {
     exam_instance_uuid: string;
     name: string;
     exam_id: string;
@@ -204,6 +215,52 @@ declare module "knex/types/tables" {
     updated_at: Date; // timestamp
   }
 
+  // Must keep this in sync with enum type in DB
+  type DB_Collaborative_Grader_Kind =
+    | "manual_regex_fill_in_the_blank"
+    | "simple_multiple_choice"
+    | "summation_multiple_choice"
+    | "standard_select_lines"
+    | "standard_fitb_drop"
+    | "bug_catching";
+
+  interface DB_Collaborative_Grading_Servers {
+    grading_server_pk: number; // primary key, auto-incrementing
+    question_id: string; // which question is this grading server eligible to grade
+    grader_kind: DB_Collaborative_Grader_Kind;
+    epoch: number;
+  }
+
+  interface DB_Exam_Instances_Collaborative_Grading_Servers {
+    exam_instance_uuid: string; // foreign key to exam_instances.exam_instance_uuid
+    question_id: string;
+    grading_server_pk: number; // foreign key to collaborative_grading_servers.grading_server_pk
+    // primary key is (exam_instance_uuid, question_id)
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+  }
+  
+  interface DB_FITB_Drop_Rubric_Items {
+    rubric_item_uuid: string; // primary key
+    grading_server_pk: number; // foreign key to DB_Collaborative_Grading_Servers.grading_server_pk
+    title: string;
+    points: number;
+    description: string;
+    policy: "first_match" | "best_score";
+    sort_index?: string;
+    active: boolean;
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+  }
+
+  interface DB_FITB_Drop_Rubric_Item_Evaluators {
+    evaluator_uuid: string; // primary key
+    rubric_item_uuid: string; // foreign key to DB_FITB_Drop_Rubric_Items.rubric_item_uuid
+    spec: FITBDropEvaluatorSpecification; // jsonb
+    sort_index: string;
+    created_at: Date; // timestamp
+    updated_at: Date; // timestamp
+  }
   
   type ExceptID<T> = Knex.CompositeTableType<T, Omit<T, "id"> & {id?: undefined}, Partial<Omit<T, "id">> & {id?: undefined}>;
 
@@ -227,6 +284,17 @@ declare module "knex/types/tables" {
       // Insert Type
       //   All required
       DB_Exam_Submissions,
+      // Update Type
+      //   Doesn't make sense to update (you should be using insert/delete)
+      never
+    >;
+
+    question_submissions: Knex.CompositeTableType<
+      // Base Type
+      DB_Question_Submissions,
+      // Insert Type
+      //   All required
+      DB_Question_Submissions,
       // Update Type
       //   Doesn't make sense to update (you should be using insert/delete)
       never
@@ -320,15 +388,26 @@ declare module "knex/types/tables" {
       never
     >;
 
-    live_exam_instances: Knex.CompositeTableType<
+    online_submissions: Knex.CompositeTableType<
       // Base Type
-      DB_Live_Exam_Instances,
+      DB_Online_Submissions,
+      // Insert Type
+      //   All required except created_at and updated_at (set automatically)
+      Omit<DB_Online_Submissions, "created_at" | "updated_at">,
+      // Update Type
+      //   Only allowed to update submission
+      Partial<Pick<DB_Online_Submissions, "submission">>
+    >;
+
+    exam_instances: Knex.CompositeTableType<
+      // Base Type
+      DB_Exam_Instances,
       // Insert Type
       //   All required
-      DB_Live_Exam_Instances,
+      DB_Exam_Instances,
       // Update Type
       //   Only allowed to update name, uuidv5_namespace, randomization_seed, duration_seconds
-      Partial<Pick<DB_Live_Exam_Instances, "uuidv5_namespace" | "randomization_seed" | "name" | "duration_seconds">>
+      Partial<Pick<DB_Exam_Instances, "uuidv5_namespace" | "randomization_seed" | "name" | "duration_seconds">>
     >;
 
     live_windows: Knex.CompositeTableType<
@@ -425,9 +504,53 @@ declare module "knex/types/tables" {
       Omit<DB_Schedule_Offset_Items, "offset_item_pk" | "created_at" | "updated_at">,
       // Update Type
       //   Only allowed to update section_pk, day_offset, hour, minute, second
-      Partial<Pick<DB_Schedule_Offset_Items, "section_pk" | "day_offset" | "hour" | "minute" | "second">>
+      Partial<Pick<DB_Schedule_Offset_Items, "section_pk" | "day_offset" | "hour" | "minute" | "second">> & Partial<Record<"offset_item_pk" | "schedule_pk", undefined>>
     >;
 
+    collaborative_grading_servers: Knex.CompositeTableType<
+      // Base Type
+      DB_Collaborative_Grading_Servers,
+      // Insert Type
+      //   All required except grading_server_pk, created_at and updated_at (set automatically)
+      Omit<DB_Collaborative_Grading_Servers, "grading_server_pk">,
+      // Update Type
+      //   Only allowed to update epoch
+      Partial<Pick<DB_Collaborative_Grading_Servers, "epoch">> & Partial<Record<Exclude<keyof DB_Collaborative_Grading_Servers, "epoch">, undefined>>
+    >;
+    
+    exam_instances_collaborative_grading_servers: Knex.CompositeTableType<
+      // Base Type
+      DB_Exam_Instances_Collaborative_Grading_Servers,
+      // Insert Type
+      //   All required except created_at and updated_at (set automatically)
+      Omit<DB_Exam_Instances_Collaborative_Grading_Servers, "created_at" | "updated_at">,
+      // Update Type
+      //   Only allowed to updated grading_server_pk
+      Partial<Pick<DB_Exam_Instances_Collaborative_Grading_Servers, "grading_server_pk">>
+      & Partial<Record<Exclude<keyof DB_Exam_Instances_Collaborative_Grading_Servers, "grading_server_pk">, undefined>>
+    >;
+
+    fitb_drop_rubric_items: Knex.CompositeTableType<
+      // Base Type
+      DB_FITB_Drop_Rubric_Items,
+      // Insert Type
+      //   All required, except active (defaults to true), sort_index (optional), created_at and updated_at (set automatically)
+      Omit<DB_FITB_Drop_Rubric_Items, "active" | "sort_index" | "created_at" | "updated_at"> & Partial<Pick<DB_FITB_Drop_Rubric_Items, "active" | "sort_index">>,
+      // Update Type
+      //   All optional except question_id and rubric_item_uuid may not be updated
+      Partial<Omit<DB_FITB_Drop_Rubric_Items, "question_id" | "rubric_item_uuid">> & Partial<Record<"question_id" | "rubric_item_uuid", undefined>>
+    >;
+
+    fitb_drop_rubric_item_evaluators: Knex.CompositeTableType<
+      // Base Type
+      DB_FITB_Drop_Rubric_Item_Evaluators,
+      // Insert Type
+      //   All required except created_at and updated_at (set automatically)
+      Omit<DB_FITB_Drop_Rubric_Item_Evaluators, "created_at" | "updated_at">,
+      // Update Type
+      //   Only allowed to update evaluator and sort_index
+      Partial<Pick<DB_FITB_Drop_Rubric_Item_Evaluators, "spec" | "sort_index">> & Partial<Record<"evaluator_uuid" | "rubric_item_uuid", undefined>>
+    >;
     
   }
 }

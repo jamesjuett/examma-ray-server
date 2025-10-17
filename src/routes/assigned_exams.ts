@@ -1,7 +1,7 @@
 import { Request, Response, Router } from "express";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamInstanceByUuid, db_getLiveExamSubmissionByUuid } from "../db/db_live";
+import { db_getLiveExamAssignmentByExamUuid, db_getExamInstanceByUuid, db_getLiveExamSubmissionByUuid } from "../db/db_live";
 import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, validateBody, validateParamUuid } from "./common";
+import { createRoute, jsonBodyParser_large_10MB, NO_AUTHORIZATION, NO_PREPROCESSING, validateBody, validateParamUuid } from "./common";
 
 
 export const assigned_exams = Router();
@@ -22,7 +22,7 @@ export const assigned_exams = Router();
 
 assigned_exams.route("/:exam_uuid")
   .put(createRoute({
-    preprocessing: jsonBodyParser,
+    preprocessing: jsonBodyParser_large_10MB,
     validation: [
       validateParamUuid("exam_uuid"),
       validateBody("exam_id").isLength({min: 1, max: 100}),
@@ -56,7 +56,7 @@ assigned_exams.route("/:exam_uuid")
 
 assigned_exams.route("/:exam_uuid/reset_time")
   .put(createRoute({
-    preprocessing: jsonBodyParser,
+    preprocessing: jsonBodyParser_large_10MB,
     validation: [
       validateParamUuid("exam_uuid"),
       validateBody("exam_id").isLength({min: 1, max: 100}),
@@ -122,7 +122,7 @@ assigned_exams.route("/:exam_uuid/manifest")
         return res.sendStatus(404);
       }
 
-      const exam_instance = await db_getLiveExamInstanceByUuid(exam_assn.exam_instance_uuid);
+      const exam_instance = await db_getExamInstanceByUuid(exam_assn.exam_instance_uuid);
       if (!exam_instance) {
         return res.sendStatus(404);
       }
