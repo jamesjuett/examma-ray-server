@@ -5,11 +5,12 @@ import { ExamUtils } from "examma-ray/dist/ExamUtils";
 import { readdirSync } from 'fs';
 import passport from 'passport';
 import path from 'path';
-import { requireAdmin, requireStaff } from './auth/jwt_auth';
+import { getJwtUserInfo, requireAdmin, requireStaff } from './auth/jwt_auth';
 import { ExammaRayServer } from './ExammaRayGradingServer';
 import { auth_router } from './routes/auth';
 import { exams_router } from './routes/exams';
 import { manual_grading_router } from './routes/manual_grading';
+import { collaborative_grading_router } from './routes/collaborative_grading';
 import { run_router } from './routes/run';
 import { users_router } from './routes/users';
 import { participation_router } from './routes/participation';
@@ -17,10 +18,12 @@ import { student_router } from './routes/student';
 import { assigned_exams } from './routes/assigned_exams';
 import { live_exams_router } from './routes/live';
 import { courses_router } from './routes/courses';
+import { questions_router } from './routes/questions';
 
 export let EXAMMA_RAY_GRADING_SERVER: ExammaRayServer;
 
 async function main() {
+  console.log("Creating Examma-Ray Grading Server...");
 
   EXAMMA_RAY_GRADING_SERVER = await ExammaRayServer.create(
     readdirSync("data", "utf8").map(
@@ -65,8 +68,8 @@ async function main() {
     cookieParser(),
     passport.initialize(),
     passport.authenticate('jwt-cookie', { session: false }),
-    live_exams_router, // if unauthorized here, will not call next() and not go to express.static below
-    express.static("live")
+    live_exams_router, // if unauthorized here, will not call next() and will not go to express.static below
+    express.static("live") // fallback for exam js, css, and other assets
   );
 
   // ALL requests to the api require authentication via a bearer
@@ -81,12 +84,15 @@ async function main() {
   app.use("/api/users", users_router);
   app.use("/api/courses", courses_router);
   app.use("/api/exams", exams_router);
+  app.use("/api/questions", questions_router);
   app.use("/api/assigned_exams", assigned_exams);
   // app.use("/api/questions", questions_router);
   app.use("/api/manual_grading", manual_grading_router);
+  app.use("/api/collaborative_grading", collaborative_grading_router);
 
   // Separate student API routes, require authentication but
-  // do not require any additional staff authorization
+  // do not require any additional staff authorization.
+
   app.use('/student_api',
     passport.initialize(),
     passport.authenticate('jwt-bearer', { session: false }),

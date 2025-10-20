@@ -4,17 +4,15 @@ import { asMutable } from "./util/util";
 
 export class ExammaRayServer implements ExamServerListener {
 
-  private readonly exams_by_id: {
-    [index: string]: ExamServer | undefined
-  } = {};
+  public readonly examServersById: ReadonlyMap<string, ExamServer> = new Map();
 
-  public readonly exam_instances_by_uuid: ReadonlyMap<string, ExamInstanceServer> = new Map();
+  public readonly examInstancesByUuid: ReadonlyMap<string, ExamInstanceServer> = new Map();
 
   private constructor(exams: readonly ExamServer[]) {
     exams.forEach(exam => {
-      this.exams_by_id[exam.exam.exam_id] = exam;
+      asMutable(this.examServersById).set(exam.exam.exam_id, exam);
       exam.getExamInstances().forEach(instance => {
-        asMutable(this.exam_instances_by_uuid).set(instance.exam_instance_uuid, instance);
+        asMutable(this.examInstancesByUuid).set(instance.exam_instance_uuid, instance);
       })
       exam.addListener(this);
     });
@@ -27,25 +25,27 @@ export class ExammaRayServer implements ExamServerListener {
   }
 
   public getExamServer(exam_id: string) {
-    return this.exams_by_id[exam_id];
+    return this.examServersById.get(exam_id);
   }
 
   public async loadExamServer(exam_spec: ExamSpecification) {
-    this.exams_by_id[exam_spec.exam_id] = await ExamServer.create(exam_spec);
+    const exam_server = await ExamServer.create(exam_spec);
+    asMutable(this.examServersById).set(exam_spec.exam_id, exam_server);
+    return exam_server;
   }
 
   public unloadExamServer(exam_id: string) {
-    const exam_server = this.exams_by_id[exam_id];
-    delete this.exams_by_id[exam_id];
+    const exam_server = asMutable(this.examServersById).get(exam_id);
+    asMutable(this.examServersById).delete(exam_id);
     return exam_server;
   }
 
   public getAllExamsInfo() {
-    return Object.values(this.exams_by_id).map(exam => exam!.getInfo());
+    return this.examServersById.values().map(exam => exam.getInfo()).toArray();
   }
 
   public onInstanceCreated(exam_instance: ExamInstanceServer) {
-    asMutable(this.exam_instances_by_uuid).set(exam_instance.exam_instance_uuid, exam_instance);
+    asMutable(this.examInstancesByUuid).set(exam_instance.exam_instance_uuid, exam_instance);
   }
 
 }

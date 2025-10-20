@@ -1,5 +1,5 @@
 import express, { Request, Response, Router } from "express";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getLiveExamInstanceByUuid, db_getLiveExamSubmissionByUuid, db_getWindowByUuid, db_setStartTimeToNow } from "../db/db_live";
+import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getExamInstanceByUuid, db_getLiveExamSubmissionByUuid, db_getWindowByUuid, db_setStartTimeToNow } from "../db/db_live";
 import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, validateParamExammaRayId, validateParamUuid } from "./common";
 import { getJwtUserInfo, isSuper } from "../auth/jwt_auth";
 import e from "express";
@@ -34,7 +34,7 @@ live_exams_router.route("/:exam_id/exams/:exam_uuid.html")
         return res.sendStatus(404); // 404 and not 403 - don't reveal existence
       }
 
-      const exam_instance = await db_getLiveExamInstanceByUuid(exam_info.exam_instance_uuid);
+      const exam_instance = await db_getExamInstanceByUuid(exam_info.exam_instance_uuid);
       if (!exam_instance) {
         console.log(`Live exam ERROR: No such exam instance ${exam_info.exam_instance_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
         return res.sendStatus(404);
@@ -105,7 +105,7 @@ live_exams_router.route("/:exam_id/graded/:exam_uuid.html")
         return res.sendStatus(404); // 404 and not 403 - don't reveal existence
       }
 
-      const exam_instance = await db_getLiveExamInstanceByUuid(exam_info.exam_instance_uuid);
+      const exam_instance = await db_getExamInstanceByUuid(exam_info.exam_instance_uuid);
       if (!exam_instance) {
         console.log(`Graded exam ERROR: No such exam instance ${exam_info.exam_instance_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
         return res.sendStatus(404);

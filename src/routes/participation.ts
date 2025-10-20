@@ -6,7 +6,7 @@ import { auth_config } from "../auth/config";
 import { db_setOnlineSubmission } from "../db/db_online_submissions";
 import { db_getAllParticipationForUser, db_getParticipation, db_setParticipation } from "../db/db_participation";
 import { assert } from "../util/util";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_VALIDATION, validateBody, validateParamExammaRayId } from "./common";
+import { createRoute, jsonBodyParser_large_10MB, NO_AUTHORIZATION, NO_VALIDATION, validateBody, validateParamExammaRayId } from "./common";
 
 const client = new OAuth2Client();
 
@@ -168,7 +168,7 @@ participation_router.route("/me/:exam_id")
   .put(createRoute({
     preprocessing: [
       cors(),
-      jsonBodyParser,
+      jsonBodyParser_large_10MB,
     ],
     validation: [
       validateParamExammaRayId("exam_id"),

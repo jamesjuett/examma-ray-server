@@ -1,7 +1,7 @@
 import { StudentInfo } from "examma-ray";
 import { ExamGeneratorOptions } from "examma-ray/dist/ExamGenerator";
 import { ExamGraderOptions } from "examma-ray/dist/ExamGrader";
-import { DB_Live_Exam_Assignments, DB_Live_Exam_Instances } from "knex/types/tables";
+import { DB_Live_Exam_Assignments, DB_Exam_Instances } from "knex/types/tables";
 import { Worker } from "worker_threads";
 
 
@@ -38,6 +38,7 @@ export type RunGradingRequest = {
 
 export type WorkerData_Grade = {
   readonly exam_id: string,
+  readonly exam_instance_uuid: string,
   readonly assigned_exams: readonly DB_Live_Exam_Assignments[],
   readonly grade_request: RunGradingRequest,
   readonly uuidv5_namespace: string,

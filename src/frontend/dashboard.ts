@@ -1,17 +1,19 @@
 import avatar from "animal-avatar-generator";
 import axios from "axios";
-import { Exam, parseExamSpecification } from "examma-ray";
+import { Exam, parseExamSpecification, Question } from "examma-ray";
 import { ExamDiff } from "examma-ray/dist/ExamDiff";
 import queryString from "query-string";
 import { ExamPingResponse, RunGradingRequest } from "../dashboard";
 import { ExamTaskStatus } from "../ExamServer";
-import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, SubmissionInfo, WindowInfo } from "../rest_types";
+import { ExamAssignmentInfo, ExamInfo, ExamInstanceInfo, ExamSubmissionInfo, WindowInfo } from "../rest_types";
 import { asMutable, assert } from "../util/util";
 import { ExammaRayClient } from "./Application";
 import randomColor from "randomcolor";
 import { event } from "jquery";
 import { format } from "path";
 import { StudentEditor } from "./StudentEditor";
+import { CollaborativeGraderKind, CollaborativeGradingServerConfig } from "../collaborative_grading/CollaborativeGradingTypes";
+import { GradedResponseKind, GraderFor, GraderSpecification } from "examma-ray/dist/graders/QuestionGrader";
 
 async function getExamInfo(client: ExammaRayClient, exam_id: string): Promise<ExamInfo> {
   return (await axios({
@@ -35,7 +37,7 @@ async function getExamInstanceInfo(client: ExammaRayClient, exam_id: string, exa
   })).data as ExamInstanceInfo;
 }
 
-async function getExamSpec(client: ExammaRayClient, exam_id: string): Promise<Exam> {
+async function getExam(client: ExammaRayClient, exam_id: string): Promise<Exam> {
   const exam_spec_response = await axios({
     url: `/api/exams/${exam_id}/spec`,
     method: "GET",
@@ -49,6 +51,18 @@ async function getExamSpec(client: ExammaRayClient, exam_id: string): Promise<Ex
   return Exam.create(parseExamSpecification(exam_spec_response.data as string));
 }
 
+async function getCollaborativeGradingServers(client: ExammaRayClient, exam_id: string, exam_instance_uuid: string) {
+  return (await axios({
+    url: `/api/exams/${exam_id}/instances/${exam_instance_uuid}/collaborative_grading_servers`,
+    method: "GET",
+    data: {},
+    headers: {
+      'Authorization': 'bearer ' + client.getBearerToken()
+    }
+  })).data as readonly CollaborativeGradingServerConfig[];
+}
+
+
 export class ExamDashboardApplication {
 
   public readonly client: ExammaRayClient;
@@ -56,6 +70,7 @@ export class ExamDashboardApplication {
   public readonly exam_info: ExamInfo;
   public readonly exam_instance_info: ExamInstanceInfo;
   public readonly exam: Exam;
+  public readonly collaborative_grading_servers_by_question_id: ReadonlyMap<string, CollaborativeGradingServerConfig>;
 
   public readonly exam_windows: readonly WindowInfo[] = [];
   private exam_windows_by_uuid: Map<string, WindowInfo> = new Map();
@@ -68,11 +83,12 @@ export class ExamDashboardApplication {
   
   public studentEditor: StudentEditor;
 
-  private constructor(client: ExammaRayClient, exam_info: ExamInfo, exam_instance_info: ExamInstanceInfo, exam: Exam) {
+  private constructor(client: ExammaRayClient, exam_info: ExamInfo, exam_instance_info: ExamInstanceInfo, exam: Exam, collaborative_grading_servers: readonly CollaborativeGradingServerConfig[]) {
     this.client = client;
     this.exam_instance_info = exam_instance_info;
     this.exam_info = exam_info;
     this.exam = exam;
+    this.collaborative_grading_servers_by_question_id = new Map(collaborative_grading_servers.map(cgs => [cgs.question_id, cgs]));
     this.studentEditor = new StudentEditor(this, $("#student-editor-elem"));
 
     this.initComponents();
@@ -92,7 +108,8 @@ export class ExamDashboardApplication {
       client,
       await getExamInfo(client, exam_id),
       await getExamInstanceInfo(client, exam_id, exam_instance_uuid),
-      await getExamSpec(client, exam_id)
+      await getExam(client, exam_id),
+      await getCollaborativeGradingServers(client, exam_id, exam_instance_uuid),
     );
   }
 
@@ -449,7 +466,7 @@ export class ExamDashboardApplication {
       //       'Authorization': 'bearer ' + this.client.getBearerToken()
       //   },
       // });
-      // const exam_instances = <DB_Live_Exam_Instances[]>exam_instance_response.data;
+      // const exam_instances = <DB_Exam_Instances[]>exam_instance_response.data;
       // if (exam_instances.length > 0) {
       //   asMutable(this).exam_instance_uuid = exam_instances[0].exam_instance_uuid;
       // }
@@ -480,9 +497,9 @@ export class ExamDashboardApplication {
         headers: {
             'Authorization': 'bearer ' + this.client.getBearerToken()
         }
-      })).data as SubmissionInfo[];
+      })).data as ExamSubmissionInfo[];
 
-      const submissions_by_uuid: {[index: string]: SubmissionInfo} = {};
+      const submissions_by_uuid: {[index: string]: ExamSubmissionInfo} = {};
       submissions.forEach(s => submissions_by_uuid[s.exam_uuid] = s);
 
       // const roster_response = await axios({
@@ -559,7 +576,46 @@ export class ExamDashboardApplication {
         this.exam.allQuestions
         .filter(q => q.response.default_grader === undefined)
         .map(q => `<li><span style="color: red;">No grader defined for: ${q.question_id}</span></li>`).join("\n")
+        +
+        this.collaborative_grading_servers_by_question_id.entries().map(
+          ([question_id, cgs]) => `<li>Collaborative Rubric Page: <a href="${cgs.grader_kind}.html?exam_id=${this.exam.exam_id}&grading_server_pk=${cgs.grading_server_pk}">${question_id}</a><span id="question-grader-avatars-${question_id}" class="question-grader-avatars"></span></li>`).toArray().join("\n")
       );
+
+      const createAutograderOrCollaborativeGradingServerLink = (question_id: string, default_grader: GraderSpecification<CollaborativeGraderKind>) => {
+        const cgs = this.collaborative_grading_servers_by_question_id.get(question_id);
+        if (cgs) {
+          return `<li>${question_id}: <a href="${cgs.grader_kind}.html?exam_id=${this.exam.exam_id}&grading_server_pk=${cgs.grading_server_pk}">Collaborative Rubric (<code>${cgs.grader_kind}</code>)</a></li>`;
+        }
+        else {
+          const self = this;
+          return $(`<li>${question_id}: <button type="button" class="btn btn-sm btn-primary">Create Collaborative Rubric</button></li>`).on("click", async function () {
+            const cgs = (await axios({
+              url: `/api/exams/${self.exam.exam_id}/instances/${self.exam_instance_info.exam_instance_uuid}/collaborative_grading_servers/${question_id}`,
+              method: "PUT",
+              data: {
+                grader_kind: "standard_fitb_drop",
+              },
+              headers: {
+                'Authorization': 'bearer ' + self.client.getBearerToken(),
+              },
+            })).data as CollaborativeGradingServerConfig;
+            $(this).replaceWith(`<li>${question_id}: <a href="${cgs.grader_kind}.html?exam_id=${self.exam.exam_id}&grading_server_pk=${cgs.grading_server_pk}">Collaborative Rubric (<code>${cgs.grader_kind}</code>)</a></li>`);
+          });
+        }
+      }
+
+      const question_elems = this.exam.allQuestions.map(q =>
+        !q.response.default_grader ? `<li>${q.question_id}: <span style="color: red;">No grader defined.</span></li>` :
+        q.response.default_grader.grader_kind === "manual_code_writing" ? `<li>${q.question_id}: <a href="manual-code-grader.html?exam_id=${this.exam.exam_id}&question_id=${q.question_id}">Manual Grading</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>` :
+        q.response.default_grader.grader_kind === "manual_generic" ? `<li>${q.question_id}: <a href="manual-generic-grader.html?exam_id=${this.exam.exam_id}&question_id=${q.question_id}">Manual Grading</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>` :
+        q.response.default_grader.grader_kind === "freebie" ? `<li>${q.question_id}: Autograded (<code>freebie</code>)</li>` :
+        q.response.default_grader.grader_kind === "standard_iframe" ? `<li>${q.question_id}:: Autograded (<code>standard_iframe</code>)</li>` :
+        createAutograderOrCollaborativeGradingServerLink(q.question_id, q.response.default_grader)
+      );
+
+      question_elems.forEach(qe => {$("#examma-ray-question-grading-list").append(qe);});
+
+
         
       this.studentEditor.onEpochUpdate();
     }
@@ -567,6 +623,7 @@ export class ExamDashboardApplication {
       alert("Error loading question :(");
     }
   }
+
 
   public async addSubmissions(files: FileList) {
     if (!this.exam) {

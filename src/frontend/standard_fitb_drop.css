@@ -1,0 +1,96 @@
+.examma-ray-drop-matcher > .examma-ray-fitb-drop-location {
+  margin: 0;
+}
+
+.examma-ray-drop-matcher > .examma-ray-fitb-drop-location {
+  margin: 0;
+}
+
+#grader-fitb-drop-bank .examma-ray-fitb-droppable {
+  display: inline-block;
+}
+
+#rubric-items {
+  border: solid 1px black;
+  flex-grow: 1;
+  margin-right: 5px;
+  overflow-x: scroll;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 0 5px;
+}
+
+#rubric-items > .list-group-item {
+  width: 150px;
+  height: 65px;
+  margin-top: 5px;
+  padding: 10px;
+  text-align: left;
+  position: relative;
+}
+
+#rubric-items > .list-group-item .badge {
+  position: absolute;
+  right: -0.5em;
+  top: -0.5em;
+  z-index: 10;
+}
+
+.examma-ray-rubric-item-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10pt;
+}
+
+.examma-ray-rubric-item-button-bar {
+  text-align: right;
+}
+
+.edit-rubric-item-button {
+  line-height: 1;
+  font-size: 8pt;
+}
+
+#rubric-items .progress {
+  width: 6em;
+}
+
+#evaluator-items > .list-group-item {
+  padding: 10px;
+  text-align: left;
+  position: relative;
+}
+
+#evaluator-items > .list-group-item .badge {
+  position: absolute;
+  right: -0.5em;
+  top: -0.5em;
+  z-index: 10;
+}
+
+.examma-ray-evaluator-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 10pt;
+  line-height: 1.75;
+}
+
+.examma-ray-evaluator-explanation {
+  font-size: 8pt;
+}
+
+.examma-ray-evaluator-button-bar {
+  text-align: right;
+}
+
+.edit-evaluator-button {
+  line-height: 1;
+  font-size: 8pt;
+}
+
+#evaluator-items .progress {
+  width: 6em;
+}

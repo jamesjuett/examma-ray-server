@@ -16,6 +16,8 @@ import { WorkerData_Grade } from "./run";
 import { db_getLiveExamSubmissionByUuid } from "../db/db_live";
 import { ExamSubmission, isTransparentExamManifest } from "examma-ray/dist/core/submissions";
 import { assert } from "../util/util";
+import { db_getCollaborativeGradingServerConfig, db_getCollaborativeGradingServersByExamInstance } from "../db/db_collaborative_grading";
+import { collaborativeGradingStrategy } from "../collaborative_grading/CollaborativeGrading";
 
 const workerData: WorkerData_Grade = workerDataUntyped;
 
@@ -32,8 +34,20 @@ class WebExamGrader extends ExamGrader {
     this.grading_data = grading_data;
   }
 
-  public static async create(exam: Exam, options: ExamGraderOptions, graders?: GraderSpecificationMap | readonly GraderSpecificationMap[], exceptions?: ExceptionMap | readonly ExceptionMap[], onStatus?: (status: string) => void) {
+  public static async create(exam: Exam, exam_isntance_uuid: string, options: ExamGraderOptions, exceptions?: ExceptionMap | readonly ExceptionMap[], onStatus?: (status: string) => void) {
     let grading_data : { [index: string]: CodeWritingGraderData } = {};
+
+    const collaborative_grading_servers = await db_getCollaborativeGradingServersByExamInstance(exam_isntance_uuid);
+    const cgs_graders = Object.fromEntries(await Promise.all(collaborative_grading_servers.map(async cg => {
+      const config = await db_getCollaborativeGradingServerConfig(cg.grading_server_pk);
+      assert(config !== undefined, `No collaborative grading server config found for PK ${cg.grading_server_pk}`);
+      const strategy = collaborativeGradingStrategy(config.grader_kind);
+      return [
+        cg.question_id,
+        strategy.loadGraderSpec(await strategy.loadGradingRecords(cg.grading_server_pk))
+      ] as const;
+    })));
+
     for(let question of exam.allQuestions) {
       // if (question.kind === "code_editor") {
         let rubric = await db_getManualGradingRubric(question.question_id);
@@ -52,7 +66,7 @@ class WebExamGrader extends ExamGrader {
         }
       // }
     }
-    return new WebExamGrader(exam, options, graders, exceptions, onStatus, grading_data);
+    return new WebExamGrader(exam, options, cgs_graders, exceptions, onStatus, grading_data);
   }
 
   protected override prepareGradingData(question: Question, grader: QuestionGrader) {
@@ -83,11 +97,11 @@ async function main() {
 
   const EXAM_GRADER = await WebExamGrader.create(
     EXAM,
+    workerData.exam_instance_uuid,
     {
       uuid_options: { strategy: "uuidv5", v5_namespace: uuidv5_namespace },
       assets_bundle_dir: `data/${exam_id}/assets/`,
     },
-    {},
     EXCEPTIONS,
     RATE_LIMITED_POST_MESSAGE()
   );

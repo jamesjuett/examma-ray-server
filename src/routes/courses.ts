@@ -1,14 +1,12 @@
 import { Request, Response, Router } from "express";
-import multer from "multer";
-import { EXAMMA_RAY_GRADING_SERVER } from "../server";
-import { createRoute, jsonBodyParser, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParam } from "./common";
-import { db_assignUsersToSections, db_getAllCourses, db_getCourseSections, db_getAllCourseUsers, db_upsertCourseSections, db_getCourseUsersByRole, db_upsertUsersToCourseRosterWithRole } from "../db/db_courses";
-import { requireSuper, requireAdmin } from "../auth/jwt_auth";
-import Papa from "papaparse";
 import { readFileSync } from "fs";
-import { assertExists } from "../util/util";
-import { assert } from "console";
 import { rm } from "fs/promises";
+import multer from "multer";
+import Papa from "papaparse";
+import { requireAdmin, requireSuper } from "../auth/jwt_auth";
+import { db_assignUsersToSections, db_getAllCourses, db_getAllCourseUsers, db_getCourseSections, db_getCourseUsersByRole, db_upsertCourseSections, db_upsertUsersToCourseRosterWithRole } from "../db/db_courses";
+import { assertExists } from "../util/util";
+import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateParam } from "./common";
 
 const upload = multer({
   dest: "uploads/"

@@ -8,9 +8,7 @@ export function asMutable<T>(obj: T) : T {
     return obj;
 }
 
-export type Exact<A, B> = A extends B
-  ? B extends A ? A : never
-  : never;
+export type Exact<A, B extends A> = [A] extends [B] ? A : never; // [] are used to prevent distribution
 
 export function assert(condition: any, message: string = "") : asserts condition {
   if (!condition) {
@@ -33,3 +31,12 @@ export function assertExists<T>(obj: T | undefined, message: string = "") : T {
   }
   return obj;
 }
+
+type SimpleJSONComponent =
+  | string | number | boolean
+  | SimpleJSONComponent[]
+  | { [key: string]: SimpleJSONComponent };
+
+export type SimpleJSON = {
+  [key: string]: SimpleJSONComponent
+};

@@ -150,9 +150,11 @@ export class StudentEditor {
         </li>
       `).join("\n")}
     `);
-    dashboard.exam_windows.forEach(w => {
-      $("#edit-student-window-select").append(`<option value="${w.window_uuid}"}>${w.name}</option>`);
-    });
+    $("#edit-student-window-select").html(dashboard.exam_windows.map(w => `
+      <option value="${w.window_uuid}"}>${w.name}</option>
+    `).join("\n") + '<option value="">(none)</option>');
+    
+    this.setEditingStudent(this.editingStudent);
     
     $("#edit-student-uniqname-list").html(
       Array.from(dashboard.assigned_exams_by_uuid.values()).map(assn => `<option value="${assn.uniqname}">`).join("\n")

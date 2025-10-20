@@ -4,7 +4,7 @@ import { SimpleExerciseLobsterOutlet } from "lobster-vis/dist/js/view/SimpleExer
 import { createEmbeddedExerciseOutlet } from "lobster-vis/dist/js/view/embeddedExerciseOutlet"
 
 import { applySkin, highlightCode } from "examma-ray/dist/core/render";
-import "highlightjs/styles/github.css";
+import "highlight.js/styles/github.css";
 
 import "./code-grader.css";
 import { COMPLETION_ALL_CHECKPOINTS, Exercise, Project } from "lobster-vis/dist/js/core/Project";

@@ -2,7 +2,8 @@ import express, { NextFunction, Request, RequestHandler, Response } from 'expres
 import { param as validateParam, ValidationChain, validationResult } from 'express-validator';
 
 // Body parsers
-export const jsonBodyParser = express.json({limit: "10MB"});
+export const jsonBodyParser_small_1MB = express.json({limit: "1MB"});
+export const jsonBodyParser_large_10MB = express.json({limit: "10MB"});
 export const urlencodedBodyParser = express.urlencoded({ extended: false });
 
 // NOTE: validate then sanitize is more strict
@@ -67,6 +68,7 @@ export const NO_AUTHORIZATION = [] as readonly never[];
 export function validateParamExammaRayId(param_name: string) {
   return validateParam(param_name).trim().isLength({min: 1, max: 100});
 }
+
 export function validateParamExammaRayName(param_name: string) {
   return validateParam(param_name).trim().isLength({min: 1, max: 200});
 }
@@ -74,8 +76,4 @@ export function validateParamExammaRayName(param_name: string) {
 export function validateParamUuid(param_name: string) {
   return validateParam(param_name).trim().isUUID();
 }
-
-export const validateParamQuestionId = validateParam("question_id").trim().isLength({min: 1, max: 100});
-export const validateParamSectionId = validateParam("section_id").trim().isLength({min: 1, max: 100});
-export const validateParamExamId = validateParam("exam_id").trim().isLength({min: 1, max: 100});
 
