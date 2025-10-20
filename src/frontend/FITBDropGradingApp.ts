@@ -594,11 +594,13 @@ class FITBDropEvaluatorsOutlet {
       .sort((ev_out_a, ev_out_b) => (ev_out_a.evaluator_data.sort_index).localeCompare(ev_out_b.evaluator_data.sort_index));
 
     // Set up evaluator match elements on each submission
+    const submission_cards_elem = $("#submission-cards").detach();
     let matched_evaluators_html = "";
     for(let i = 0; i < ordered_evaluators.length; i++) {
       matched_evaluators_html += `<kbd class="evaluator-match-${i+1}">${i + 1}</kbd> `;
     }
-    $(".matched-evaluators").html(matched_evaluators_html);
+    submission_cards_elem.find(".matched-evaluators").html(matched_evaluators_html);
+    $("#submission-cards-container").append(submission_cards_elem);
 
     ordered_evaluators.forEach((ev_out, i) => {
       ev_out.elem.appendTo(this.panel_elem)
@@ -620,8 +622,10 @@ class FITBDropEvaluatorsOutlet {
     `);
     ev_outlet.elem.find(".examma-ray-evaluator-percent").html(renderPercentChosenProgressBar(ev_outlet.submissions_matched.length, this.app.assigned_questions.length));
 
-    $(".evaluator-match-" + ev_outlet.display_index).hide();
+    const submission_cards_elem = $("#submission-cards").detach();
+    submission_cards_elem.find(".evaluator-match-" + ev_outlet.display_index).hide();
     ev_outlet.submissions_matched.forEach(sub_i => this.app.submission_outlets[sub_i].elem.find(".evaluator-match-" + ev_outlet.display_index).show());
+    $("#submission-cards-container").append(submission_cards_elem);
 
     if (client_uuid) { this.highlight(ev_outlet, client_uuid); }
 
