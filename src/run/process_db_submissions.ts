@@ -29,24 +29,24 @@ async function addSubmission(exam: Exam, db_submission: DB_Live_Submissions & DB
       // TODO: REMOVE THIS
       // for now, add question submissions
       // Load a trusted submission for them
-      const manifest_file = `data/${exam.exam_id}/manifests/${db_submission.uniqname}-${db_submission.exam_uuid}.json`;
+      // const manifest_file = `data/${exam.exam_id}/manifests/${db_submission.uniqname}-${db_submission.exam_uuid}.json`;
       
-      const manifest = ExamUtils.loadExamManifest(manifest_file) as TransparentExamManifest;
+      // const manifest = ExamUtils.loadExamManifest(manifest_file) as TransparentExamManifest;
       
-      const parsed_sub = db_submission.submission as unknown as ExamSubmission;
-      const trusted_sub = fillManifest(manifest, parsed_sub);
-      const question_submissions = trusted_sub.sections.flatMap(s_sub => s_sub.questions.map(q_sub => ({
-        question_id: q_sub.question_id,
-        exam_id: exam.exam_id,
-        exam_instance_uuid: db_submission.exam_instance_uuid,
-        assigned_exam_uuid: db_submission.exam_uuid,
-        uniqname: trusted_sub.student.uniqname,
-        submission: {
-          ...q_sub,
-          skin_id : compositeSkinId(s_sub.skin_id, q_sub.skin_id)
-        }
-      })));
-      await db_insertQuestionSubmissions(question_submissions);
+      // const parsed_sub = db_submission.submission as unknown as ExamSubmission;
+      // const trusted_sub = fillManifest(manifest, parsed_sub);
+      // const question_submissions = trusted_sub.sections.flatMap(s_sub => s_sub.questions.map(q_sub => ({
+      //   question_id: q_sub.question_id,
+      //   exam_id: exam.exam_id,
+      //   exam_instance_uuid: db_submission.exam_instance_uuid,
+      //   assigned_exam_uuid: db_submission.exam_uuid,
+      //   uniqname: trusted_sub.student.uniqname,
+      //   submission: {
+      //     ...q_sub,
+      //     skin_id : compositeSkinId(s_sub.skin_id, q_sub.skin_id)
+      //   }
+      // })));
+      // await db_insertQuestionSubmissions(question_submissions);
 
       console.log("skipping duplicate submission for " + db_submission.uniqname + " (" + db_submission.exam_uuid + ")");
       return;
