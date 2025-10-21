@@ -541,7 +541,6 @@ export class ExamDashboardApplication {
           const assn_window = assn.window_uuid && this.exam_windows_by_uuid.get(assn.window_uuid);
           return `<li>
             ${assn.uniqname}
-            <button type="button" class="btn btn-sm btn-warning student-settings-modal-open" data-exam-uuid="${assn.exam_uuid}"><i class="bi bi-pencil"></i> Edit Student</button>
             ${submissions_by_uuid[assn.exam_uuid]
               ? `<span class="text-muted">Submitted ${new Date(submissions_by_uuid[assn.exam_uuid].updated_at).toLocaleString()}</span>`
               : '<span class="text-muted">[no submission]</span>'
