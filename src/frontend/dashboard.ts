@@ -564,23 +564,6 @@ export class ExamDashboardApplication {
         self.sendPing();
       });
 
-      $("#examma-ray-question-grading-list").html(
-        this.exam.allQuestions
-          .filter(q => q.response.default_grader?.grader_kind === "manual_code_writing")
-          .map(q => `<li><a href="manual-code-grader.html?exam_id=${this.exam.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("\n")
-        + 
-        this.exam.allQuestions
-        .filter(q => q.response.default_grader?.grader_kind === "manual_generic")
-        .map(q => `<li><a href="manual-generic-grader.html?exam_id=${this.exam.exam_id}&question_id=${q.question_id}">${q.question_id}</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>`).join("\n")
-        + 
-        this.exam.allQuestions
-        .filter(q => q.response.default_grader === undefined)
-        .map(q => `<li><span style="color: red;">No grader defined for: ${q.question_id}</span></li>`).join("\n")
-        +
-        this.collaborative_grading_servers_by_question_id.entries().map(
-          ([question_id, cgs]) => `<li>Collaborative Rubric Page: <a href="${cgs.grader_kind}.html?exam_id=${this.exam.exam_id}&grading_server_pk=${cgs.grading_server_pk}">${question_id}</a><span id="question-grader-avatars-${question_id}" class="question-grader-avatars"></span></li>`).toArray().join("\n")
-      );
-
       const createAutograderOrCollaborativeGradingServerLink = (question_id: string, default_grader: GraderSpecification<CollaborativeGraderKind>) => {
         const cgs = this.collaborative_grading_servers_by_question_id.get(question_id);
         if (cgs) {

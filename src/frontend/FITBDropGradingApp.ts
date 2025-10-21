@@ -1,7 +1,7 @@
 import avatar from "animal-avatar-generator";
 import { ExamComponentSkin, OriginalExamRenderer } from "examma-ray";
 import { applySkin, mk2html_unwrapped } from "examma-ray/dist/core/render";
-import { renderPercentChosenProgressBar, renderPointsProgressBar, renderScoreBadge, renderShortPointsWorthBadge } from "examma-ray/dist/core/ui_components";
+import { renderNumBadge, renderPercentChosenProgressBar, renderPointsProgressBar, renderScoreBadge, renderShortPointsWorthBadge } from "examma-ray/dist/core/ui_components";
 import { evaluateRubricItem, extractFromDropLocation, fillDropLocation, fitbDropEvaluate, MatchingDropEvaluatorSpecification, SPECIAL_MATCHER_DROPPABLES, StandardFITBDropGrader } from "examma-ray/dist/graders/StandardFITBDropGrader";
 import { activateFITBDropBank, getFirstLevelFITBDropElements, renderFITBDropBank } from "examma-ray/dist/response/fitb-drop";
 import { activate_response } from "examma-ray/dist/response/handlers";
@@ -16,6 +16,8 @@ const ACTIVE_GRADER_AVATAR_SIZE = 30;
 
 interface SubmissionOutlet {
   elem: JQuery;
+  applied_evaluator: number; // which match was actually applied according to current rubric policy
+  matched_evaluators: number[]; // list of most recently computed matches
 };
 
 export class FITBDropGradingApp extends CollaborativeGradingAppBase<"standard_fitb_drop"> {
@@ -131,7 +133,9 @@ export class FITBDropGradingApp extends CollaborativeGradingAppBase<"standard_fi
               </div>
             </div>
           </div>
-        `).appendTo("#submission-cards")
+        `).appendTo("#submission-cards"),
+        applied_evaluator: -1,
+        matched_evaluators: [],
       });
     }
   }
@@ -428,6 +432,7 @@ interface EvaluatorOutlet {
   content_elem: JQuery;
   display_index: number;
   submissions_matched: number[];
+  applied_to: number[];
 };
 
 
@@ -516,9 +521,9 @@ class FITBDropEvaluatorsOutlet {
   }
 
   public onRubricItemEdit(ri: CollaborativeGradingFITBDropRubricItem, client_uuid: string) {
-    this.evaluatorOutlets.values()
-      .filter(ev_outlet => ev_outlet.evaluator_data.rubric_item_uuid === ri.rubric_item_uuid)
-      .forEach(ev_outlet => this.updateEvaluatorItem(ev_outlet, client_uuid));
+    if (this.current_rubric_item?.item_data.rubric_item_uuid === ri.rubric_item_uuid) {
+      this.refreshEvaluators();
+    }
   }
 
   public onEvaluatorEdit(evaluator: CollaborativeGradingFITBDropEvaluator, client_uuid: string) {
@@ -530,11 +535,10 @@ class FITBDropEvaluatorsOutlet {
       const ev_outlet = assertExists(this.evaluatorOutlets.get(evaluator.evaluator_uuid));
       Object.assign(ev_outlet.evaluator_data, evaluator);
       ev_outlet.submissions_matched = this.gradeEvaluatorItem(ev_outlet.evaluator_data);
-      this.updateEvaluatorItem(ev_outlet, client_uuid);
-    }
-
-    if (this.current_rubric_item?.item_data.rubric_item_uuid === evaluator.rubric_item_uuid) {
-      this.refreshEvaluators(this.current_rubric_item)
+      if (this.current_rubric_item?.item_data.rubric_item_uuid === ev_outlet.evaluator_data.rubric_item_uuid) {
+        this.refreshEvaluators();
+        this.highlight(ev_outlet, client_uuid);
+      }
     }
   }
 
@@ -543,8 +547,11 @@ class FITBDropEvaluatorsOutlet {
     const evaluator_elem = $(`<div class="list-group-item examma-ray-fitb-drop-evaluator-button">
       <div class="examma-ray-evaluator-button-content"></div>
       <div class="examma-ray-evaluator-avatar-bar" style="position: absolute; bottom: 0; left: 5px; text-align: left;"></div>
+      <div>
+        <span class="examma-ray-evaluator-percent-matched"></span>
+        <span class="examma-ray-evaluator-percent-applied-to"></span>
+      </div>
       <div class="examma-ray-evaluator-button-bar">
-        <span class="examma-ray-evaluator-percent"></span>
         <button class="edit-evaluator-button btn btn-primary btn-sm">Edit</button>
       </div>
     </div>`);
@@ -555,10 +562,12 @@ class FITBDropEvaluatorsOutlet {
       content_elem: evaluator_elem.find(".examma-ray-evaluator-button-content"),
       display_index: this.evaluatorOutlets.size + 1,
       submissions_matched: this.gradeEvaluatorItem(evaluator),
+      applied_to: [],
     }
     this.evaluatorOutlets.set(evaluator.evaluator_uuid, ev_outlet);
 
-    this.updateEvaluatorItem(ev_outlet, this.app.client.client_uuid);
+    this.refreshEvaluators();
+    this.highlight(ev_outlet, this.app.client.client_uuid);
 
     evaluator_elem.on("click", () => {
       this.setCurrentEvaluator(ev_outlet);
@@ -569,7 +578,7 @@ class FITBDropEvaluatorsOutlet {
       this.openEditEvaluatorModal(ev_outlet);
     })
 
-    return ev_outlet
+    return ev_outlet;
   }
 
   public setCurrentRubricItem(ri_outlet: RubricItemOutlet) {
@@ -577,61 +586,114 @@ class FITBDropEvaluatorsOutlet {
       return;
     }
     this.current_rubric_item = ri_outlet;
-    this.refreshEvaluators(ri_outlet);
+    this.refreshEvaluators();
   
     this.setCurrentEvaluator(this.evaluatorOutlets.values().find(ev_outlet => ev_outlet.display_index === 0) );
   }
 
-  private refreshEvaluators(ri_outlet: RubricItemOutlet) {
+  private refreshEvaluators() {
     
     // detach all evaluator elements (don't use .empty() on the parent, we want to keep the event handlers)
     this.evaluatorOutlets.forEach(ev_outlet => ev_outlet!.elem.detach());
+    
+    if (!this.current_rubric_item) {
+      return;
+    }
 
     // Add back sorted elements
     const ordered_evaluators = this.evaluatorOutlets.values()
-      .filter(ev_outlet => ev_outlet.evaluator_data.rubric_item_uuid === ri_outlet.item_data.rubric_item_uuid)
+      .filter(ev_outlet => ev_outlet.evaluator_data.rubric_item_uuid === this.current_rubric_item!.item_data.rubric_item_uuid)
       .toArray()
       .sort((ev_out_a, ev_out_b) => (ev_out_a.evaluator_data.sort_index).localeCompare(ev_out_b.evaluator_data.sort_index));
 
+    ordered_evaluators.forEach((ev_out, i) => {
+      ev_out.display_index = i + 1;
+    });
+
+    this.computePreciseMatches(ordered_evaluators);
+
     // Set up evaluator match elements on each submission
     const submission_cards_elem = $("#submission-cards").detach();
-    let matched_evaluators_html = "";
-    for(let i = 0; i < ordered_evaluators.length; i++) {
-      matched_evaluators_html += `<kbd class="evaluator-match-${i+1}">${i + 1}</kbd> `;
-    }
-    submission_cards_elem.find(".matched-evaluators").html(matched_evaluators_html);
+    submission_cards_elem.find(".matched-evaluators").get().forEach((elem,i) => {
+      const sub_out = this.app.submission_outlets[i];
+      $(elem).html(sub_out.matched_evaluators.map(
+        ev_display_index => ev_display_index === sub_out.applied_evaluator
+          ? `<kbd class="applied-evaluator-marker">${ev_display_index}</kbd> `
+          : `<kbd class="non-applied-evaluator-marker">${ev_display_index}</kbd> `
+      ).join("\n"))
+    });
     $("#submission-cards-container").append(submission_cards_elem);
 
+    let prev_applied = 0;
     ordered_evaluators.forEach((ev_out, i) => {
       ev_out.elem.appendTo(this.panel_elem)
-      ev_out.display_index = i + 1;
-      this.updateEvaluatorItem(ev_out, undefined);
+      prev_applied = this.refreshEvaluatorItem(ev_out, prev_applied);
     });
   }
 
-  private updateEvaluatorItem(ev_outlet: EvaluatorOutlet, client_uuid: string | undefined) {
+  private computePreciseMatches(ordered_evaluators: EvaluatorOutlet[]) {
+    assert(this.current_rubric_item, "No current rubric item set in FITBDropEvaluatorsOutlet.computePreciseMatches");
+    
+    this.app.submission_outlets.forEach(sub_out => {
+      sub_out.applied_evaluator = -1;
+      sub_out.matched_evaluators = [];
+    });
+
+    if (this.current_rubric_item.item_data.policy === "first_match") {
+      // In reverse order of evaluator, mark matching submissions with evaluator display index.
+      // This ensures that the first matching evaluator has the last say and is recorded.
+      ordered_evaluators.slice().reverse().forEach((ev_out, i) => {
+        ev_out.submissions_matched.forEach(sub_i => {
+          this.app.submission_outlets[sub_i].applied_evaluator = ev_out.display_index;
+          this.app.submission_outlets[sub_i].matched_evaluators.push(ev_out.display_index);
+        });
+      });
+    }
+    else {
+      // sort a copy by scores ascending, break ties by original ordering.
+      // Since sort() is stable, this only requires one pass on the original ordering.
+      const asc_score_evaluators = ordered_evaluators.slice().sort((ev_out_a, ev_out_b) => {
+        return (ev_out_a.evaluator_data.spec as MatchingDropEvaluatorSpecification).evaluation.pointsEarned
+              - (ev_out_b.evaluator_data.spec as MatchingDropEvaluatorSpecification).evaluation.pointsEarned;
+      });
+
+      // In ascending order of evaluator score, mark matching submissions with evaluator display index.
+      // This ensures that the best scoring evaluator has the last say and is recorded.
+      asc_score_evaluators.forEach((ev_out, i) => {
+        ev_out.submissions_matched.forEach(sub_i => {
+          this.app.submission_outlets[sub_i].applied_evaluator = ev_out.display_index;
+          this.app.submission_outlets[sub_i].matched_evaluators.push(ev_out.display_index);
+        });
+      });
+    }
+
+    ordered_evaluators.forEach(
+      ev_out => ev_out.applied_to = this.app.submission_outlets.map(
+        (sub_out, i) => sub_out.applied_evaluator === ev_out.display_index ? i : undefined
+      ).filter(n => n !== undefined)
+    )
+  }
+
+  // Only call from refreshEvaluators
+  private refreshEvaluatorItem(ev_outlet: EvaluatorOutlet, previous_applied: number) {
     
     if (ev_outlet.evaluator_data.spec.kind !== "matching_drop_evaluator") {
       ev_outlet.content_elem.html(`<div>Unsupported evaluator type: ${ev_outlet.evaluator_data.spec.kind}</div>`);
-      return;
+      return previous_applied;
     }
     ev_outlet.content_elem.html(`
       <div class="examma-ray-evaluator-name"><b>${this.renderDisplayIndexLabel(ev_outlet.display_index)} ${mk2html_unwrapped(ev_outlet.evaluator_data.name, this.app.currentSkin)}</b></div>
       ${renderScoreBadge(ev_outlet.evaluator_data.spec.evaluation.pointsEarned, this.current_rubric_item?.item_data.points ?? 0)}
       <div class="examma-ray-evaluator-explanation">${mk2html_unwrapped(ev_outlet.evaluator_data.spec.evaluation.explanation, this.app.currentSkin)}</div>
     `);
-    ev_outlet.elem.find(".examma-ray-evaluator-percent").html(renderPercentChosenProgressBar(ev_outlet.submissions_matched.length, this.app.assigned_questions.length));
-
-    const submission_cards_elem = $("#submission-cards").detach();
-    submission_cards_elem.find(".evaluator-match-" + ev_outlet.display_index).hide();
-    ev_outlet.submissions_matched.forEach(sub_i => this.app.submission_outlets[sub_i].elem.find(".evaluator-match-" + ev_outlet.display_index).show());
-    $("#submission-cards-container").append(submission_cards_elem);
-
-    if (client_uuid) { this.highlight(ev_outlet, client_uuid); }
+    const applied_so_far = previous_applied + ev_outlet.applied_to.length;
+    ev_outlet.elem.find(".examma-ray-evaluator-percent-matched").html(renderNumBadge(ev_outlet.submissions_matched.length));
+    ev_outlet.elem.find(".examma-ray-evaluator-percent-applied-to").html(renderPercentChosenProgressBar(applied_so_far, this.app.assigned_questions.length));
 
     if (ev_outlet === this.current_evaluator) {
       this.setCurrentEvaluator(ev_outlet);
     }
+    return applied_so_far;
   }
 
   private gradeEvaluatorItem(evaluator: CollaborativeGradingFITBDropEvaluator) {

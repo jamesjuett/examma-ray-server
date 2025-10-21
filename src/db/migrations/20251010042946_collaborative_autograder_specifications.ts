@@ -42,7 +42,7 @@ export async function up(knex: Knex): Promise<void> {
     table.string("rubric_item_uuid").primary();
     table.integer("grading_server_pk").notNullable().references("grading_server_pk").inTable("collaborative_grading_servers").onDelete("cascade");
     table.string("title").notNullable();
-    table.integer("points").notNullable();
+    table.double("points").notNullable();
     table.text("description").notNullable();
     table.enum("policy", ["first_match", "best_score"]).notNullable();
     table.string("sort_index").notNullable().defaultTo("");
