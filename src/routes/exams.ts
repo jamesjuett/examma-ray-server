@@ -79,7 +79,7 @@ exams_router
         await EXAMMA_RAY_GRADING_SERVER.loadExamServer(new_exam_spec);
 
         await EXAMMA_RAY_GRADING_SERVER.getExamServer(exam_id)!.createExamInstance(
-          "EECS 280 Fall 2025 Quiz 3",
+          "EECS 280 Fall 2025 Quiz 4",
           1500
         );
   

@@ -13,7 +13,7 @@ const UPDATED_HTML = `
 `;
 const SAVE_CHANGES_HTML = `<i class="bi bi-cloud-arrow-up"></i> Save Changes`;
 
-
+// TODO: name disappears on edit
 export class StudentEditor {
   
   public readonly dashboard: ExamDashboardApplication;
@@ -154,7 +154,6 @@ export class StudentEditor {
       <option value="${w.window_uuid}"}>${w.name}</option>
     `).join("\n") + '<option value="">(none)</option>');
     
-    this.setEditingStudent(this.editingStudent);
     
     $("#edit-student-uniqname-list").html(
       Array.from(dashboard.assigned_exams_by_uuid.values()).map(assn => `<option value="${assn.uniqname}">`).join("\n")
