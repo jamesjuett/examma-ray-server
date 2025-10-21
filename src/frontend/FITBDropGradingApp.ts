@@ -13,6 +13,10 @@ import deepEqual from "deep-equal";
 
 const ACTIVE_GRADER_AVATAR_SIZE = 30;
 
+// TODO: ensure some rubric item is always selected, or gracefully fail adding an evaluator if not
+// TODO: ensure bad skin replacements in explanation, etc. do not cause issues
+// TODO: don't read matchers into other evaluator when edit clicked.
+// TODO: ensure some evaluator is always selected, or gracefully fail click on save button if not
 
 interface SubmissionOutlet {
   elem: JQuery;

@@ -70,6 +70,7 @@ class WebExamGrader extends ExamGrader {
   }
 
   protected override prepareGradingData(question: Question, grader: QuestionGrader) {
+    console.log("preparing grading data for question", question.question_id);
     if (grader instanceof CodeWritingGrader || grader instanceof ManualGenericGrader) {
       return this.grading_data[question.question_id];
     }
@@ -169,4 +170,10 @@ async function main() {
   await query.destroy();
 }
 
-main();
+try {
+  main();
+}
+catch(e) {
+  console.log("Fatal error in grading worker:", e);
+  throw e;
+}
