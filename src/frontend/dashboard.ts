@@ -595,6 +595,7 @@ export class ExamDashboardApplication {
         createAutograderOrCollaborativeGradingServerLink(q.question_id, q.response.default_grader)
       );
 
+      $("#examma-ray-question-grading-list").empty();
       question_elems.forEach(qe => {$("#examma-ray-question-grading-list").append(qe);});
 
 
