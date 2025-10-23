@@ -96,7 +96,7 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
     this.lobster.project.setFileContents(new SourceFile("file.cpp", code));
 
     // get line number of submission
-    let i = this.app.config.test_harness.indexOf("{{submission}}");
+    let i = this.app.config.test_harness.indexOf("{{submission"); // {{submission will match both {{submission and {{submission[0]
     if (i !== -1) {
       // number of lines
       let line = this.app.config.test_harness.slice(0, i).split("\n").length - 1;

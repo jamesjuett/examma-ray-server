@@ -55,6 +55,7 @@ export class ManualGraderApp {
   public readonly grading_records: ManualGradingQuestionRecords;
   public readonly skins: ManualGradingSkins;
 
+  public readonly n_submissions: number;
   public readonly currentGroup?: ManualGradingGroupRecord;
 
   private local_changes: ManualGradingOperation[] = [];
@@ -75,6 +76,7 @@ export class ManualGraderApp {
     this.config = config;
     this.rubric = rubric;
     this.grading_records = records;
+    this.n_submissions = Object.values(records.groups).reduce((acc, group) => group ? acc + group.submissions.length : acc, 0);
     this.skins = skins;
 
     this.submissionComponent = new submissionComponent(this);
@@ -158,16 +160,16 @@ export class ManualGraderApp {
   private updateGradingProgressBar() {
     let groups = Object.values(this.grading_records.groups);
     let n_graded = groups.filter(g => g!.finished).length;
-    $("#examma-ray-grading-progress-left-text").html(`${n_graded} / ${groups.length} groups`);
-    $("#examma-ray-grading-progress-right-text").html(`${n_graded} / ${groups.length} groups`);
+    $("#examma-ray-grading-progress-left-text").html(`${n_graded} / ${groups.length} groups (${this.n_submissions} subs)`);
+    $("#examma-ray-grading-progress-right-text").html(`${n_graded} / ${groups.length} groups (${this.n_submissions} subs)`);
     this.gradingProgressBarElem.css("width", `${n_graded / groups.length * 100}%`);
     if (n_graded/groups.length < 0.5) {
-      $("#examma-ray-grading-progress-left-text").show();
-      $("#examma-ray-grading-progress-right-text").hide();
-    }
-    else {
       $("#examma-ray-grading-progress-left-text").hide();
       $("#examma-ray-grading-progress-right-text").show();
+    }
+    else {
+      $("#examma-ray-grading-progress-left-text").show();
+      $("#examma-ray-grading-progress-right-text").hide();
     }
   }
 
@@ -394,6 +396,7 @@ export class ManualGraderApp {
     else if (op.kind === "assign_groups_operation") {
       
       reassignGradingGroups(this.grading_records, op.assignment);
+      asMutable(this).n_submissions = Object.values(this.grading_records.groups).reduce((acc: number, group) => group ? acc + group.submissions.length : acc, 0);
 
       this.groupThumbnailsPanel.onGroupsChanged(remote_grader_email);
 
