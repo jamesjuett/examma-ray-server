@@ -165,14 +165,6 @@ export class FITBDropGradingApp extends CollaborativeGradingAppBase<"standard_fi
       assertNever(op);
     }
 
-    const grader = new StandardFITBDropGrader({
-      grader_kind: "standard_fitb_drop",
-      rubric: this.grading_records.rubric_items.map(ri => ({
-        ...ri,
-        evaluators: this.grading_records.evaluators.filter(ev => ev.rubric_item_uuid === ri.rubric_item_uuid).map(ev => ev.spec),
-      })),
-    });
-
   }
 
 }

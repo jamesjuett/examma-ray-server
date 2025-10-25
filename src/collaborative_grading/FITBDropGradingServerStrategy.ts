@@ -47,6 +47,7 @@ export const FITB_DROP_GRADING_STRATEGY : CollaborativeGradingServerStrategy<"st
             .sort((a,b)=>a.sort_index.localeCompare(b.sort_index))
             .map(ev => ev.spec),
         })),
+      points_possible: grading_records.rubric_items.reduce((acc, item) => acc + item.points, 0), // TODO: need to explicitly specify points possible and store in database if some rubric items might have penalties?
     };
   }
 
