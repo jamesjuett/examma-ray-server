@@ -18,7 +18,7 @@ export interface ManualGradingSubmissionComponent {
   onConfigUpdate() : void;
   updateDisplayedSubmission() : void;
   renderSubmissionThumbnail(sub: ManualGradingSubmission) : string;
-  groupOneSubmission(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program })[], sub: ManualGradingSubmission) : Promise<void>;
+  groupOneSubmission(equivalenceGroups: (ManualGradingGroupRecord)[], sub: ManualGradingSubmission) : Promise<void>;
   autogradeGroup(group: ManualGradingGroupRecord) : Promise<(RubricItemGradingResult | undefined)[] | undefined>
 }
 
@@ -566,10 +566,8 @@ export class ManualGraderApp {
 
     $("#examma-ray-grouping-progress-modal").modal("show");
 
-    // let equivalenceGroups : (ManualGradingGroupRecord & { repProgram?: Program })[] = [];
-
     let submissionsToPlace : ManualGradingSubmission[] = [];
-    let newGroups : (ManualGradingGroupRecord & { repProgram?: Program })[] = [];
+    let newGroups : (ManualGradingGroupRecord)[] = [];
     Object.values(this.grading_records.groups).forEach(group => {
       if (group!.submissions.length === 0) {
         return; // ignore empty groups

@@ -187,7 +187,12 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
   private findMatchingGroup(equivalenceGroups: (ManualGradingGroupRecord & { repProgram?: Program, repString?: string })[], sub: ManualGradingSubmission) {
 
     let repString = sub.submission.replace(/\s+|\n+/g,"");
-    let exactMatch = equivalenceGroups.find(group => repString === group.repString);
+    let exactMatch = equivalenceGroups.find(group => {
+      if (!group.repString) {
+        group.repString = group.submissions[0].submission.replace(/\s+|\n+/g,"");
+      }
+      return repString === group.repString;
+    });
     if (exactMatch) {
       return exactMatch;
     }
@@ -316,8 +321,8 @@ export class CodeSubmissionComponent implements ManualGradingSubmissionComponent
 
 
 function getFunc(program: Program, name: string) {
-  if (name[0].indexOf("::[[constructor]]") !== -1) {
-    let className = name[0].slice(0, name[0].indexOf("::[[constructor]]"));
+  if (name.indexOf("::[[constructor]]") !== -1) {
+    let className = name.slice(0, name.indexOf("::[[constructor]]"));
     let entity = program.translationUnits["main.cpp"].qualifiedLookup(parseQualifiedName(className));
     if (entity?.declarationKind === "class") {
       let ctor = entity.definition?.constructors[0].definition;
