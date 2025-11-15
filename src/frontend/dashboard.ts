@@ -563,7 +563,7 @@ export class ExamDashboardApplication {
         self.sendPing();
       });
 
-      const createAutograderOrCollaborativeGradingServerLink = (question_id: string, default_grader: GraderSpecification<CollaborativeGraderKind>) => {
+      const createAutograderOrCollaborativeGradingServerLink = (question_id: string) => {
         const cgs = this.collaborative_grading_servers_by_question_id.get(question_id);
         if (cgs) {
           return `<li>${question_id}: <a href="${cgs.grader_kind}.html?exam_id=${this.exam.exam_id}&grading_server_pk=${cgs.grading_server_pk}">Collaborative Rubric (<code>${cgs.grader_kind}</code>)</a></li>`;
@@ -587,12 +587,12 @@ export class ExamDashboardApplication {
       }
 
       const question_elems = this.exam.allQuestions.map(q =>
-        !q.response.default_grader ? `<li>${q.question_id}: <span style="color: red;">No grader defined.</span></li>` :
+        !q.response.default_grader ? createAutograderOrCollaborativeGradingServerLink(q.question_id) :
         q.response.default_grader.grader_kind === "manual_code_writing" ? `<li>${q.question_id}: <a href="manual-code-grader.html?exam_id=${this.exam.exam_id}&question_id=${q.question_id}">Manual Grading</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>` :
         q.response.default_grader.grader_kind === "manual_generic" ? `<li>${q.question_id}: <a href="manual-generic-grader.html?exam_id=${this.exam.exam_id}&question_id=${q.question_id}">Manual Grading</a><span id="question-grader-avatars-${q.question_id}" class="question-grader-avatars"></span></li>` :
         q.response.default_grader.grader_kind === "freebie" ? `<li>${q.question_id}: Autograded (<code>freebie</code>)</li>` :
         q.response.default_grader.grader_kind === "standard_iframe" ? `<li>${q.question_id}:: Autograded (<code>standard_iframe</code>)</li>` :
-        createAutograderOrCollaborativeGradingServerLink(q.question_id, q.response.default_grader)
+        createAutograderOrCollaborativeGradingServerLink(q.question_id)
       );
 
       $("#examma-ray-question-grading-list").empty();
