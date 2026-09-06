@@ -11,7 +11,7 @@ export type ExamInstanceInfo = {
   readonly exam_instance_uuid: string,
   readonly name: string,
   readonly exam_id: string,
-  readonly duration_seconds: number,
+  readonly duration_seconds?: number, // absent means no time limit
   readonly uuidv5_namespace: string,
   readonly randomization_seed: string,
   readonly epoch: string,
@@ -91,7 +91,7 @@ export type StudentFacingExamSessionInfo = {
   readonly exam_window?: Pick<WindowInfo, "name" | "open_time" | "close_time">,
   readonly start_time?: Date | null, // timestamp
   readonly now: number; // Unix timestamp in milliseconds
-  readonly duration_seconds: number,
+  readonly duration_seconds?: number, // absent means no time limit
   readonly force_open?: boolean,
   readonly duration_multiplier: number,
 };

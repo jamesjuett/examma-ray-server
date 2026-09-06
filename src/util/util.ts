@@ -32,6 +32,42 @@ export function assertExists<T>(obj: T | undefined, message: string = "") : T {
   return obj;
 }
 
+// An absent duration means the exam has no time limit, so it never expires.
+export function isDurationExpired(
+  duration_seconds: number | null | undefined,
+  duration_multiplier: number,
+  start_time: Date | string | null | undefined,
+  now_ms: number,
+  grace_period_ms: number = 0
+) : boolean {
+  if (duration_seconds === undefined || duration_seconds === null || !start_time) {
+    return false;
+  }
+  const duration_ms = duration_seconds * duration_multiplier * 1000;
+  return new Date(start_time).getTime() + duration_ms < now_ms - grace_period_ms;
+}
+
+// grace_period_ms extends how long after close_time the window is still considered open.
+export function isWithinWindow(
+  open_time: Date | string,
+  close_time: Date | string,
+  now_ms: number,
+  grace_period_ms: number = 0
+) : boolean {
+  return now_ms >= new Date(open_time).getTime() && now_ms < new Date(close_time).getTime() + grace_period_ms;
+}
+
+// An absent deadline means there is no deadline, so it can never be past.
+export function isPastDeadline(
+  deadline: Date | string | null | undefined,
+  now_ms: number
+) : boolean {
+  if (deadline === undefined || deadline === null) {
+    return false;
+  }
+  return new Date(deadline).getTime() < now_ms;
+}
+
 type SimpleJSONComponent =
   | string | number | boolean
   | SimpleJSONComponent[]

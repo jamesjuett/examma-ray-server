@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from "express";
 import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getExamInstanceByUuid, db_getLiveExamSubmissionByUuid, db_getWindowByUuid, db_setStartTimeToNow } from "../db/db_live";
 import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, validateParamExammaRayId, validateParamUuid } from "./common";
 import { getJwtUserInfo, isSuper } from "../auth/jwt_auth";
+import { isDurationExpired, isWithinWindow } from "../util/util";
 import e from "express";
 
 
@@ -52,15 +53,14 @@ live_exams_router.route("/:exam_id/exams/:exam_uuid.html")
           return res.sendStatus(404);
         }
 
-        const now = new Date();
-        if (now.getTime() < new Date(window.open_time).getTime() || now.getTime() >= new Date(window.close_time).getTime()) {
+        const now_ms = Date.now();
+        if (!isWithinWindow(window.open_time, window.close_time, now_ms)) {
           console.log(`Live exam FORBIDDEN: ${userInfo.email} attempted to access exam ${exam_uuid} outside of window ${window.name} (${window.open_time} - ${window.close_time})`);
           return res.sendStatus(403);
         }
 
         // If the exam has a duration, are we within that time limit?
-        const duration_ms = exam_instance.duration_seconds * exam_info.duration_multiplier * 1000;
-        if (exam_info.start_time && exam_info.start_time.getTime() + duration_ms < now.getTime()) {
+        if (isDurationExpired(exam_instance.duration_seconds, exam_info.duration_multiplier, exam_info.start_time, now_ms)) {
           console.log(`Live exam FORBIDDEN: ${userInfo.email} attempted to access exam ${exam_uuid} after time limit expired`);
           return res.sendStatus(403);
         }

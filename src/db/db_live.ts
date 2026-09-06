@@ -7,7 +7,7 @@ import { DB_Live_Exam_Assignment_Insert, DB_Live_Exam_Assignment_Update, DB_Live
 import { StudentFacingExamInfo, WindowInfo } from "../rest_types";
 
 export async function db_createExamInstance(
-  exam_id: string, name: string, duration_seconds: number,
+  exam_id: string, name: string, duration_seconds: number | undefined,
   uuidv5_namespace: string = uuidv4(),
   randomization_seed: string = crypto.randomBytes(12).toString('base64') // 3 bytes -> 4 base64 chars, so 12 bytes -> 16 char seed
 ) {
@@ -15,7 +15,7 @@ export async function db_createExamInstance(
     exam_instance_uuid: uuidv4(),
     name: name,
     exam_id: exam_id,
-    duration_seconds: duration_seconds,
+    duration_seconds: duration_seconds ?? null,
     uuidv5_namespace: uuidv5_namespace,
     randomization_seed: randomization_seed
   }).returning("*"))[0];
@@ -86,7 +86,7 @@ async function db_helper_getStudentExamInfo(orig_assn: DB_Live_Exam_Assignments)
     },
     exam_instance: {
       name: exam_instance.name,
-      duration_seconds: exam_instance.duration_seconds,
+      duration_seconds: exam_instance.duration_seconds ?? undefined,
       exam_id: exam_instance.exam_id,
     },
     window: window ? {

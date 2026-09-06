@@ -114,7 +114,7 @@ declare module "knex/types/tables" {
     exam_instance_uuid: string;
     name: string;
     exam_id: string;
-    duration_seconds: number;
+    duration_seconds: number | null; // null means no time limit
     uuidv5_namespace: string;
     randomization_seed: string;
   }

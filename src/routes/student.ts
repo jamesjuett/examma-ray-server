@@ -4,6 +4,7 @@ import { db_getLiveExamAssignmentByExamUuid, db_getExamInstanceByUuid, db_getStu
 import { db_getUserByEmail } from "../db/db_user";
 import { StudentFacingExamSessionInfo } from "../rest_types";
 import { createRoute, jsonBodyParser_small_1MB, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamUuid } from "./common";
+import { isDurationExpired, isWithinWindow } from "../util/util";
 import { now } from "jquery";
 import rateLimit from "express-rate-limit";
 
@@ -97,7 +98,7 @@ student_router.route("/exams/:exam_uuid/session")
           close_time: exam_window.close_time,
         } : undefined,
         now: Date.now(),
-        duration_seconds: exam_instance.duration_seconds,
+        duration_seconds: exam_instance.duration_seconds ?? undefined,
         force_open: exam_assn.force_open,
         duration_multiplier: exam_assn.duration_multiplier,
       };
@@ -171,14 +172,13 @@ student_router.route("/exams/:exam_uuid/live_submission")
             return res.sendStatus(404);
           }
 
-          const now = new Date();
-          if (now.getTime() < new Date(window.open_time).getTime() || now.getTime() >= new Date(window.close_time).getTime() + grace_period_ms) {
+          const now_ms = Date.now();
+          if (!isWithinWindow(window.open_time, window.close_time, now_ms, grace_period_ms)) {
             console.log(`Live exam FORBIDDEN: ${userInfo.email} attempted to access exam ${exam_uuid} outside of window ${window.name} (${window.open_time} - ${window.close_time})`);
             return res.sendStatus(403);
           }
-          const duration_ms = exam_instance.duration_seconds * exam_info.duration_multiplier * 1000;
           // If the exam has a duration, are we within that time limit?
-          if (exam_info.start_time && exam_info.start_time.getTime() + duration_ms < now.getTime() - grace_period_ms) {
+          if (isDurationExpired(exam_instance.duration_seconds, exam_info.duration_multiplier, exam_info.start_time, now_ms, grace_period_ms)) {
             console.log(`Live submission FORBIDDEN: ${userInfo.email} attempted to submit for exam ${exam_uuid} after time limit expired`);
             return res.sendStatus(403);
           }

@@ -2,6 +2,7 @@ import axios from "axios";
 import { DB_Exams, DB_Live_Exam_Assignments, DB_Exam_Instances } from "knex/types/tables";
 import { ExammaRayClient } from "./Application";
 import { ExamAssignmentInfo, ExamInstanceInfo, StudentExamsResponse, StudentFacingExamInfo } from "../rest_types";
+import { isDurationExpired } from "../util/util";
 
 const date_time_format_options: Intl.DateTimeFormatOptions = {
   weekday: 'short',
@@ -61,8 +62,9 @@ export class IndexExammaRayApplication {
                 <div class="card-body">
                   <h5 class="card-title">${exam_instance.name}</h5>
                   <h6 class="card-subtitle mb-2 text-muted"><i class="bi bi-hourglass"></i>
-                    ${assigned_exam.duration_multiplier === 1.0 
-                      ? `${Math.floor(exam_instance.duration_seconds / 60)} minutes`
+                    ${
+                      exam_instance.duration_seconds === undefined ? `No time limit` :
+                      assigned_exam.duration_multiplier === 1.0 ? `${Math.floor(exam_instance.duration_seconds / 60)} minutes`
                       : `${Math.floor(exam_instance.duration_seconds * assigned_exam.duration_multiplier / 60)} minutes <span class="badge badge-info">${assigned_exam.duration_multiplier}x applied</span>`
                     }
                   </h6>
@@ -151,9 +153,12 @@ function renderExamButton(server_now: number, exam_info: StudentFacingExamInfo) 
   }
 
   // If duration has elapsed
-  const duration_ms = exam_info.exam_instance.duration_seconds * exam_info.assigned_exam.duration_multiplier * 1000;
-  const start_time = exam_info.assigned_exam.start_time ? new Date(exam_info.assigned_exam.start_time) : undefined;
-  if (start_time && start_time.getTime() + duration_ms < server_now) {
+  if (isDurationExpired(
+    exam_info.exam_instance.duration_seconds,
+    exam_info.assigned_exam.duration_multiplier,
+    exam_info.assigned_exam.start_time,
+    server_now
+  )) {
     if (exam_info.submission !== undefined) {
       return `<button class="btn btn-success" disabled><i class="bi bi-check-lg"></i> Submitted</button>`;
     }

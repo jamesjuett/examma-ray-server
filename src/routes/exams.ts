@@ -79,8 +79,8 @@ exams_router
         await EXAMMA_RAY_GRADING_SERVER.loadExamServer(new_exam_spec);
 
         await EXAMMA_RAY_GRADING_SERVER.getExamServer(exam_id)!.createExamInstance(
-          "EECS 280 Fall 2025 Quiz 4",
-          1500
+          "new_instance",
+          undefined,
         );
   
         return res.sendStatus(201);
@@ -373,7 +373,7 @@ exams_router
       validateParamExammaRayId("exam_id"),
       validateBody("name").trim().isLength({min: 1, max: 200}),
       // TODO: verify the way sanitizers work in express-validator
-      validateBody("duration_seconds").toInt().isInt({min: 1}),
+      validateBody("duration_seconds").optional().toInt().isInt({min: 1}), // omitted means no time limit
       validateBody("uuidv5_namespace").isUUID().optional(),
       validateBody("randomization_seed").trim().isLength({min: 1, max: 100}).optional(),
     ],

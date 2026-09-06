@@ -34,7 +34,7 @@ export class ExamInstanceServer {
   public readonly exam_instance_uuid: string;
   public readonly exam_id: string;
   public readonly name: string;
-  public readonly duration_seconds: number;
+  public readonly duration_seconds?: number; // absent means no time limit
   public readonly uuidv5_namespace: string;
   public readonly randomization_seed: string;
 
@@ -62,7 +62,7 @@ export class ExamInstanceServer {
     this.exam_instance_uuid = db_instance.exam_instance_uuid;
     this.exam_id = db_instance.exam_id;
     this.name = db_instance.name;
-    this.duration_seconds = db_instance.duration_seconds;
+    this.duration_seconds = db_instance.duration_seconds ?? undefined;
     this.uuidv5_namespace = db_instance.uuidv5_namespace;
     this.randomization_seed = db_instance.randomization_seed;
     this.assigned_exams = db_assignments;
@@ -362,7 +362,7 @@ export class ExamServer {
   }
 
   public async createExamInstance(
-    name: string, duration_seconds: number,
+    name: string, duration_seconds: number | undefined,
     uuidv5_namespace?: string, randomization_seed?: string) {
 
     console.log("creating exam instance...".bgBlue);

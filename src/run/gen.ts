@@ -1,5 +1,5 @@
 // import minimist from "minimist";
-import { Exam, OriginalExamRenderer } from "examma-ray";
+import { DocRenderer, Exam, OriginalExamRenderer } from "examma-ray";
 import { ExamGenerator } from "examma-ray/dist/ExamGenerator";
 import { ExamPreview } from "examma-ray/dist/ExamPreview";
 import { ExamUtils } from "examma-ray/dist/ExamUtils";
@@ -31,7 +31,8 @@ async function main() {
   
   exam_generator.assignExams(workerData.students),
   
-  exam_generator.writeAll(new OriginalExamRenderer(), "live", "data", false);
+  // exam_generator.writeAll(new OriginalExamRenderer(), "live", "data", false);
+  exam_generator.writeAll(new DocRenderer(), "live", "data", false);
 
   // const EXAM_PREVIEW = new ExamPreview(EXAM);
   // EXAM_PREVIEW.writeAll("out/preview");
