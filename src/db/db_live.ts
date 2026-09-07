@@ -35,13 +35,6 @@ export async function db_updateLiveExamAssignment(
   return (await query("live_exam_assignments").where({exam_uuid: exam_uuid}).update(fields).returning("*"))[0];
 }
 
-export async function db_setStartTimeToNow(exam_uuid: string) {
-  return (await query("live_exam_assignments").where({exam_uuid: exam_uuid}).update({
-    start_time: new Date()
-  }).returning("*"))[0];
-}
-
-
 export async function db_getExamInstancesByExamId(exam_id: string) {
   return await query("exam_instances").where({exam_id: exam_id}).select("*");
 }

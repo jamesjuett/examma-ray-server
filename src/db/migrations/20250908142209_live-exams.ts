@@ -3,19 +3,6 @@ import { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
   return knex.schema
-
-    // .createTable("online_submissions", table => {
-    //   table.string("exam_id", 100).notNullable();
-    //   table.string("email", 100).notNullable();
-    //   table.timestamps(true, true);
-    //   table.jsonb("submission");
-
-    //   table.primary(["exam_id", "email"]);
-
-    //   table.index("exam_id");
-    //   table.index("email");
-    //   table.index(["exam_id", "email"]);
-    // })
     .createTable("live_exam_instances", table => {
       table.uuid("exam_instance_uuid").primary().notNullable();
       table.string("exam_id", 100).notNullable()

@@ -44,12 +44,15 @@ export class ExamInstanceServer {
 
   private readonly assigned_exams: readonly ExamAssignmentInfo[];
   private readonly assigned_exams_by_uniqname: Map<string, Readonly<ExamAssignmentInfo>>;
+  private readonly assigned_exams_by_uuid: Map<string, Readonly<ExamAssignmentInfo>>;
 
   private readonly windows_by_uuid: Map<string, Readonly<WindowInfo>> = new Map();
   private windows_sorted_open_asc: Readonly<WindowInfo>[];
   private windows_sorted_close_asc: Readonly<WindowInfo>[];
 
   private modification_lock: Promise<void> = Promise.resolve();
+
+  private readonly listeners: ExamInstanceServerListener[] = [];
 
   public readonly collaborative_grading_servers_by_question_id : ReadonlyMap<string, CollaborativeGradingServer>;
 
@@ -67,6 +70,7 @@ export class ExamInstanceServer {
     this.randomization_seed = db_instance.randomization_seed;
     this.assigned_exams = db_assignments;
     this.assigned_exams_by_uniqname = new Map(db_assignments.map(assgn => [assgn.uniqname, assgn]));
+    this.assigned_exams_by_uuid = new Map(db_assignments.map(assgn => [assgn.exam_uuid, assgn]));
     this.windows_sorted_open_asc = db_windows.slice().sort((a, b) => a.open_time.getTime() - b.open_time.getTime());
     this.windows_sorted_close_asc = db_windows.slice().sort((a, b) => a.close_time.getTime() - b.close_time.getTime());
     this.windows_by_uuid = new Map(db_windows.map(w => [w.window_uuid, w]));
@@ -120,6 +124,14 @@ export class ExamInstanceServer {
     return this.windows_sorted_open_asc;
   }
 
+  public getWindowByUuid(window_uuid: string) : Readonly<WindowInfo> | undefined {
+    return this.windows_by_uuid.get(window_uuid);
+  }
+
+  public addListener(listener: ExamInstanceServerListener) {
+    this.listeners.push(listener);
+  }
+
   public async addWindows(windows: readonly Omit<WindowInfo, "exam_instance_uuid">[]) {
 
     const windows_with_exam_instance_uuid : readonly WindowInfo[] = windows.map(w => ({
@@ -168,7 +180,7 @@ export class ExamInstanceServer {
 
 
     // Update existing students
-    await Promise.all(existing_students.map(async (student) => db_updateLiveExamAssignment(
+    const updated_assns = await Promise.all(existing_students.map(async (student) => db_updateLiveExamAssignment(
       this.assigned_exams_by_uniqname.get(student.uniqname)!.exam_uuid,
       {
         name: student.name,
@@ -178,9 +190,11 @@ export class ExamInstanceServer {
       }
     )));
     
-    existing_students.forEach(student => {
-      const student_assn = this.assigned_exams_by_uniqname.get(student.uniqname);
-      Object.assign(assertExists(student_assn), student)
+    // Apply the rows returned by the DB rather than the requested patch, since knex
+    // ignores undefined fields and the patch would otherwise blank them in memory.
+    updated_assns.forEach(updated_assn => {
+      const student_assn = this.assigned_exams_by_uniqname.get(updated_assn.uniqname);
+      Object.assign(assertExists(student_assn), updated_assn);
     });
 
     // Add new students
@@ -200,7 +214,10 @@ export class ExamInstanceServer {
     new_assns.forEach(assn => {
       asMutable(this.assigned_exams).push(assn);
       this.assigned_exams_by_uniqname.set(assn.uniqname, assn);
+      this.assigned_exams_by_uuid.set(assn.exam_uuid, assn);
     });
+
+    this.listeners.forEach(listener => listener.onAssignedExamsAdded(this, new_assns));
 
     this.generateExams(new_assns.map(db_student => ({
       uniqname: db_student.uniqname,
@@ -218,19 +235,37 @@ export class ExamInstanceServer {
     return this.assigned_exams_by_uniqname.get(uniqname);
   }
 
+  public getAssignedExamByUuid(exam_uuid: string) : ExamAssignmentInfo | undefined {
+    return this.assigned_exams_by_uuid.get(exam_uuid);
+  }
+
   public async updateAssignedExamByUuid(exam_uuid: string, fields: DB_Live_Exam_Assignment_Update) {
-    const assn = this.assigned_exams.find(a => a.exam_uuid === exam_uuid);
+    const assn = this.assigned_exams_by_uuid.get(exam_uuid);
     if (!assn) {
       throw new Error(`No such assigned exam ${exam_uuid}`);
     }
     const updated_assn = await db_updateLiveExamAssignment(exam_uuid, fields);
-    Object.assign(assn, fields);
+    // Apply the row returned by the DB rather than the requested patch, since knex
+    // ignores undefined fields and the patch would otherwise blank them in memory.
+    Object.assign(assn, assertExists(updated_assn, `Assigned exam ${exam_uuid} missing from database`));
     this.nextEpoch();
-    return updated_assn;
+    return assn;
   }
 
   public async resetAssignedExamTimerByExamUuid(exam_uuid: string) {
     return this.updateAssignedExamByUuid(exam_uuid, { start_time: null });
+  }
+
+  // Starts the timer for an assigned exam, unless it was already started.
+  public async startAssignedExamByUuid(exam_uuid: string) {
+    const assn = this.assigned_exams_by_uuid.get(exam_uuid);
+    if (!assn) {
+      throw new Error(`No such assigned exam ${exam_uuid}`);
+    }
+    if (!assn.start_time) {
+      return this.updateAssignedExamByUuid(exam_uuid, { start_time: new Date() });
+    }
+    return assn;
   }
 
   public async setForceOpenByExamUuid(exam_uuid: string, force_open: boolean) {
@@ -292,6 +327,10 @@ export class ExamInstanceServer {
     );
   }
 
+};
+
+export interface ExamInstanceServerListener {
+  onAssignedExamsAdded(exam_instance: ExamInstanceServer, assigned_exams: readonly ExamAssignmentInfo[]) : void;
 };
 
 export interface ExamServerListener {
@@ -410,25 +449,6 @@ export class ExamServer {
 
   public async getLiveSubmissionByExamUuid(exam_uuid: string) {
     return db_getExamSubmissionByUuid(exam_uuid);
-  }
-
-  public async addSubmissions(files: readonly Express.Multer.File[]) {
-
-    // Files will have been uploaded to "/uploads" and information about
-    // each is in the files object. We'll pass this off to a worker
-    // script to process each
-    const worker = new Worker("./build/run/process_submissions.js", {
-      workerData: {
-        exam_id: this.exam.exam_id,
-        files: files
-      }
-    });
-
-    await this.tasks.workerTask(worker, "submissions", "Preparing to add submissions...");
-    this.nextEpoch();
-
-    // All question grading servers will need to reload new submission data from the DB
-    await Promise.all(this.questionGradingServers.values().map(qgs => qgs!.reloadGradingRecords()));
   }
 
   public async processDBSubmissions(exam_instance_uuid: string) {

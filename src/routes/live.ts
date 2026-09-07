@@ -1,7 +1,7 @@
 import express, { Request, Response, Router } from "express";
-import { db_getLiveExamAssignmentByExamUuid, db_getLiveExamAssignmentsByUniqname, db_getExamInstanceByUuid, db_getLiveExamSubmissionByUuid, db_getWindowByUuid, db_setStartTimeToNow } from "../db/db_live";
 import { createRoute, NO_AUTHORIZATION, NO_PREPROCESSING, validateParamExammaRayId, validateParamUuid } from "./common";
 import { getJwtUserInfo, isSuper } from "../auth/jwt_auth";
+import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { isDurationExpired, isWithinWindow } from "../util/util";
 import e from "express";
 
@@ -21,35 +21,30 @@ live_exams_router.route("/:exam_id/exams/:exam_uuid.html")
       const userInfo = getJwtUserInfo(req);
       const exam_uuid = req.params["exam_uuid"];
 
-      const exam_info = await db_getLiveExamAssignmentByExamUuid(exam_uuid);
+      const found = EXAMMA_RAY_GRADING_SERVER.getAssignedExamByUuid(exam_uuid);
 
       // Does the requested exam even exist?
-      if (!exam_info) {
+      if (!found) {
         console.log(`Live exam ERROR: No such exam ${exam_uuid} attempted by ${userInfo.email}`);
         return res.sendStatus(404);
       }
+      const { exam_instance, assigned_exam } = found;
 
       // If it exists, is the user authorized to access it?
-      if (exam_info.student_email !== userInfo.email && !isSuper(userInfo.email)) {
-        console.log(`Live exam FORBIDDEN: ${userInfo.email} not authorized to access exam ${exam_uuid} for ${exam_info.uniqname} (${exam_info.student_email})`);
+      if (assigned_exam.student_email !== userInfo.email && !isSuper(userInfo.email)) {
+        console.log(`Live exam FORBIDDEN: ${userInfo.email} not authorized to access exam ${exam_uuid} for ${assigned_exam.uniqname} (${assigned_exam.student_email})`);
         return res.sendStatus(404); // 404 and not 403 - don't reveal existence
       }
 
-      const exam_instance = await db_getExamInstanceByUuid(exam_info.exam_instance_uuid);
-      if (!exam_instance) {
-        console.log(`Live exam ERROR: No such exam instance ${exam_info.exam_instance_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
-        return res.sendStatus(404);
-      }
-
       // Are we within the allowed window if there is one?
-      if (!exam_info.force_open) {
-        if(!exam_info.window_uuid) {
+      if (!assigned_exam.force_open) {
+        if(!assigned_exam.window_uuid) {
           console.log(`Live exam ERROR: No window defined for exam ${exam_uuid} attempted by ${userInfo.email}`);
           return res.sendStatus(404);
         }
-        const window = await db_getWindowByUuid(exam_info.window_uuid);
+        const window = exam_instance.getWindowByUuid(assigned_exam.window_uuid);
         if (!window) {
-          console.log(`Live exam ERROR: No such window ${exam_info.window_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
+          console.log(`Live exam ERROR: No such window ${assigned_exam.window_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
           return res.sendStatus(404);
         }
 
@@ -60,20 +55,18 @@ live_exams_router.route("/:exam_id/exams/:exam_uuid.html")
         }
 
         // If the exam has a duration, are we within that time limit?
-        if (isDurationExpired(exam_instance.duration_seconds, exam_info.duration_multiplier, exam_info.start_time, now_ms)) {
+        if (isDurationExpired(exam_instance.duration_seconds, assigned_exam.duration_multiplier, assigned_exam.start_time, now_ms)) {
           console.log(`Live exam FORBIDDEN: ${userInfo.email} attempted to access exam ${exam_uuid} after time limit expired`);
           return res.sendStatus(403);
         }
       }
 
-      console.log(`Live exam ACCESSED: ${userInfo.email} accessed exam ${exam_uuid} for ${exam_info.uniqname} (${exam_info.student_email})`);
+      console.log(`Live exam ACCESSED: ${userInfo.email} accessed exam ${exam_uuid} for ${assigned_exam.uniqname} (${assigned_exam.student_email})`);
       
-      // start the exam in the database if not already started
-      if (!exam_info.start_time) {
-        await db_setStartTimeToNow(exam_uuid);
-      }
+      // start the exam if not already started
+      await exam_instance.startAssignedExamByUuid(exam_uuid);
 
-      return res.sendFile(`${exam_instance.exam_id}/exams/${exam_info.uniqname}-${exam_info.exam_uuid}.html`, { root: "live" });
+      return res.sendFile(`${exam_instance.exam_id}/exams/${assigned_exam.uniqname}-${assigned_exam.exam_uuid}.html`, { root: "live" });
     },
   }));
 
@@ -91,26 +84,21 @@ live_exams_router.route("/:exam_id/graded/:exam_uuid.html")
       const userInfo = getJwtUserInfo(req);
       const exam_uuid = req.params["exam_uuid"];
 
-      const exam_info = await db_getLiveExamAssignmentByExamUuid(exam_uuid);
+      const found = EXAMMA_RAY_GRADING_SERVER.getAssignedExamByUuid(exam_uuid);
 
       // Does the requested exam even exist?
-      if (!exam_info) {
+      if (!found) {
         console.log(`Graded exam ERROR: No such exam ${exam_uuid} attempted by ${userInfo.email}`);
         return res.sendStatus(404);
       }
+      const { exam_instance, assigned_exam } = found;
 
       // If it exists, is the user authorized to access it?
-      if (exam_info.student_email !== userInfo.email) {
-        console.log(`Graded exam FORBIDDEN: ${userInfo.email} not authorized to access exam ${exam_uuid} for ${exam_info.uniqname} (${exam_info.student_email})`);
+      if (assigned_exam.student_email !== userInfo.email) {
+        console.log(`Graded exam FORBIDDEN: ${userInfo.email} not authorized to access exam ${exam_uuid} for ${assigned_exam.uniqname} (${assigned_exam.student_email})`);
         return res.sendStatus(404); // 404 and not 403 - don't reveal existence
       }
 
-      const exam_instance = await db_getExamInstanceByUuid(exam_info.exam_instance_uuid);
-      if (!exam_instance) {
-        console.log(`Graded exam ERROR: No such exam instance ${exam_info.exam_instance_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
-        return res.sendStatus(404);
-      }
-
-      return res.sendFile(`${exam_instance.exam_id}/graded/${exam_info.uniqname}-${exam_info.exam_uuid}.html`, { root: "live" });
+      return res.sendFile(`${exam_instance.exam_id}/graded/${assigned_exam.uniqname}-${assigned_exam.exam_uuid}.html`, { root: "live" });
     },
   }));

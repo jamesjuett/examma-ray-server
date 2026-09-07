@@ -45,7 +45,7 @@ assigned_exams.route("/:exam_uuid")
         return res.status(400).send("Invalid exam_id or exam_instance_uuid");
       }
 
-      return res.status(200).json(exam_inst.updateAssignedExamByUuid(exam_uuid, {
+      return res.status(200).json(await exam_inst.updateAssignedExamByUuid(exam_uuid, {
         name: req.body.name,
         window_uuid: exam_window,
         duration_multiplier: req.body.duration_multiplier,
@@ -76,7 +76,7 @@ assigned_exams.route("/:exam_uuid/reset_time")
         return res.status(400).send("Invalid exam_id or exam_instance_uuid");
       }
 
-      return res.status(200).json(exam_inst.resetAssignedExamTimerByExamUuid(exam_uuid));
+      return res.status(200).json(await exam_inst.resetAssignedExamTimerByExamUuid(exam_uuid));
     },
   }));
 
@@ -103,7 +103,7 @@ assigned_exams.route("/:exam_uuid/force_open")
         return res.status(400).send("Invalid exam_id or exam_instance_uuid");
       }
 
-      return res.status(200).json(exam_inst.setForceOpenByExamUuid(exam_uuid, req.body.force_open));
+      return res.status(200).json(await exam_inst.setForceOpenByExamUuid(exam_uuid, req.body.force_open));
     },
   }));
 

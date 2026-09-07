@@ -1,8 +1,9 @@
 import { Request, Response, Router } from "express";
 import { getJwtUserInfo, isAdmin, isStaff } from "../auth/jwt_auth";
-import { db_getLiveExamAssignmentByExamUuid, db_getExamInstanceByUuid, db_getStudentExamsInfoByEmail, db_getWindowByUuid, db_saveLiveExamSubmission, db_setStartTimeToNow } from "../db/db_live";
+import { db_getStudentExamsInfoByEmail, db_saveLiveExamSubmission } from "../db/db_live";
 import { db_getUserByEmail } from "../db/db_user";
 import { StudentFacingExamSessionInfo } from "../rest_types";
+import { EXAMMA_RAY_GRADING_SERVER } from "../server";
 import { createRoute, jsonBodyParser_small_1MB, NO_AUTHORIZATION, NO_PREPROCESSING, NO_VALIDATION, validateBody, validateParamUuid } from "./common";
 import { isDurationExpired, isWithinWindow } from "../util/util";
 import { now } from "jquery";
@@ -61,49 +62,49 @@ student_router.route("/exams/:exam_uuid/session")
       const userInfo = getJwtUserInfo(req);
       const exam_uuid = req.params["exam_uuid"];
 
-      let exam_assn = await db_getLiveExamAssignmentByExamUuid(exam_uuid);
-      if (!exam_assn) {
+      const found = EXAMMA_RAY_GRADING_SERVER.getAssignedExamByUuid(exam_uuid);
+      if (!found) {
         console.log(`Live exam ERROR: No such exam ${exam_uuid} attempted by ${userInfo.email}`);
         return res.sendStatus(404);
       }
+      const { exam_instance, assigned_exam } = found;
 
-      if (exam_assn.student_email !== userInfo.email) {
-        console.log(`Live exam FORBIDDEN: ${userInfo.email} not authorized to access exam ${exam_uuid} for ${exam_assn.uniqname} (${exam_assn.student_email})`);
+      if (assigned_exam.student_email !== userInfo.email) {
+        console.log(`Live exam FORBIDDEN: ${userInfo.email} not authorized to access exam ${exam_uuid} for ${assigned_exam.uniqname} (${assigned_exam.student_email})`);
         return res.sendStatus(404); // 404 and not 403 - don't reveal existence
       }
-      
-      const exam_instance = await db_getExamInstanceByUuid(exam_assn.exam_instance_uuid);
-      if (!exam_instance) {
-        console.log(`Live exam ERROR: No such exam instance ${exam_assn.exam_instance_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
-        return res.sendStatus(404);
-      }
+
+      const exam_window = assigned_exam.window_uuid
+        ? exam_instance.getWindowByUuid(assigned_exam.window_uuid)
+        : undefined;
+
+      const now_ms = Date.now();
 
       // If there was no start time (generally should only happen if time is reset by staff while
       // a student is already on the exam page, otherwise it would be set when they open the exam),
-      // then we go ahead and set it to now.
-      if (!exam_assn.start_time) {
-        exam_assn = await db_setStartTimeToNow(exam_uuid);
+      // then we go ahead and set it to now. We don't do this if the access is outside the window,
+      // since this plays more nicely with piecemeal resets of the exam (e.g. a student has time
+      // reset and also is moved to a later window).
+
+      if (assigned_exam.force_open || (exam_window && isWithinWindow(exam_window.open_time, exam_window.close_time, now_ms))) {
+        await exam_instance.startAssignedExamByUuid(exam_uuid);
       }
-      
-      const exam_window = exam_assn.window_uuid
-        ? await db_getWindowByUuid(exam_assn.window_uuid)
-        : undefined;
 
       const result : StudentFacingExamSessionInfo = {
-        exam_uuid: exam_assn.exam_uuid,
-        start_time: exam_assn.start_time,
+        exam_uuid: assigned_exam.exam_uuid,
+        start_time: assigned_exam.start_time,
         exam_window: exam_window ? {
           name: exam_window.name,
           open_time: exam_window.open_time,
           close_time: exam_window.close_time,
         } : undefined,
-        now: Date.now(),
-        duration_seconds: exam_instance.duration_seconds ?? undefined,
-        force_open: exam_assn.force_open,
-        duration_multiplier: exam_assn.duration_multiplier,
+        now: now_ms,
+        duration_seconds: exam_instance.duration_seconds,
+        force_open: assigned_exam.force_open,
+        duration_multiplier: assigned_exam.duration_multiplier,
       };
 
-      console.log(`Live exam SESSION checked: ${userInfo.email} taking exam ${exam_uuid} for ${exam_assn.uniqname} (${exam_assn.student_email})`);
+      console.log(`Live exam SESSION checked: ${userInfo.email} taking exam ${exam_uuid} for ${assigned_exam.uniqname} (${assigned_exam.student_email})`);
       
       return res.status(200).json(result)
     },
@@ -140,35 +141,30 @@ student_router.route("/exams/:exam_uuid/live_submission")
         const userInfo = getJwtUserInfo(req);
         const exam_uuid = req.params["exam_uuid"];
 
-        const exam_info = await db_getLiveExamAssignmentByExamUuid(exam_uuid);
-        if (!exam_info) {
+        const found = EXAMMA_RAY_GRADING_SERVER.getAssignedExamByUuid(exam_uuid);
+        if (!found) {
           console.log(`Live submission ERROR: No such exam ${exam_uuid} attempted by ${userInfo.email}`);
           return res.sendStatus(404);
         }
+        const { exam_instance, assigned_exam } = found;
 
-        if (exam_info.student_email !== userInfo.email) {
-          console.log(`Live submission FORBIDDEN: ${userInfo.email} not authorized to submit for exam ${exam_uuid} for ${exam_info.uniqname} (${exam_info.student_email})`);
+        if (assigned_exam.student_email !== userInfo.email) {
+          console.log(`Live submission FORBIDDEN: ${userInfo.email} not authorized to submit for exam ${exam_uuid} for ${assigned_exam.uniqname} (${assigned_exam.student_email})`);
           return res.sendStatus(404); // 404 and not 403 - don't reveal existence
-        }
-
-        const exam_instance = await db_getExamInstanceByUuid(exam_info.exam_instance_uuid);
-        if (!exam_instance) {
-          console.log(`Live exam ERROR: No such exam instance ${exam_info.exam_instance_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
-          return res.sendStatus(404);
         }
 
         // 30 seconds grace period to ensure frontend can get it one final save
         const grace_period_ms = 30 * 1000;
 
         // Are we within the allowed window if there is one?
-        if (!exam_info.force_open) {
-          if(!exam_info.window_uuid) {
+        if (!assigned_exam.force_open) {
+          if(!assigned_exam.window_uuid) {
             console.log(`Live exam ERROR: No window defined for exam ${exam_uuid} attempted by ${userInfo.email}`);
             return res.sendStatus(404);
           }
-          const window = await db_getWindowByUuid(exam_info.window_uuid);
+          const window = exam_instance.getWindowByUuid(assigned_exam.window_uuid);
           if (!window) {
-            console.log(`Live exam ERROR: No such window ${exam_info.window_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
+            console.log(`Live exam ERROR: No such window ${assigned_exam.window_uuid} for exam ${exam_uuid} attempted by ${userInfo.email}`);
             return res.sendStatus(404);
           }
 
@@ -178,13 +174,13 @@ student_router.route("/exams/:exam_uuid/live_submission")
             return res.sendStatus(403);
           }
           // If the exam has a duration, are we within that time limit?
-          if (isDurationExpired(exam_instance.duration_seconds, exam_info.duration_multiplier, exam_info.start_time, now_ms, grace_period_ms)) {
+          if (isDurationExpired(exam_instance.duration_seconds, assigned_exam.duration_multiplier, assigned_exam.start_time, now_ms, grace_period_ms)) {
             console.log(`Live submission FORBIDDEN: ${userInfo.email} attempted to submit for exam ${exam_uuid} after time limit expired`);
             return res.sendStatus(403);
           }
         }
 
-        console.log(`Live submission SUCCESS: Saving submission from ${userInfo.email} for exam ${exam_uuid} for ${exam_info.uniqname} (${exam_info.student_email})`);
+        console.log(`Live submission SUCCESS: Saving submission from ${userInfo.email} for exam ${exam_uuid} for ${assigned_exam.uniqname} (${assigned_exam.student_email})`);
         return res.status(200).json(await db_saveLiveExamSubmission(
           exam_uuid, userInfo.email, req.body.submission
         ));

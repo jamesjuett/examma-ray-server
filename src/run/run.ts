@@ -14,11 +14,6 @@ export type WorkerData_Generate = {
   readonly randomization_seed: string,
 }
 
-export type WorkerData_ProcessSubmissions = {
-  readonly exam_id: string,
-  readonly files: readonly Express.Multer.File[],
-}
-
 export type WorkerData_ProcessDBSubmissions = {
   readonly exam_id: string,
   readonly exam_instance_uuid: string,

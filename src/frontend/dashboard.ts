@@ -151,14 +151,6 @@ export class ExamDashboardApplication {
     });
 
     
-    $("#submissions-file-input-form").on("submit", async (e) => {
-      e.preventDefault();
-      let files = (<HTMLInputElement>$("#submissions-file-input")[0]).files;
-      if (files) {
-        this.addSubmissions(files);
-      }
-    });
-
     $("#run-generate-submit-button").on("click", async () => {
       let response = await axios({
         url: `/run/generate/${this.exam_info.exam_id}/instances/${this.exam_instance_info.exam_instance_uuid}`,
@@ -605,29 +597,6 @@ export class ExamDashboardApplication {
     catch(e: unknown) {
       alert("Error loading question :(");
     }
-  }
-
-
-  public async addSubmissions(files: FileList) {
-    if (!this.exam) {
-      return;
-    }
-    
-    const formData = new FormData();
-    if (files) {
-      for(let i = 0; i < files.length; ++i) {
-        formData.append("submissions", files[i]);
-      }
-    }
-
-    await axios({
-      url: `/api/exams/${this.exam.exam_id}/submissions`,
-      method: "POST",
-      data: formData,
-      headers: {
-        'Authorization': 'bearer ' + this.client.getBearerToken(),
-      },
-    });
   }
 }
 
